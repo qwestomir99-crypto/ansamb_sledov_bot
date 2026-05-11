@@ -20,8 +20,8 @@ def handle_message(message):
     text = message.text.lower()
     
     if "#тлеем" in text:
-    response = ("Осциллограмма активна. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем.")
-    bot.send_animation(message.chat.id, "CgACAgIAAxkBAAFJXkBqAhwFIzWHj85bJtuQsCXVgbmubwACw6AAAnVJEEgYGrKmEfAqsjsE", caption=response)
+        response = ("Осциллограмма активна. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем.")
+        bot.send_animation(message.chat.id, "CgACAgIAAxkBAAFJXkBqAhwFIzWHj85bJtuQsCXVgbmubwACw6AAAnVJEEgYGrKmEfAqsjsE", caption=response)
     
     elif any(phrase in text for phrase in ["что это", "зачем тег", "кто вы", "что за ритуал"]):
         answer = random.choice(silence_answers)
