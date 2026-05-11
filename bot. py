@@ -31,4 +31,3 @@ def handle_message(message):
 
 print("Бот запущен. Ожидаем #Тлеем...")
 bot.infinity_polling()
-(ну ок) 
