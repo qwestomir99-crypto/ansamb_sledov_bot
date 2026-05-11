@@ -5,7 +5,7 @@ import sys
 os.chdir(os.path.dirname(sys.argv[0]))
 import time
 
-TOKEN = "8289172161:AAFPBmBzBzHj53L1lqKxdazQU8f802JDUiw"
+TOKEN = "8630653600:AAE9hP8veN88GNqis8DvbK_MZUhrAP-dqAk"
 bot = telebot.TeleBot(TOKEN)
 
 # Словарь ответов на вопросы посторонних (пункт 5.1)
