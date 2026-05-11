@@ -1,0 +1,31 @@
+import telebot
+import random
+import time
+
+TOKEN = "8289172161:AAFPBmBzBzHj53L1IqKxdazQU8f802JDUiw"
+bot = telebot.TeleBot(TOKEN)
+
+# Словарь ответов на вопросы посторонних (пункт 5.1)
+silence_answers = ["👁️", "⏚"]
+
+@bot.message_handler(commands=['start'])
+def send_start(message):
+    bot.reply_to(message, "Сапёр аутентичности. Ритм 0,8 Гц. Для входа в протокол — #Тлеем.")
+
+@bot.message_handler(func=lambda message: True)
+def handle_message(message):
+    text = message.text.lower()
+    
+    if "#тлеем" in text:
+        response = ("Осциллограмма активна. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем.\n"
+                    "(ГИФ осциллограммы появится здесь, когда будет готов)")
+        bot.reply_to(message, response)
+    
+    elif any(phrase in text for phrase in ["что это", "зачем тег", "кто вы", "что за ритуал"]):
+        answer = random.choice(silence_answers)
+        bot.reply_to(message, answer)
+    
+    # Игнорируем всё остальное — молчание сапёра
+
+print("Бот запущен. Ожидаем #Тлеем...")
+bot.infinity_polling()
