@@ -8,7 +8,7 @@ import time
 TOKEN = "8723848026:AAFls7TwfOgMokhnvXI8ShH6l6JYTwQyIgg"
 bot = telebot.TeleBot(TOKEN)
 
-# Словарь ответов на вопросы посторонних (пункт 5.1)
+# Словарь ответов потусторонних (пункт 5.1)
 silence_answers = ["👁️", "⏚"]
 
 @bot.message_handler(commands=['start'])
