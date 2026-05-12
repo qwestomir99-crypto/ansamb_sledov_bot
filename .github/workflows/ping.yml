@@ -11,4 +11,4 @@ jobs:
     steps:
       - name: Ping Telegram Bot
         run: |
-          curl -s -o /dev/null -w "%{http_code}\n" https://ansamb-sledov5-bot.onrender.com/
+          curl -s -o /dev/null -w "%{http_code}\n" https://ansamb-sledov6-bot.onrender.com/
