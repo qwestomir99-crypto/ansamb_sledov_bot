@@ -62,3 +62,6 @@ def handle_message(message):
 
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
 bot.infinity_polling()
+import time
+print("Бот готовится к запуску, пауза 10 секунд...")
+time.sleep(10)
