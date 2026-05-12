@@ -9,7 +9,7 @@ from flask import Flask
 # Фикс для Render (чтобы find нашёл файл)
 os.chdir(os.path.dirname(sys.argv[0]))
 
-TOKEN = "8723848026:AAFypWSAnMMdIgDS34WllhoyJQ2lMjy8_tI"
+TOKEN = "8693407556:AAGiXN0JIrb-o3j-QYcHZlNHbwOSGhYwiBw"
 bot = telebot.TeleBot(TOKEN)
 
 # Словарь для ответов посторонним (пункт 5.1)
