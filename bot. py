@@ -61,3 +61,21 @@ def handle_message(message):
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
 time.sleep(5)
 bot.infinity_polling()
+# ... (весь остальной код)
+
+# --- Самопинг ---
+def keep_alive():
+    import requests
+    while True:
+        time.sleep(540)
+        try:
+            requests.get('http://127.0.0.1:10000/')
+        except:
+            pass
+
+threading.Thread(target=keep_alive, daemon=True).start()
+# ----------------
+
+print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
+time.sleep(5)
+bot.infinity_polling()
