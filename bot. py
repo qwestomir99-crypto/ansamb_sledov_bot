@@ -3,6 +3,7 @@ import random
 import os
 import sys
 import threading
+import time
 from flask import Flask
 
 # Фикс для Render (чтобы find нашёл файл)
@@ -38,12 +39,8 @@ def handle_message(message):
 
     # Основной триггер — #Тлеем
     if "#тлеем" in text:
-        response = "Осциллограмма активна. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем."
-        bot.send_animation(
-            message.chat.id,
-            "CgACAgIAAxkBAAFJXkBqAhwFIzWHj85bJtuQsCXVgbmubwACw6AAAnVJEEgYGrKmEfAqsjsE",
-            caption=response
-        )
+        response = "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем."
+        bot.reply_to(message, response)
 
     # Ответ на #Фиксируем
     elif "#фиксируем" in text:
@@ -60,8 +57,7 @@ def handle_message(message):
 
     # Всё остальное — игнорируем (молчание сапёра)
 
+# Небольшая пауза перед стартом (помогает избежать 409)
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
+time.sleep(5)
 bot.infinity_polling()
-import time
-print("Бот готовится к запуску, пауза 10 секунд...")
-time.sleep(10)
