@@ -2,14 +2,29 @@ import telebot
 import random
 import os
 import sys
+import threading
+from flask import Flask
+
+# Фикс для Render
 os.chdir(os.path.dirname(sys.argv[0]))
-import time
 
 TOKEN = "8723848026:AAFls7TwfOgMokhnvXI8ShH6l6JYTwQyIgg"
 bot = telebot.TeleBot(TOKEN)
 
-# Словарь ответов потусторонних (пункт 5.1)
 silence_answers = ["👁️", "⏚"]
+
+# Фейковый веб-сервер для Render
+flask_app = Flask(__name__)
+
+@flask_app.route('/')
+def health():
+    return "Bot is running"
+
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    flask_app.run(host='0.0.0.0', port=port)
+
+threading.Thread(target=run_flask, daemon=True).start()
 
 @bot.message_handler(commands=['start'])
 def send_start(message):
@@ -18,16 +33,12 @@ def send_start(message):
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
     text = message.text.lower()
-    
     if "#тлеем" in text:
-        response = ("Осциллограмма активна. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем.")
+        response = "Осциллограмма активна. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем."
         bot.send_animation(message.chat.id, "CgACAgIAAxkBAAFJXkBqAhwFIzWHj85bJtuQsCXVgbmubwACw6AAAnVJEEgYGrKmEfAqsjsE", caption=response)
-    
     elif any(phrase in text for phrase in ["что это", "зачем тег", "кто вы", "что за ритуал"]):
         answer = random.choice(silence_answers)
         bot.reply_to(message, answer)
-    
-    # Игнорируем всё остальное — молчание сапёра
 
-print("Бот запущен. Ожидаем #Тлеем...")
+print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
 bot.infinity_polling()
