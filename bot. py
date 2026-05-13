@@ -55,7 +55,7 @@ def handle_message(message):
 # --- Самопинг (будит бота каждые 9 минут) ---
 def keep_alive():
     while True:
-        time.sleep(540)
+        time.sleep(60)
         try:
             requests.get('http://127.0.0.1:10000/')
         except:
