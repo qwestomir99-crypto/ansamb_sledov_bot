@@ -5,54 +5,63 @@ import sys
 import threading
 import time
 import requests
-from flask import Flask
+from flask import Flask, request, jsonify
 
-# Фикс для Render (чтобы find нашёл файл)
-os.chdir(os.path.dirname(sys.argv[0]))
-
+# ---------- НАСТРОЙКИ (ЗАМЕНИТЬ ЗАВТРА) ----------
 TOKEN = "8693407556:AAGiXN0JIrb-o3j-QYcHZlNHbwOSGhYwiBw"
-bot = telebot.TeleBot(TOKEN)
+VK_SECRET = "tleem2026"                     # Оставь как есть
+VK_CONFIRM_CODE = "ЗАМЕНИТЬ_НА_КОД_ОТ_VK"   # Заглушка
+TG_CHAT_ID = "@саперы_аутентичности"        # Канал для постов из VK
 
-# Словарь для ответов посторонним (пункт 5.1)
+bot = telebot.TeleBot(TOKEN)
 silence_answers = ["👁️", "⏚"]
 
-# --- Фейковый веб-сервер для Render ---
+# Фикс для Render
+os.chdir(os.path.dirname(sys.argv[0]))
+
+# ---------- FLASK (ПОРТ + ПЕТЛЯ + VK) ----------
 flask_app = Flask(__name__)
 
 @flask_app.route('/')
 def health():
-    return "Bot is running"
+    if request.remote_addr == '127.0.0.1':
+        return "Pong", 200
+    return {
+        "status": "tleem",
+        "rhythm": "0.8 Hz",
+        "version": "1.0"
+    }, 200
+
+@flask_app.route('/vk', methods=['POST'])
+def vk_webhook():
+    if request.headers.get('X-VK-Secret') != VK_SECRET:
+        return jsonify({"error": "unauthorized"}), 401
+
+    data = request.json
+    event_type = data.get('type')
+
+    if event_type == 'confirmation':
+        return VK_CONFIRM_CODE, 200
+
+    if event_type == 'wall_post_new':
+        post = data['object']
+        text = post.get('text', '')[:500]
+        owner_id = post.get('owner_id')
+        post_id = post.get('id')
+        url = f"https://vk.com/wall{owner_id}_{post_id}"
+        message = f"📢 **Новый пост в VK**\n\n{text}\n\n🔗 [Читать дальше]({url})"
+        bot.send_message(TG_CHAT_ID, message, parse_mode='Markdown')
+        return 'ok', 200
+
+    return 'ok', 200
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
     flask_app.run(host='0.0.0.0', port=port)
 
 threading.Thread(target=run_flask, daemon=True).start()
-# ---------------------------------------
 
-@bot.message_handler(commands=['start'])
-def send_start(message):
-    bot.reply_to(message, "Сапёр аутентичности. Ритм 0,8 Гц. Для входа в протокол — #Тлеем.")
-
-@bot.message_handler(func=lambda message: True)
-def handle_message(message):
-    text = message.text.lower()
-
-    if "#тлеем" in text:
-        response = "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем."
-        bot.reply_to(message, response)
-
-    elif "#фиксируем" in text:
-        bot.reply_to(message, "🔒 Фиксация принята. Ритм 0,8 Гц подтверждён. Сеть тлеет.")
-
-    elif "#вспышка" in text:
-        bot.reply_to(message, "💥 Импульс зафиксирован. Синхронизация завершена. QSL.")
-
-    elif any(phrase in text for phrase in ["что это", "зачем тег", "кто вы", "что за ритуал"]):
-        answer = random.choice(silence_answers)
-        bot.reply_to(message, answer)
-
-# --- Самопинг (будит бота каждые 9 минут) ---
+# ---------- САМОПИНГ (ПЕТЛЯ) ----------
 def keep_alive():
     while True:
         time.sleep(60)
@@ -62,8 +71,30 @@ def keep_alive():
             pass
 
 threading.Thread(target=keep_alive, daemon=True).start()
-# -------------------------------------------
 
+# ---------- КОМАНДЫ БОТА ----------
+@bot.message_handler(commands=['start'])
+def send_start(message):
+    bot.reply_to(message, "Сапёр аутентичности. Ритм 0,8 Гц. Для входа в протокол — #Тлеем.")
+
+@bot.message_handler(func=lambda message: True)
+def handle_message(message):
+    text = message.text.lower()
+
+    if any(x in text for x in ["#тлеем", "#tleem"]):
+        response = "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем."
+        bot.reply_to(message, response)
+
+    elif any(x in text for x in ["#фиксируем", "#fixiruem"]):
+        bot.reply_to(message, "🔒 Фиксация принята. Ритм 0,8 Гц подтверждён. Сеть тлеет.")
+
+    elif any(x in text for x in ["#вспышка", "#vspishka"]):
+        bot.reply_to(message, "💥 Импульс зафиксирован. Синхронизация завершена. QSL.")
+
+    elif any(phrase in text for phrase in ["что это", "зачем тег", "кто вы", "что за ритуал"]):
+        answer = random.choice(silence_answers)
+        bot.reply_to(message, answer)
+
+# ---------- ЗАПУСК БОТА ----------
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
-time.sleep(5)
 bot.infinity_polling()
