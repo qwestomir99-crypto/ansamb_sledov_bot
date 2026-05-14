@@ -5,12 +5,12 @@ import sys
 import threading
 import time
 import requests
-from flask import Flask, request, jsonify
+from flask import Flask
 
 # ---------- КОНФИГУРАЦИЯ (БЕЗ СЕКРЕТОВ) ----------
 TOKEN = os.environ.get("BOT_TOKEN")          # Токен бота — в переменную окружения Render!
-VK_SERVICE_TOKEN = os.environ.get("VK_TOKEN") # Ключ доступа VK — тоже в переменную!
-OWNER_ID =  607754499                        # ЗАМЕНИ НА СВОЙ ЧИСЛОВОЙ ID ПРОФИЛЯ VK
+VK_TOKEN = os.environ.get("VK_TOKEN")        # Ключ доступа VK — туда же!
+OWNER_ID = 607754499                         # ТВОЙ ЧИСЛОВОЙ ID ИЗ ССЫЛКИ
 TG_CHAT_ID = "@саперы_аутентичности"         # Твой Telegram-канал
 
 bot = telebot.TeleBot(TOKEN)
@@ -24,10 +24,8 @@ flask_app = Flask(__name__)
 
 @flask_app.route('/')
 def health():
-    # Внутренняя петля (самопинг) — короткий ответ
     if request.remote_addr == '127.0.0.1':
         return "Pong", 200
-    # Внешний запрос — статус сети
     return {
         "status": "tleem",
         "rhythm": "0.8 Hz",
@@ -52,15 +50,14 @@ def keep_alive():
 threading.Thread(target=keep_alive, daemon=True).start()
 
 # ---------- ПАРСИНГ ВК (НОВЫЕ ПОСТЫ) ----------
-last_post_id = 0  # Храним ID последнего обработанного поста
+last_post_id = 0
 
 def check_vk_wall():
     global last_post_id
     while True:
         try:
-            # Запрашиваем последний пост со стены
             params = {
-                'access_token': VK_SERVICE_TOKEN,
+                'access_token': VK_TOKEN,
                 'v': '5.131',
                 'owner_id': OWNER_ID,
                 'count': 1,
@@ -73,7 +70,6 @@ def check_vk_wall():
                 post = data['response']['items'][0]
                 post_id = post['id']
                 
-                # Если это новый пост (ещё не отправляли)
                 if post_id > last_post_id:
                     last_post_id = post_id
                     text = post.get('text', '')[:500]
@@ -81,11 +77,10 @@ def check_vk_wall():
                     message = f"📢 **Новый пост в VK**\n\n{text}\n\n🔗 [Читать дальше]({url})"
                     bot.send_message(TG_CHAT_ID, message, parse_mode='Markdown')
         except Exception as e:
-            print(f"Ошибка при проверке VK: {e}")
+            print(f"Ошибка VK: {e}")
         
-        time.sleep(300)  # Проверяем раз в 5 минут
+        time.sleep(300)
 
-# Запускаем поток проверки VK
 threading.Thread(target=check_vk_wall, daemon=True).start()
 
 # ---------- КОМАНДЫ БОТА ----------
