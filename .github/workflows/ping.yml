@@ -9,6 +9,6 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-    - name: Ping
-      run: |
-        curl -I https://ansamb-sledov-bot-94wz.onrender.com/ping || echo "failed"
+      - name: Ping
+        run: |
+          curl -I https://ansamb-sledov-bot-94wz.onrender.com/ping || echo "failed"
