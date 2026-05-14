@@ -10,7 +10,7 @@ from flask import Flask, request, jsonify
 # ---------- КОНФИГУРАЦИЯ (БЕЗ СЕКРЕТОВ) ----------
 TOKEN = os.environ.get("BOT_TOKEN")          # Токен бота — в переменную окружения Render!
 VK_SERVICE_TOKEN = os.environ.get("VK_TOKEN") # Ключ доступа VK — тоже в переменную!
-OWNER_ID = 123456789                         # ЗАМЕНИ НА СВОЙ ЧИСЛОВОЙ ID ПРОФИЛЯ VK
+OWNER_ID =  607754499                        # ЗАМЕНИ НА СВОЙ ЧИСЛОВОЙ ID ПРОФИЛЯ VK
 TG_CHAT_ID = "@саперы_аутентичности"         # Твой Telegram-канал
 
 bot = telebot.TeleBot(TOKEN)
