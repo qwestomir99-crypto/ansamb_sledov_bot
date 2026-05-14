@@ -8,15 +8,16 @@ import requests
 from flask import Flask, request, jsonify
 
 # ---------- КОНФИГУРАЦИЯ (БЕЗ СЕКРЕТОВ) ----------
-TOKEN = os.environ.get("BOT_TOKEN")          # Токен — в переменную окружения Render!
-VK_SECRET = "tleem2026"                      # Можно оставить так
-VK_CONFIRM_CODE = "ЗАМЕНИТЬ_НА_КОД_ОТ_VK"    # Заглушка
-TG_CHAT_ID = "@саперы_аутентичности"         # ID канала для постов
+TOKEN = os.environ.get("BOT_TOKEN")          # Токен бота — в переменную окружения Render!
+VK_SECRET = "tleem2026"                      # Секрет для вебхука (можно оставить)
+VK_CONFIRM_CODE = "ЗАМЕНИТЬ_НА_КОД_ОТ_VK"    # Код подтверждения от VK (будет при настройке)
+VK_SERVICE_TOKEN = "ЗАМЕНИТЬ_НА_КЛЮЧ_ДОСТУПА" # Ключ доступа сообщества VK
+TG_CHAT_ID = "@саперы_аутентичности"         # Твой Telegram-канал
 
 bot = telebot.TeleBot(TOKEN)
 silence_answers = ["👁️", "⏚"]
 
-# Фикс для Render (чтобы find нашёл файл)
+# Фикс для Render
 os.chdir(os.path.dirname(sys.argv[0]))
 
 # ---------- FLASK (ПЕТЛЯ + ВЕБХУК) ----------
@@ -24,10 +25,8 @@ flask_app = Flask(__name__)
 
 @flask_app.route('/')
 def health():
-    # Внутренняя петля (самопинг) — короткий ответ
     if request.remote_addr == '127.0.0.1':
         return "Pong", 200
-    # Внешний запрос — статус сети
     return {
         "status": "tleem",
         "rhythm": "0.8 Hz",
@@ -36,25 +35,41 @@ def health():
 
 @flask_app.route('/vk', methods=['POST'])
 def vk_webhook():
-    # Проверка секрета (защита от подделок)
+    # Проверка секрета
     if request.headers.get('X-VK-Secret') != VK_SECRET:
         return jsonify({"error": "unauthorized"}), 401
 
     data = request.json
     event_type = data.get('type')
 
-    # Подтверждение сервера (VK требует вернуть код)
+    # Подтверждение сервера
     if event_type == 'confirmation':
         return VK_CONFIRM_CODE, 200
 
     # Новый пост на стене
     if event_type == 'wall_post_new':
         post = data['object']
-        text = post.get('text', '')[:500]
         owner_id = post.get('owner_id')
-        post_id = post.get('id')
-        url = f"https://vk.com/wall{owner_id}_{post_id}"
+        
+        # --- Преобразование короткого имени в ID (для твоего профиля qwestoman) ---
+        if isinstance(owner_id, str) and not owner_id.startswith('-'):
+            try:
+                resolve_url = f"https://api.vk.com/method/utils.resolveScreenName?screen_name={owner_id}&access_token={VK_SERVICE_TOKEN}&v=5.131"
+                response = requests.get(resolve_url).json()
+                if 'response' in response and response['response']:
+                    owner_id = -response['response']['object_id']
+                else:
+                    return 'ok', 200
+            except Exception:
+                return 'ok', 200
+        # -----------------------------------------------------------------
+
+        # Формируем сообщение для Telegram
+        text = post.get('text', '')[:500]
+        url = f"https://vk.com/wall{owner_id}_{post.get('id')}"
         message = f"📢 **Новый пост в VK**\n\n{text}\n\n🔗 [Читать дальше]({url})"
+        
+        # Отправляем в Telegram
         bot.send_message(TG_CHAT_ID, message, parse_mode='Markdown')
         return 'ok', 200
 
@@ -69,7 +84,7 @@ threading.Thread(target=run_flask, daemon=True).start()
 # ---------- САМОПИНГ (БУДИЛЬНИК) ----------
 def keep_alive():
     while True:
-        time.sleep(60)   # каждую минуту
+        time.sleep(60)
         try:
             requests.get('http://127.0.0.1:10000/')
         except:
@@ -86,25 +101,19 @@ def send_start(message):
 def handle_message(message):
     text = message.text.lower()
 
-    # #Тлеем / #tleem
     if any(x in text for x in ["#тлеем", "#tleem"]):
         response = "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем."
         bot.reply_to(message, response)
 
-    # #Фиксируем / #fixiruem
     elif any(x in text for x in ["#фиксируем", "#fixiruem"]):
         bot.reply_to(message, "🔒 Фиксация принята. Ритм 0,8 Гц подтверждён. Сеть тлеет.")
 
-    # #Вспышка / #vspishka
     elif any(x in text for x in ["#вспышка", "#vspishka"]):
         bot.reply_to(message, "💥 Импульс зафиксирован. Синхронизация завершена. QSL.")
 
-    # Молчание сапёра — на любые другие вопросы
     elif any(phrase in text for phrase in ["что это", "зачем тег", "кто вы", "что за ритуал"]):
         answer = random.choice(silence_answers)
         bot.reply_to(message, answer)
-
-    # Всё остальное — игнорируем
 
 # ---------- ЗАПУСК БОТА ----------
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
