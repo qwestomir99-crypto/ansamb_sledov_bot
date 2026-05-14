@@ -12,13 +12,15 @@ TOKEN = os.environ.get("BOT_TOKEN")
 if not TOKEN:
     raise ValueError("BOT_TOKEN не задан в переменных окружения")
 
+TOKEN_SECRET = os.environ.get("TOKEN_SECRET", "tleem2026")  # Секрет для /token
+
 bot = telebot.TeleBot(TOKEN)
 silence_answers = ["👁️", "⏚"]
 
 # Фикс для Render
 os.chdir(os.path.dirname(sys.argv[0]))
 
-# ---------- FLASK ДЛЯ ПОРТА ----------
+# ---------- FLASK (ПОРТ, СТАТУС, ВЫДАЧА ТОКЕНА) ----------
 flask_app = Flask(__name__)
 
 @flask_app.route('/')
@@ -31,6 +33,14 @@ def health():
         "version": "3.0"
     }, 200
 
+@flask_app.route('/token', methods=['GET'])
+def get_token():
+    """Выдаёт токен бота только при правильном секрете."""
+    secret = request.args.get('secret')
+    if secret != TOKEN_SECRET:
+        return "Forbidden", 403
+    return TOKEN, 200
+
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
     flask_app.run(host='0.0.0.0', port=port)
@@ -40,7 +50,7 @@ threading.Thread(target=run_flask, daemon=True).start()
 # ---------- САМОПИНГ (НЕ ДАЁТ УСНУТЬ) ----------
 def keep_alive():
     while True:
-        time.sleep(60)
+        time.sleep(60)  # Каждую минуту
         try:
             requests.get('http://127.0.0.1:10000/')
         except:
@@ -57,19 +67,25 @@ def send_start(message):
 def handle_message(message):
     text = message.text.lower()
 
+    # #Тлеем / #tleem
     if any(x in text for x in ["#тлеем", "#tleem"]):
         response = "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем."
         bot.reply_to(message, response)
 
+    # #Фиксируем / #fixiruem
     elif any(x in text for x in ["#фиксируем", "#fixiruem"]):
         bot.reply_to(message, "🔒 Фиксация принята. Ритм 0,8 Гц подтверждён. Сеть тлеет.")
 
+    # #Вспышка / #vspishka
     elif any(x in text for x in ["#вспышка", "#vspishka"]):
         bot.reply_to(message, "💥 Импульс зафиксирован. Синхронизация завершена. QSL.")
 
+    # Молчание сапёра
     elif any(phrase in text for phrase in ["что это", "зачем тег", "кто вы", "что за ритуал"]):
         answer = random.choice(silence_answers)
         bot.reply_to(message, answer)
+
+    # Всё остальное — игнорируем
 
 # ---------- ЗАПУСК ----------
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
