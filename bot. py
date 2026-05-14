@@ -174,14 +174,6 @@ def handle_message(message):
         answer = random.choice(silence_answers)
         bot.reply_to(message, answer)
 
-# ---------- ФИНАЛЬНЫЙ ЗАПУСК (циклический перезапуск polling) ----------
+# ---------- ЗАПУСК ----------
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
-print("Бот будет перезапускать цикл опроса после каждого таймаута (30 секунд).")
-
-while True:
-    try:
-        # Запускаем один цикл опроса
-        bot.infinity_polling(timeout=30, long_polling_timeout=30)
-    except Exception as e:
-        print(f"Ошибка в infinity_polling: {e}")
-    print("Цикл опроса завершён. Запускаем новый цикл...")
+bot.infinity_polling()
