@@ -9,9 +9,8 @@ from flask import Flask, request, jsonify
 
 # ---------- КОНФИГУРАЦИЯ (БЕЗ СЕКРЕТОВ) ----------
 TOKEN = os.environ.get("BOT_TOKEN")          # Токен бота — в переменную окружения Render!
-VK_SECRET = "tleem2026"                      # Секрет для вебхука (можно оставить)
-VK_CONFIRM_CODE = "ЗАМЕНИТЬ_НА_КОД_ОТ_VK"    # Код подтверждения от VK (будет при настройке)
-VK_SERVICE_TOKEN = "ЗАМЕНИТЬ_НА_КЛЮЧ_ДОСТУПА" # Ключ доступа сообщества VK
+VK_SERVICE_TOKEN = os.environ.get("VK_TOKEN") # Ключ доступа VK — тоже в переменную!
+OWNER_ID = 123456789                         # ЗАМЕНИ НА СВОЙ ЧИСЛОВОЙ ID ПРОФИЛЯ VK
 TG_CHAT_ID = "@саперы_аутентичности"         # Твой Telegram-канал
 
 bot = telebot.TeleBot(TOKEN)
@@ -20,60 +19,20 @@ silence_answers = ["👁️", "⏚"]
 # Фикс для Render
 os.chdir(os.path.dirname(sys.argv[0]))
 
-# ---------- FLASK (ПЕТЛЯ + ВЕБХУК) ----------
+# ---------- FLASK (ТОЛЬКО ДЛЯ ПОРТА И ПЕТЛИ) ----------
 flask_app = Flask(__name__)
 
 @flask_app.route('/')
 def health():
+    # Внутренняя петля (самопинг) — короткий ответ
     if request.remote_addr == '127.0.0.1':
         return "Pong", 200
+    # Внешний запрос — статус сети
     return {
         "status": "tleem",
         "rhythm": "0.8 Hz",
-        "version": "1.0"
+        "version": "2.0"
     }, 200
-
-@flask_app.route('/vk', methods=['POST'])
-def vk_webhook():
-    # Проверка секрета
-    if request.headers.get('X-VK-Secret') != VK_SECRET:
-        return jsonify({"error": "unauthorized"}), 401
-
-    data = request.json
-    event_type = data.get('type')
-
-    # Подтверждение сервера
-    if event_type == 'confirmation':
-        return VK_CONFIRM_CODE, 200
-
-    # Новый пост на стене
-    if event_type == 'wall_post_new':
-        post = data['object']
-        owner_id = post.get('owner_id')
-        
-        # --- Преобразование короткого имени в ID (для твоего профиля qwestoman) ---
-        if isinstance(owner_id, str) and not owner_id.startswith('-'):
-            try:
-                resolve_url = f"https://api.vk.com/method/utils.resolveScreenName?screen_name={owner_id}&access_token={VK_SERVICE_TOKEN}&v=5.131"
-                response = requests.get(resolve_url).json()
-                if 'response' in response and response['response']:
-                    owner_id = -response['response']['object_id']
-                else:
-                    return 'ok', 200
-            except Exception:
-                return 'ok', 200
-        # -----------------------------------------------------------------
-
-        # Формируем сообщение для Telegram
-        text = post.get('text', '')[:500]
-        url = f"https://vk.com/wall{owner_id}_{post.get('id')}"
-        message = f"📢 **Новый пост в VK**\n\n{text}\n\n🔗 [Читать дальше]({url})"
-        
-        # Отправляем в Telegram
-        bot.send_message(TG_CHAT_ID, message, parse_mode='Markdown')
-        return 'ok', 200
-
-    return 'ok', 200
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -91,6 +50,43 @@ def keep_alive():
             pass
 
 threading.Thread(target=keep_alive, daemon=True).start()
+
+# ---------- ПАРСИНГ ВК (НОВЫЕ ПОСТЫ) ----------
+last_post_id = 0  # Храним ID последнего обработанного поста
+
+def check_vk_wall():
+    global last_post_id
+    while True:
+        try:
+            # Запрашиваем последний пост со стены
+            params = {
+                'access_token': VK_SERVICE_TOKEN,
+                'v': '5.131',
+                'owner_id': OWNER_ID,
+                'count': 1,
+                'filter': 'owner'
+            }
+            response = requests.get('https://api.vk.com/method/wall.get', params=params)
+            data = response.json()
+            
+            if 'response' in data and data['response']['items']:
+                post = data['response']['items'][0]
+                post_id = post['id']
+                
+                # Если это новый пост (ещё не отправляли)
+                if post_id > last_post_id:
+                    last_post_id = post_id
+                    text = post.get('text', '')[:500]
+                    url = f"https://vk.com/wall{OWNER_ID}_{post_id}"
+                    message = f"📢 **Новый пост в VK**\n\n{text}\n\n🔗 [Читать дальше]({url})"
+                    bot.send_message(TG_CHAT_ID, message, parse_mode='Markdown')
+        except Exception as e:
+            print(f"Ошибка при проверке VK: {e}")
+        
+        time.sleep(300)  # Проверяем раз в 5 минут
+
+# Запускаем поток проверки VK
+threading.Thread(target=check_vk_wall, daemon=True).start()
 
 # ---------- КОМАНДЫ БОТА ----------
 @bot.message_handler(commands=['start'])
