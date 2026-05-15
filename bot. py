@@ -8,7 +8,7 @@ import requests
 from flask import Flask, request
 from datetime import datetime
 from ping_utils import ping_self, start_background_pinger
-from alisa_client import ask_alisa   # <--- ИЗМЕНЁН ИМПОРТ
+from yandex_gpt import ask_alisa   # <--- Yandex GPT активен
 
 # ---------- КОНФИГУРАЦИЯ ----------
 TOKEN = os.environ.get("BOT_TOKEN")
@@ -162,7 +162,7 @@ def send_start(message):
 def handle_message(message):
     text = message.text.lower()
 
-    # --- #ГОВОРИМ (через alisa_client) ---
+    # --- #ГОВОРИМ (Yandex GPT) ---
     if text.startswith("#говорим"):
         phrase = text.replace("#говорим", "", 1).strip()
         if not phrase:
