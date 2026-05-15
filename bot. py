@@ -7,6 +7,7 @@ import time
 import requests
 from flask import Flask, request
 from datetime import datetime
+from ping_utils import ping_self, start_background_pinger   # <-- ДОБАВЛЕН ИМПОРТ
 
 # ---------- КОНФИГУРАЦИЯ ----------
 TOKEN = os.environ.get("BOT_TOKEN")
@@ -160,10 +161,10 @@ def send_start(message):
 def handle_message(message):
     text = message.text.lower()
 
-    # --- НОВЫЙ ТЕГ #ДЫШИМ (НЕ ОТВЕЧАЕТ, НО АКТИВНОСТЬ ФИКСИРУЕТСЯ) ---
+    # --- #ДЫШИМ (ручной пинг) ---
     if "#дышим" in text:
-        # Бот не отвечает, просто фиксируем активность
-        return
+        ping_self()          # Отправляем запрос на /ping
+        return               # Не отвечаем в чат
 
     if any(x in text for x in ["#тлеем", "#tleem"]):
         response = "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем."
@@ -181,4 +182,5 @@ def handle_message(message):
 
 # ---------- ЗАПУСК ----------
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
+start_background_pinger(60)   # Запускаем фоновый пинг (каждые 60 секунд)
 bot.infinity_polling()
