@@ -19,8 +19,8 @@ VK_TOKEN = os.environ.get("VK_TOKEN")          # Может быть пусты�
 OWNER_ID = 607754499
 TG_CHAT_ID = "@саперы_аутентичности"
 
-# URL агента (замени на свой, после создания сервиса agent)
-AGENT_URL = "https://agent-xxxx.onrender.com/ask"   # <--- ПОДСТАВЬ СВОЙ URL
+# URL агента (публичный адрес сервиса agent на Render)
+AGENT_URL = "https://agent-3kek.onrender.com/ask"
 
 bot = telebot.TeleBot(TOKEN)
 silence_answers = ["👁️", "⏚"]
