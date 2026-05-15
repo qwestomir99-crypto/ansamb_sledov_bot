@@ -10,6 +10,7 @@ from datetime import datetime
 from ping_utils import ping_self, start_background_pinger
 from dialogue.journalist import journalist_loop
 from dialogue.vk_reader import vk_reader_loop
+from dialogue.quotes import quotes_loop          # <--- ЦИТАТЫ ДНЯ
 
 # ---------- КОНФИГУРАЦИЯ ----------
 TOKEN = os.environ.get("BOT_TOKEN")
@@ -69,11 +70,10 @@ def keep_alive():
 
 threading.Thread(target=keep_alive, daemon=True).start()
 
-# ---------- VK READER (из dialogue) ----------
+# ---------- ПОТОКИ ДЛЯ ДИАЛОГА ----------
 threading.Thread(target=vk_reader_loop, args=(bot, VK_TOKEN, OWNER_ID, TG_CHAT_ID), daemon=True).start()
-
-# ---------- ЖУРНАЛИСТ (из dialogue) ----------
 threading.Thread(target=journalist_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
+threading.Thread(target=quotes_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
 
 # ---------- ВЫЗОВ АГЕНТА ----------
 def ask_agent(phrase):
