@@ -1,4 +1,5 @@
 pytelegrambotapi
 flask
 requests
+telethon
 gunicorn
