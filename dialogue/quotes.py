@@ -1,13 +1,19 @@
+
 import time
 import random
 import os
 from datetime import datetime
 
-QUOTES_FILE = "quotes.txt"
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+QUOTES_FILE = os.path.join(DATA_DIR, "quotes.txt")
+
+def ensure_data_dir():
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
 
 def load_quotes():
+    ensure_data_dir()
     if not os.path.exists(QUOTES_FILE):
-        # Создаём файл с примерами, если нет
         with open(QUOTES_FILE, "w", encoding="utf-8") as f:
             f.write("Ритм 0,8 Гц стабилен. Сеть тлеет.\n")
             f.write("Пингвины на базе Туле не спят.\n")
@@ -22,7 +28,6 @@ def quotes_loop(bot, TG_CHAT_ID):
     if not quotes:
         return
     while True:
-        # Публикуем раз в сутки в 9:00
         now = datetime.now()
         target = now.replace(hour=9, minute=0, second=0, microsecond=0)
         if now >= target:
