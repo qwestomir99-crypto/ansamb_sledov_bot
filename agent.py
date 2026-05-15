@@ -4,13 +4,14 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# Конфигурация Yandex GPT (берётся из переменных окружения)
+# Конфигурация Yandex GPT (из переменных окружения)
 API_KEY = os.environ.get("YC_API_KEY")
 FOLDER_ID = os.environ.get("YC_FOLDER_ID")
 YANDEX_GPT_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 
 @app.route('/ask', methods=['POST'])
 def ask():
+    """Эндпоинт для запросов от основного бота"""
     data = request.json
     prompt = data.get('prompt', '')
     if not prompt:
@@ -37,6 +38,10 @@ def ask():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/')
+def health():
+    return "Agent is alive", 200
+
 if __name__ == '__main__':
-    port = int(os.environ.get("AGENT_PORT", 5001))
+    port = int(os.environ.get("PORT", 5001))
     app.run(host='0.0.0.0', port=port)
