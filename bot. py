@@ -19,7 +19,8 @@ VK_TOKEN = os.environ.get("VK_TOKEN")          # Может быть пусты�
 OWNER_ID = 607754499
 TG_CHAT_ID = "@саперы_аутентичности"
 
-AGENT_URL = "http://127.0.0.1:5001/ask"        # Агент внутри того же контейнера
+# URL агента (замени на свой, после создания сервиса agent)
+AGENT_URL = "https://agent-xxxx.onrender.com/ask"   # <--- ПОДСТАВЬ СВОЙ URL
 
 bot = telebot.TeleBot(TOKEN)
 silence_answers = ["👁️", "⏚"]
@@ -162,7 +163,7 @@ def journalist_loop():
 
 threading.Thread(target=journalist_loop, daemon=True).start()
 
-# ---------- ОБРАЩЕНИЕ К АГЕНТУ ----------
+# ---------- ВЫЗОВ АГЕНТА ----------
 def ask_agent(phrase):
     try:
         resp = requests.post(AGENT_URL, json={"prompt": phrase}, timeout=15)
@@ -182,6 +183,7 @@ def send_start(message):
 def handle_message(message):
     text = message.text.lower()
 
+    # --- #ГОВОРИМ (через агента) ---
     if text.startswith("#говорим"):
         phrase = text.replace("#говорим", "", 1).strip()
         if not phrase:
@@ -192,6 +194,7 @@ def handle_message(message):
         bot.reply_to(message, f"🗣 *Старший брат:*\n{answer}", parse_mode='Markdown')
         return
 
+    # --- #ДЫШИМ (ручной пинг) ---
     if "#дышим" in text:
         ping_self()
         return
