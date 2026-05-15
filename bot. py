@@ -8,6 +8,8 @@ import requests
 from flask import Flask, request
 from datetime import datetime
 from ping_utils import ping_self, start_background_pinger
+from dialogue.journalist import journalist_loop
+from dialogue.vk_reader import vk_reader_loop
 
 # ---------- КОНФИГУРАЦИЯ ----------
 TOKEN = os.environ.get("BOT_TOKEN")
@@ -19,7 +21,6 @@ VK_TOKEN = os.environ.get("VK_TOKEN")          # Может быть пусты�
 OWNER_ID = 607754499
 TG_CHAT_ID = "@саперы_аутентичности"
 
-# URL агента (публичный адрес сервиса agent на Render)
 AGENT_URL = "https://agent-3kek.onrender.com/ask"
 
 bot = telebot.TeleBot(TOKEN)
@@ -68,100 +69,11 @@ def keep_alive():
 
 threading.Thread(target=keep_alive, daemon=True).start()
 
-# ---------- VK READER ----------
-last_post_id = 0
-LAST_POST_FILE = "last_post.txt"
+# ---------- VK READER (из dialogue) ----------
+threading.Thread(target=vk_reader_loop, args=(bot, VK_TOKEN, OWNER_ID, TG_CHAT_ID), daemon=True).start()
 
-def load_last_post_id():
-    global last_post_id
-    if os.path.exists(LAST_POST_FILE):
-        try:
-            with open(LAST_POST_FILE, "r") as f:
-                last_post_id = int(f.read().strip())
-        except:
-            last_post_id = 0
-
-def save_last_post_id(post_id):
-    with open(LAST_POST_FILE, "w") as f:
-        f.write(str(post_id))
-
-def check_vk_wall():
-    global last_post_id
-    if not VK_TOKEN:
-        print("VK Reader: VK_TOKEN не задан")
-        return
-    print("VK Reader: проверка стены...")
-    params = {
-        'access_token': VK_TOKEN,
-        'v': '5.131',
-        'owner_id': OWNER_ID,
-        'count': 1,
-        'filter': 'owner'
-    }
-    try:
-        response = requests.get('https://api.vk.com/method/wall.get', params=params, timeout=10)
-        data = response.json()
-        if 'response' in data and data['response']['items']:
-            post = data['response']['items'][0]
-            post_id = post['id']
-            if post_id > last_post_id:
-                last_post_id = post_id
-                save_last_post_id(post_id)
-                text = post.get('text', '')[:500]
-                url = f"https://vk.com/wall{OWNER_ID}_{post_id}"
-                message = f"📢 **Новый пост в VK**\n\n{text}\n\n🔗 [Читать дальше]({url})"
-                bot.send_message(TG_CHAT_ID, message, parse_mode='Markdown')
-                print(f"VK Reader: отправлен новый пост {post_id}")
-            else:
-                print(f"VK Reader: новых постов нет (последний ID {last_post_id})")
-        else:
-            print(f"VK Reader: ошибка API: {data}")
-    except Exception as e:
-        print(f"VK Reader ошибка: {e}")
-
-def vk_reader_loop():
-    load_last_post_id()
-    print(f"VK Reader: поток запущен, последний ID = {last_post_id}")
-    while True:
-        check_vk_wall()
-        time.sleep(300)
-
-threading.Thread(target=vk_reader_loop, daemon=True).start()
-
-# ---------- ЖУРНАЛИСТ ----------
-NEWS_FILE = "news.txt"
-
-if not os.path.exists(NEWS_FILE):
-    with open(NEWS_FILE, "w", encoding="utf-8") as f:
-        f.write("""🔹 Ритм 0,8 Гц стабилен. Сеть тлеет.
-🔹 Сапёры, напоминание: #Тлеем → #Фиксируем → #Вспышка.
-🔹 Новый артефакт: холст «Розетка. Разлом. Два полюса».
-🔹 Пингвины на базе Туле не спят. Наблюдение продолжается.
-🔹 Исполнительный лист от Того, Кто не спорит о тональности.
-🔹 #Тлеем — войти в протокол. #Фиксируем — подтвердить синхронизацию.
-🔹 2026 плита. 2027 яма. Время тлеет.
-""")
-
-def load_news():
-    with open(NEWS_FILE, "r", encoding="utf-8") as f:
-        return [line.strip() for line in f if line.strip()]
-
-def journalist_loop():
-    news_list = load_news()
-    if not news_list:
-        return
-    index = 0
-    while True:
-        message = news_list[index % len(news_list)]
-        full_message = f"📰 *Дайджест {datetime.now().strftime('%d.%m.%Y %H:%M')}*\n\n{message}"
-        try:
-            bot.send_message(TG_CHAT_ID, full_message, parse_mode='Markdown')
-            index += 1
-        except Exception as e:
-            print(f"Журналист ошибка: {e}")
-        time.sleep(86400)
-
-threading.Thread(target=journalist_loop, daemon=True).start()
+# ---------- ЖУРНАЛИСТ (из dialogue) ----------
+threading.Thread(target=journalist_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
 
 # ---------- ВЫЗОВ АГЕНТА ----------
 def ask_agent(phrase):
@@ -183,7 +95,6 @@ def send_start(message):
 def handle_message(message):
     text = message.text.lower()
 
-    # --- #ГОВОРИМ (через агента) ---
     if text.startswith("#говорим"):
         phrase = text.replace("#говорим", "", 1).strip()
         if not phrase:
@@ -194,7 +105,6 @@ def handle_message(message):
         bot.reply_to(message, f"🗣 *Старший брат:*\n{answer}", parse_mode='Markdown')
         return
 
-    # --- #ДЫШИМ (ручной пинг) ---
     if "#дышим" in text:
         ping_self()
         return
