@@ -5,10 +5,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# --- КОНФИГУРАЦИЯ (из переменных окружения Render) ---
 API_KEY = os.environ.get("YC_API_KEY")
 FOLDER_ID = os.environ.get("YC_FOLDER_ID")
 YANDEX_GPT_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 
+# --- ЛИМИТ ЗАПРОСОВ В ДЕНЬ ---
 LIMIT_FILE = "limit_counter.txt"
 DAILY_LIMIT = 100
 
@@ -41,8 +43,14 @@ def ask_alisa(phrase: str) -> str | None:
         return "Лимит запросов на сегодня исчерпан. Попробуй завтра."
 
     if not API_KEY or not FOLDER_ID:
-        logger.error("YC_API_KEY или YC_FOLDER_ID не заданы")
+        logger.error("YC_API_KEY или YC_FOLDER_ID не заданы в переменных окружения Render")
         return None
+
+    # ПРАВИЛЬНЫЕ ЗАГОЛОВКИ ДЛЯ API-КЛЮЧА (x-folder-id НЕ НУЖЕН)
+    headers = {
+        "Authorization": f"Api-Key {API_KEY}",
+        "Content-Type": "application/json"
+    }
 
     payload = {
         "modelUri": f"gpt://{FOLDER_ID}/yandexgpt/latest",
@@ -53,11 +61,6 @@ def ask_alisa(phrase: str) -> str | None:
         },
         "messages": [{"role": "user", "text": phrase}]
     }
-    headers = {
-        "Authorization": f"Api-Key {API_KEY}",
-        "x-folder-id": FOLDER_ID,
-        "Content-Type": "application/json"
-    }
 
     try:
         response = requests.post(YANDEX_GPT_URL, headers=headers, json=payload, timeout=30)
@@ -66,6 +69,11 @@ def ask_alisa(phrase: str) -> str | None:
         answer = result['result']['alternatives'][0]['message']['text']
         increment_limit()
         return answer
-    except Exception as e:
-        logger.error(f"Ошибка Yandex GPT: {e}")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Ошибка запроса к Yandex GPT: {e}")
+        if e.response:
+            logger.error(f"Статус: {e.response.status_code}, Тело: {e.response.text}")
+        return None
+    except (KeyError, ValueError) as e:
+        logger.error(f"Ошибка обработки ответа Yandex GPT: {e}")
         return None
