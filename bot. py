@@ -7,7 +7,8 @@ import time
 import requests
 from flask import Flask, request
 from datetime import datetime
-from ping_utils import ping_self, start_background_pinger   # <-- ДОБАВЛЕН ИМПОРТ
+from ping_utils import ping_self, start_background_pinger
+from yandex_gpt import ask_alisa   # <--- ДОБАВЛЕН ИМПОРТ ДЛЯ YANDEX GPT
 
 # ---------- КОНФИГУРАЦИЯ ----------
 TOKEN = os.environ.get("BOT_TOKEN")
@@ -160,6 +161,20 @@ def send_start(message):
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
     text = message.text.lower()
+
+    # --- #ГОВОРИМ (Yandex GPT) ---
+    if text.startswith("#говорим"):
+        phrase = text.replace("#говорим", "", 1).strip()
+        if not phrase:
+            bot.reply_to(message, "🗣 *Старший брат:*\nА что ты хотел сказать? Я не расслышал.")
+            return
+        bot.send_chat_action(message.chat.id, 'typing')
+        answer = ask_alisa(phrase)
+        if answer is None:
+            bot.reply_to(message, "🗣 *Старший брат:*\nНе могу ответить сейчас, попробуй позже.")
+        else:
+            bot.reply_to(message, f"🗣 *Старший брат:*\n{answer}", parse_mode='Markdown')
+        return
 
     # --- #ДЫШИМ (ручной пинг) ---
     if "#дышим" in text:
