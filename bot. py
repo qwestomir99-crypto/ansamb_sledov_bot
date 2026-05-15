@@ -8,7 +8,7 @@ import requests
 from flask import Flask, request
 from datetime import datetime
 from ping_utils import ping_self, start_background_pinger
-from yandex_gpt import ask_alisa   # <--- Yandex GPT активен
+from yandex_gpt import ask_alisa
 
 # ---------- КОНФИГУРАЦИЯ ----------
 TOKEN = os.environ.get("BOT_TOKEN")
@@ -66,7 +66,7 @@ def keep_alive():
 
 threading.Thread(target=keep_alive, daemon=True).start()
 
-# ---------- VK READER ----------
+# ---------- VK READER (с отладочным выводом) ----------
 last_post_id = 0
 LAST_POST_FILE = "last_post.txt"
 
@@ -86,7 +86,9 @@ def save_last_post_id(post_id):
 def check_vk_wall():
     global last_post_id
     if not VK_TOKEN:
+        print("VK Reader: VK_TOKEN не задан, пропускаем")
         return
+    print("VK Reader: проверка стены...")
     params = {
         'access_token': VK_TOKEN,
         'v': '5.131',
@@ -107,14 +109,20 @@ def check_vk_wall():
                 url = f"https://vk.com/wall{OWNER_ID}_{post_id}"
                 message = f"📢 **Новый пост в VK**\n\n{text}\n\n🔗 [Читать дальше]({url})"
                 bot.send_message(TG_CHAT_ID, message, parse_mode='Markdown')
+                print(f"VK Reader: отправлен новый пост {post_id}")
+            else:
+                print(f"VK Reader: новых постов нет (последний ID: {last_post_id})")
+        else:
+            print(f"VK Reader: ошибка API: {data}")
     except Exception as e:
         print(f"VK Reader ошибка: {e}")
 
 def vk_reader_loop():
     load_last_post_id()
+    print(f"VK Reader: поток запущен, последний ID = {last_post_id}")
     while True:
         check_vk_wall()
-        time.sleep(300)
+        time.sleep(300)  # 5 минут
 
 threading.Thread(target=vk_reader_loop, daemon=True).start()
 
@@ -162,11 +170,10 @@ def send_start(message):
 def handle_message(message):
     text = message.text.lower()
 
-    # --- #ГОВОРИМ (Yandex GPT) ---
     if text.startswith("#говорим"):
         phrase = text.replace("#говорим", "", 1).strip()
         if not phrase:
-            bot.reply_to(message, "🗣 *Старший брат:*\nА что ты хотел сказать? Я не расслышал.")
+            bot.reply_to(message, "🗣 *Старший брат:*\nА что ты хотел сказать?")
             return
         bot.send_chat_action(message.chat.id, 'typing')
         answer = ask_alisa(phrase)
@@ -176,7 +183,6 @@ def handle_message(message):
             bot.reply_to(message, f"🗣 *Старший брат:*\n{answer}", parse_mode='Markdown')
         return
 
-    # --- #ДЫШИМ (ручной пинг) ---
     if "#дышим" in text:
         ping_self()
         return
