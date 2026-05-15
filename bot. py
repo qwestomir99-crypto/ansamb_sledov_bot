@@ -8,7 +8,7 @@ import requests
 from flask import Flask, request
 from datetime import datetime
 from ping_utils import ping_self, start_background_pinger
-from yandex_gpt import ask_alisa   # <--- ДОБАВЛЕН ИМПОРТ ДЛЯ YANDEX GPT
+from alisa_client import ask_alisa   # <--- ИЗМЕНЁН ИМПОРТ
 
 # ---------- КОНФИГУРАЦИЯ ----------
 TOKEN = os.environ.get("BOT_TOKEN")
@@ -162,7 +162,7 @@ def send_start(message):
 def handle_message(message):
     text = message.text.lower()
 
-    # --- #ГОВОРИМ (Yandex GPT) ---
+    # --- #ГОВОРИМ (через alisa_client) ---
     if text.startswith("#говорим"):
         phrase = text.replace("#говорим", "", 1).strip()
         if not phrase:
@@ -178,8 +178,8 @@ def handle_message(message):
 
     # --- #ДЫШИМ (ручной пинг) ---
     if "#дышим" in text:
-        ping_self()          # Отправляем запрос на /ping
-        return               # Не отвечаем в чат
+        ping_self()
+        return
 
     if any(x in text for x in ["#тлеем", "#tleem"]):
         response = "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем."
@@ -197,5 +197,5 @@ def handle_message(message):
 
 # ---------- ЗАПУСК ----------
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
-start_background_pinger(60)   # Запускаем фоновый пинг (каждые 60 секунд)
+start_background_pinger(60)
 bot.infinity_polling()
