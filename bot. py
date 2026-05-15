@@ -160,6 +160,11 @@ def send_start(message):
 def handle_message(message):
     text = message.text.lower()
 
+    # --- НОВЫЙ ТЕГ #ДЫШИМ (НЕ ОТВЕЧАЕТ, НО АКТИВНОСТЬ ФИКСИРУЕТСЯ) ---
+    if "#дышим" in text:
+        # Бот не отвечает, просто фиксируем активность
+        return
+
     if any(x in text for x in ["#тлеем", "#tleem"]):
         response = "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем."
         bot.reply_to(message, response)
