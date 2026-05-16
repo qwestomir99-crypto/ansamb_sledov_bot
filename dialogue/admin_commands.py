@@ -85,8 +85,6 @@ def get_user_menu():
 
 def handle_callback_mode(mode, bot, chat_id, message_id, user_id):
     config = load_config()
-    if "force_mode" not in config:
-        config["force_mode"] = {}
     config["force_mode"] = mode
     config["force_mode_until"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_config(config)
@@ -146,25 +144,55 @@ def handle_callback_pub_menu(bot, chat_id, message_id, user_id):
     text = "📋 *Отложенные публикации:*\n\n"
     for p in pubs:
         status = "✅" if p["status"] == "published" else "⏳"
-        text += f"{status} `{p['text'][:50]}...` ({p['chat_id']})\n"
+        text += f"{status} `{p['text'][:50] if p['text'] else '[Без текста]'}...` ({p['chat_id']})\n"
     bot.edit_message_text(text, chat_id, message_id, parse_mode='Markdown')
 
 def ask_for_post_text(bot, chat_id, message_id):
-    msg = bot.send_message(chat_id, "✍️ Введите текст поста (можно с Markdown):")
+    msg = bot.send_message(chat_id, "✍️ Введите текст поста (можно с Markdown) или /skip для поста без текста")
     bot.register_next_step_handler(msg, process_post_text, bot, chat_id)
 
 def process_post_text(message, bot, chat_id):
-    text = message.text
-    if not text:
-        bot.send_message(chat_id, "❌ Текст не может быть пустым")
-        return
-    ask_for_post_delay(bot, chat_id, text)
+    text = None
+    if message.text != "/skip":
+        text = message.text
+    ask_for_post_file(bot, chat_id, text)
 
-def ask_for_post_delay(bot, chat_id, text):
+def ask_for_post_file(bot, chat_id, text):
+    msg = bot.send_message(chat_id, "📎 Пришлите файл (фото, видео, документ) или нажмите /skip")
+    bot.register_next_step_handler(msg, process_post_file, bot, chat_id, text)
+
+def process_post_file(message, bot, chat_id, text):
+    file_path = None
+    if message.text == "/skip":
+        file_path = None
+    elif message.photo:
+        file_info = bot.get_file(message.photo[-1].file_id)
+        file_path = f"temp_{message.photo[-1].file_id}.jpg"
+        downloaded_file = bot.download_file(file_info.file_path)
+        with open(file_path, 'wb') as f:
+            f.write(downloaded_file)
+    elif message.document:
+        file_info = bot.get_file(message.document.file_id)
+        file_path = f"temp_{message.document.file_id}_{message.document.file_name}"
+        downloaded_file = bot.download_file(file_info.file_path)
+        with open(file_path, 'wb') as f:
+            f.write(downloaded_file)
+    elif message.video:
+        file_info = bot.get_file(message.video.file_id)
+        file_path = f"temp_{message.video.file_id}.mp4"
+        downloaded_file = bot.download_file(file_info.file_path)
+        with open(file_path, 'wb') as f:
+            f.write(downloaded_file)
+    else:
+        bot.send_message(chat_id, "❌ Неподдерживаемый тип файла. Пост будет без вложения.")
+    
+    ask_for_post_delay(bot, chat_id, text, file_path)
+
+def ask_for_post_delay(bot, chat_id, text, file_path):
     msg = bot.send_message(chat_id, "⏱ Через сколько минут опубликовать? (число)")
-    bot.register_next_step_handler(msg, process_post_delay, bot, chat_id, text)
+    bot.register_next_step_handler(msg, process_post_delay, bot, chat_id, text, file_path)
 
-def process_post_delay(message, bot, chat_id, text):
+def process_post_delay(message, bot, chat_id, text, file_path):
     try:
         delay_minutes = int(message.text.strip())
         if delay_minutes <= 0:
@@ -175,11 +203,11 @@ def process_post_delay(message, bot, chat_id, text):
     delay_seconds = delay_minutes * 60
     config = load_config()
     pub_config = config.get("publisher", {})
-    default_tags = pub_config.get("default_tags", "#СапёрыАутентичности")
+    default_tags = pub_config.get("default_tags", "#СапёрыАутентичности #МихоельАв #2026плита")
     
-    add_publication("telegram", text, delay_seconds, default_tags)
+    add_publication("telegram", text, delay_seconds, default_tags, file_path)
     user_id = message.from_user.id
-    log_admin_action(user_id, f"add_post in {delay_minutes} min", "success")
+    log_admin_action(user_id, f"add_post in {delay_minutes} min, text: {bool(text)}, file: {bool(file_path)}", "success")
     bot.send_message(chat_id, f"✅ Пост запланирован через {delay_minutes} минут")
 
 def handle_admin_command(message, bot):
