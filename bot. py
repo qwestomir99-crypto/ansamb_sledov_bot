@@ -13,9 +13,11 @@ from dialogue.journalist import journalist_loop
 from dialogue.vk_reader import vk_reader_loop
 from dialogue.quotes import quotes_loop
 from dialogue.admin_commands import (
-    handle_admin_command, is_admin_authorized, handle_callback_mode,
-    handle_callback_ping, handle_callback_errors, handle_callback_log,
-    handle_callback_logout, get_user_menu
+    handle_admin_command, is_admin_authorized,
+    get_admin_menu, get_user_menu,
+    handle_callback_mode, handle_callback_ping,
+    handle_callback_errors, handle_callback_log,
+    handle_callback_logout
 )
 from dialogue.activity_modes import should_respond_to_talk
 from dialogue.scheduler import scheduler_loop
@@ -109,7 +111,10 @@ def handle_message(message):
     text = message.text.lower()
 
     if text == "#меню" or text == "#помощь":
-        bot.reply_to(message, "📋 Ваше меню:", reply_markup=get_user_menu())
+        if is_admin_authorized(message.from_user.id):
+            bot.reply_to(message, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
+        else:
+            bot.reply_to(message, "📋 Ваше меню:", reply_markup=get_user_menu())
         return
 
     if text.startswith("#админ"):
@@ -155,14 +160,14 @@ def handle_callback(call):
         if not is_admin_authorized(user_id):
             bot.answer_callback_query(call.id, "❌ Не авторизован. Введите #админ <пароль>")
             return
-        handle_callback_mode(mode, bot, chat_id, message_id)
+        handle_callback_mode(mode, bot, chat_id, message_id, user_id)
 
     elif data.startswith("ping_"):
         interval = int(data.split("_")[1])
         if not is_admin_authorized(user_id):
             bot.answer_callback_query(call.id, "❌ Не авторизован. Введите #админ <пароль>")
             return
-        handle_callback_ping(interval, bot, chat_id, message_id)
+        handle_callback_ping(interval, bot, chat_id, message_id, user_id)
 
     elif data == "errors":
         if not is_admin_authorized(user_id):
