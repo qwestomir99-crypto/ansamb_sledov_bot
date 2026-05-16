@@ -1,15 +1,47 @@
 import requests
+import os
 
-def post_to_telegram(bot, chat_id, message):
+def post_to_telegram(bot, chat_id, message, file_path=None):
     try:
-        bot.send_message(chat_id, message, parse_mode='Markdown')
+        # Если есть файл и он существует
+        if file_path and os.path.exists(file_path):
+            ext = os.path.splitext(file_path)[1].lower()
+            
+            # Фото
+            if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+                with open(file_path, 'rb') as f:
+                    if message:
+                        bot.send_photo(chat_id, f, caption=message, parse_mode='Markdown')
+                    else:
+                        bot.send_photo(chat_id, f)
+            # Видео
+            elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
+                with open(file_path, 'rb') as f:
+                    if message:
+                        bot.send_video(chat_id, f, caption=message, parse_mode='Markdown')
+                    else:
+                        bot.send_video(chat_id, f)
+            # Документ (всё остальное)
+            else:
+                with open(file_path, 'rb') as f:
+                    if message:
+                        bot.send_document(chat_id, f, caption=message, parse_mode='Markdown')
+                    else:
+                        bot.send_document(chat_id, f)
+        else:
+            # Только текст
+            if message:
+                bot.send_message(chat_id, message, parse_mode='Markdown')
+            else:
+                print(f"[PUBLISHER] Нет текста и файла для публикации в {chat_id}")
+                return False
         return True
     except Exception as e:
-        print(f"Ошибка Telegram: {e}")
+        print(f"[PUBLISHER] Ошибка Telegram: {e}")
         return False
 
-def post_to_vk(message, tags, access_token, owner_id):
-    full_message = f"{message}\n\n{tags}"
+def post_to_vk(message, tags, access_token, owner_id, file_path=None):
+    full_message = f"{message}\n\n{tags}" if message else tags
     params = {
         'access_token': access_token,
         'v': '5.131',
@@ -17,10 +49,71 @@ def post_to_vk(message, tags, access_token, owner_id):
         'owner_id': owner_id,
         'from_group': 1
     }
+    
+    # Если есть файл, загружаем его
+    if file_path and os.path.exists(file_path):
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext in ['.jpg', '.jpeg', '.png', '.gif']:
+            # Загружаем фото на стену
+            upload_url = get_upload_url(access_token, owner_id)
+            if upload_url:
+                photo_attachment = upload_photo_to_vk(upload_url, file_path, access_token)
+                if photo_attachment:
+                    params['attachments'] = photo_attachment
+        else:
+            print(f"[PUBLISHER] VK: неподдерживаемый тип файла {ext}")
+    
     try:
         r = requests.get('https://api.vk.com/method/wall.post', params=params, timeout=10)
         data = r.json()
-        return 'response' in data
+        if 'response' in data:
+            print(f"[PUBLISHER] VK: опубликовано")
+            return True
+        else:
+            print(f"[PUBLISHER] VK ошибка: {data}")
+            return False
     except Exception as e:
-        print(f"VK ошибка: {e}")
+        print(f"[PUBLISHER] VK исключение: {e}")
         return False
+
+def get_upload_url(access_token, owner_id):
+    params = {
+        'access_token': access_token,
+        'v': '5.131',
+        'owner_id': owner_id
+    }
+    try:
+        r = requests.get('https://api.vk.com/method/photos.getWallUploadServer', params=params, timeout=10)
+        data = r.json()
+        return data.get('response', {}).get('upload_url')
+    except Exception as e:
+        print(f"[PUBLISHER] VK upload URL ошибка: {e}")
+        return None
+
+def upload_photo_to_vk(upload_url, file_path, access_token):
+    try:
+        with open(file_path, 'rb') as f:
+            files = {'photo': f}
+            r = requests.post(upload_url, files=files)
+            data = r.json()
+        
+        # Сохраняем фото на сервере VK
+        save_params = {
+            'access_token': access_token,
+            'v': '5.131',
+            'photo': data['photo'],
+            'server': data['server'],
+            'hash': data['hash']
+        }
+        r = requests.get('https://api.vk.com/method/photos.saveWallPhoto', params=save_params)
+        photo_data = r.json()
+        
+        if 'response' in photo_data and photo_data['response']:
+            photo = photo_data['response'][0]
+            return f"photo{photo['owner_id']}_{photo['id']}"
+        else:
+            print(f"[PUBLISHER] VK save photo ошибка: {photo_data}")
+            return None
+    except Exception as e:
+        print(f"[PUBLISHER] VK upload photo ошибка: {e}")
+        return None
