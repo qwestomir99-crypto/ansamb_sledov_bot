@@ -20,18 +20,29 @@ from dialogue.admin_commands import (
     handle_callback_mode, handle_callback_ping,
     handle_callback_errors, handle_callback_log,
     handle_callback_logout, handle_callback_pub_menu,
+    handle_callback_toggle_alisa,
     ask_for_post_text
 )
 from dialogue.activity_modes import should_respond_to_talk
 from dialogue.scheduler import scheduler_loop
 from dialogue.autoposter import setup_autoposter
-from dialogue.exception_handler import global_exception_handler
+from alisa_client import ask_alisa
 
 CONFIG_FILE = "config.json"
 
 def load_config():
     with open(CONFIG_FILE, "r") as f:
         return json.load(f)
+
+# ---------- ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК ----------
+def global_exception_handler(exc_type, exc_value, exc_traceback):
+    with open("error.log", "a", encoding="utf-8") as f:
+        f.write(f"{datetime.now()} | {exc_type.__name__}: {exc_value}\n")
+        f.write(''.join(traceback.format_tb(exc_traceback)))
+        f.write("\n" + "-"*50 + "\n")
+    print(f"Ошибка записана в error.log")
+
+sys.excepthook = global_exception_handler
 
 # ---------- КОНФИГУРАЦИЯ ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ ----------
 TOKEN = os.environ.get("BOT_TOKEN")
@@ -96,7 +107,7 @@ threading.Thread(target=quotes_loop, args=(bot, TG_CHAT_ID), daemon=True).start(
 threading.Thread(target=scheduler_loop, daemon=True).start()
 threading.Thread(target=publish_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
 
-# ---------- ВЫЗОВ АГЕНТА ----------
+# ---------- ВЫЗОВ АГЕНТА (РЕЗЕРВ) ----------
 def ask_agent(phrase):
     try:
         resp = requests.post(AGENT_URL, json={"prompt": phrase}, timeout=15)
@@ -127,21 +138,50 @@ def handle_message(message):
         handle_admin_command(message, bot)
         return
 
-    if text.startswith("#говорим"):
+    if text.startswith("#говори"):
         if not should_respond_to_talk():
             bot.reply_to(message, "🌙 Старший брат отдыхает. Спроси в другой раз.")
             return
-        phrase = text.replace("#говорим", "", 1).strip()
+        phrase = text.replace("#говори", "", 1).strip()
         if not phrase:
             bot.reply_to(message, "🗣 *Старший брат:*\nА что ты хотел сказать?")
             return
         bot.send_chat_action(message.chat.id, 'typing')
-        answer = ask_agent(phrase)
-        bot.reply_to(message, f"🗣 *Старший брат:*\n{answer}", parse_mode='Markdown')
+        
+        alisa_enabled = config.get("alisa", {}).get("enabled", True)
+        
+        if alisa_enabled:
+            answer = ask_alisa(phrase)
+        else:
+            answer = ask_agent(phrase)
+        
+        if answer:
+            bot.reply_to(message, f"🗣 *Старший брат:*\n{answer}", parse_mode='Markdown')
+        else:
+            bot.reply_to(message, "🗣 *Старший брат:*\nНе отвечаю сейчас. Попробуй позже.")
         return
 
     if "#дышим" in text:
         ping_self()
+        return
+
+    if text == "#справка" or text == "#help":
+        help_text = """
+📖 *Доступные хештеги:*
+
+🔹 *#тлеем* / *#tleem* — зафиксировать разлом
+🔹 *#фиксируем* / *#fixiruem* — подтвердить синхронизацию
+🔹 *#вспышка* / *#vspishka* — импульс
+🔹 *#дышим* — пинг бота
+🔹 *#говори <текст>* — спросить у Старшего брата
+🔹 *#меню* / *#помощь* — открыть меню
+
+🛡️ *Админ-команды:*
+🔹 *#админ <пароль>* — вход в админ-панель
+
+📌 *Режимы:* утро, день, вечер, сон
+        """
+        bot.reply_to(message, help_text, parse_mode='Markdown')
         return
 
     if any(x in text for x in ["#тлеем", "#tleem"]):
@@ -205,6 +245,12 @@ def handle_callback(call):
             return
         ask_for_post_text(bot, chat_id, message_id)
 
+    elif data == "toggle_alisa":
+        if not is_admin_authorized(user_id):
+            bot.answer_callback_query(call.id, "❌ Не авторизован")
+            return
+        handle_callback_toggle_alisa(bot, chat_id, message_id, user_id)
+
     elif data == "tleem":
         bot.send_message(chat_id, "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем.")
     elif data == "fixiruem":
@@ -215,9 +261,19 @@ def handle_callback(call):
         ping_self()
         bot.send_message(chat_id, "🌬 Пинг отправлен (бот не отвечает)")
     elif data == "govorim":
-        bot.send_message(chat_id, "🗣 Напиши #говорим <текст> в чат")
+        bot.send_message(chat_id, "🗣 Напиши #говори <текст> в чат")
     elif data == "help":
-        bot.send_message(chat_id, "📖 Используй #помощь или #меню")
+        help_text = """
+📖 *Доступные хештеги:*
+
+🔹 *#тлеем* — разлом
+🔹 *#фиксируем* — синхронизация
+🔹 *#вспышка* — импульс
+🔹 *#дышим* — пинг
+🔹 *#говори <текст>* — вопрос Старшему брату
+🔹 *#меню* — меню
+        """
+        bot.send_message(chat_id, help_text, parse_mode='Markdown')
 
     bot.answer_callback_query(call.id)
 
