@@ -39,6 +39,10 @@ def get_current_mode():
     
     return "день"  # fallback
 
+def get_current_activity_mode():
+    """Совместимость со старым scheduler.py"""
+    return get_current_mode()
+
 def get_current_mode_config():
     """Возвращает конфиг текущего режима"""
     mode = get_current_mode()
