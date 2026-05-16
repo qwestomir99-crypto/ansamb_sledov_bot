@@ -12,7 +12,7 @@ from ping_utils import ping_self, start_background_pinger
 from dialogue.journalist import journalist_loop
 from dialogue.vk_reader import vk_reader_loop
 from dialogue.quotes import quotes_loop
-from dialogue.admin_commands import handle_admin_command
+from dialogue.admin_commands import handle_admin_command, get_help_text
 from dialogue.activity_modes import should_respond_to_talk
 from dialogue.scheduler import scheduler_loop
 
@@ -110,33 +110,9 @@ def send_start(message):
 def handle_message(message):
     text = message.text.lower()
 
-    # --- ПОМОЩЬ ---
+    # --- ПОМОЩЬ (разная для админа и пользователя) ---
     if text == "#помощь":
-        help_text = """
-📖 *Справочник команд*
-
-🌅 *Режимы и протокол*
-`#Тлеем` — войти в протокол, получить разлом
-`#Фиксируем` — подтвердить синхронизацию
-`#Вспышка` — завершить цикл
-`#дышим` — ручной пинг (бот не отвечает)
-
-🛡️ *Администрирование* (только для админа)
-`#админ <пароль>` — показать доступные режимы
-`#админ <пароль> mode <утро/день/вечер/сон>` — сменить режим
-`#админ <пароль> mode <режим> <время>` — отложенный режим
-`#админ <пароль> ping <секунды>` — изменить интервал пинга
-`#админ <пароль> ошибки` — получить последние ошибки
-
-📜 *Другое*
-`#говорим <текст>` — спросить у Старшего брата
-`#помощь` — показать это сообщение
-
-🔗 *Наши ресурсы*
-• Канал: @саперы_аутентичности
-• Бот: @ansamb_sledov6_bot
-• Хештеги: #СапёрыАутентичности #МихоельАв #2026плита
-"""
+        help_text = get_help_text(message.from_user.id)
         bot.reply_to(message, help_text, parse_mode='Markdown')
         return
 
