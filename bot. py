@@ -24,6 +24,7 @@ from dialogue.admin_commands import (
 )
 from dialogue.activity_modes import should_respond_to_talk
 from dialogue.scheduler import scheduler_loop
+from dialogue.autoposter import setup_autoposter
 
 CONFIG_FILE = "config.json"
 
@@ -234,4 +235,13 @@ def handle_callback(call):
 # ---------- ЗАПУСК ----------
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
 start_background_pinger(60)
+
+# Автопостинг из чата админа
+if config.get("autoposter", {}).get("enabled", False):
+    try:
+        setup_autoposter(bot, config, config["vk"]["token"], config["vk"]["owner_id"])
+        print("[BOT] Автопостинг запущен")
+    except Exception as e:
+        print(f"[BOT] Ошибка автопостинга: {e}")
+
 bot.infinity_polling()
