@@ -21,6 +21,10 @@ from dialogue.admin_commands import (
     handle_callback_errors, handle_callback_log,
     handle_callback_logout, handle_callback_pub_menu,
     handle_callback_toggle_alisa,
+    handle_callback_quotes_list,
+    handle_callback_quotes_add_start,
+    handle_callback_quotes_interval,
+    handle_callback_quotes_set_interval,
     ask_for_post_text
 )
 from dialogue.activity_modes import should_respond_to_talk
@@ -251,6 +255,33 @@ def handle_callback(call):
             return
         handle_callback_toggle_alisa(bot, chat_id, message_id, user_id)
 
+    # ---------- ЦИТАТЫ ----------
+    elif data == "quotes_list":
+        if not is_admin_authorized(user_id):
+            bot.answer_callback_query(call.id, "❌ Не авторизован")
+            return
+        handle_callback_quotes_list(bot, chat_id, message_id, user_id)
+
+    elif data == "quotes_add":
+        if not is_admin_authorized(user_id):
+            bot.answer_callback_query(call.id, "❌ Не авторизован")
+            return
+        handle_callback_quotes_add_start(bot, chat_id, message_id, user_id)
+
+    elif data == "quotes_interval":
+        if not is_admin_authorized(user_id):
+            bot.answer_callback_query(call.id, "❌ Не авторизован")
+            return
+        handle_callback_quotes_interval(bot, chat_id, message_id, user_id)
+
+    elif data.startswith("quote_int_"):
+        if not is_admin_authorized(user_id):
+            bot.answer_callback_query(call.id, "❌ Не авторизован")
+            return
+        interval = int(data.split("_")[2])
+        handle_callback_quotes_set_interval(interval, bot, chat_id, message_id, user_id)
+
+    # ---------- ПОЛЬЗОВАТЕЛЬСКИЕ ----------
     elif data == "tleem":
         bot.send_message(chat_id, "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем.")
     elif data == "fixiruem":
