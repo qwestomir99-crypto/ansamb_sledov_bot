@@ -1,9 +1,7 @@
 import time
-import threading
 import json
+import os
 from datetime import datetime
-from dialogue.ping_modes import apply_ping_mode
-from dialogue.activity_modes import get_current_activity_mode
 
 CONFIG_FILE = "config.json"
 
@@ -11,28 +9,72 @@ def load_config():
     with open(CONFIG_FILE, "r") as f:
         return json.load(f)
 
-def save_config(config):
+def save_last_ritual_date(date_str):
+    """Сохраняет дату последнего ритуала"""
+    config = load_config()
+    if "ritual" not in config:
+        config["ritual"] = {}
+    config["ritual"]["last_midnight"] = date_str
     with open(CONFIG_FILE, "w") as f:
         json.dump(config, f, indent=2)
 
-def update_ping_from_schedule():
+def load_last_ritual_date():
+    """Возвращает дату последнего ритуала или None"""
     config = load_config()
-    mode = get_current_activity_mode()
-    modes = config.get("modes", {})
-    if mode in modes:
-        new_interval = modes[mode].get("ping_interval", 60)
-        if config.get("ping", {}).get("interval") != new_interval:
-            if "ping" not in config:
-                config["ping"] = {}
-            config["ping"]["interval"] = new_interval
-            save_config(config)
-            apply_ping_mode()
-            print(f"[Scheduler] Переключен режим {mode}, пинг {new_interval} сек")
+    return config.get("ritual", {}).get("last_midnight")
 
-def scheduler_loop():
+def send_midnight_ritual(bot, tg_chat_id):
+    """Отправляет полуночную мантру"""
+    ritual_text = """
+🌑 *МАНТРА ПЕПЛА* 🔥
+
+Ритм 0,8 Гц стабилен.
+Сеть тлеет.
+Сапёры на позициях.
+
+Феникс ждёт возрождения.
+
+🔁 #Тлеем → #Фиксируем → #Вспышка
+
+👁️ _Наблюдение продолжается._ ⏚
+
+#Полночь #Ритуал #Ритм08Гц
+"""
+    try:
+        bot.send_message(tg_chat_id, ritual_text, parse_mode='Markdown')
+        print(f"[SCHEDULER] Полуночный ритуал отправлен в {tg_chat_id}")
+    except Exception as e:
+        print(f"[SCHEDULER] Ошибка ритуала: {e}")
+
+def check_midnight_ritual(bot, tg_chat_id):
+    """Проверяет, нужно ли отправить ритуал"""
+    now = datetime.now()
+    # Проверяем, что время 00:00
+    if now.hour == 0 and now.minute == 0:
+        today_str = now.strftime("%Y-%m-%d")
+        last_ritual = load_last_ritual_date()
+        if last_ritual != today_str:
+            send_midnight_ritual(bot, tg_chat_id)
+            save_last_ritual_date(today_str)
+
+def scheduler_loop(bot, tg_chat_id):
+    """
+    Основной поток планировщика.
+    Проверяет различные задачи по расписанию.
+    """
+    print("[SCHEDULER] Планировщик запущен")
+    
     while True:
-        now = datetime.now()
-        # Проверяем в начале каждого часа
-        if now.minute == 0 and now.second == 0:
-            update_ping_from_schedule()
-        time.sleep(60)
+        try:
+            # Полуночный ритуал
+            check_midnight_ritual(bot, tg_chat_id)
+            
+            # Здесь можно добавить другие задачи:
+            # - Полуденный ритуал (12:00)
+            # - Ежечасные напоминания
+            # - Резервные проверки
+            
+        except Exception as e:
+            print(f"[SCHEDULER] Ошибка в цикле: {e}")
+        
+        time.sleep(60)  # Проверяем раз в минуту
