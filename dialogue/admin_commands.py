@@ -56,6 +56,7 @@ def save_config(config):
 def get_admin_menu():
     keyboard = InlineKeyboardMarkup(row_width=2)
     
+    # Блок 1: Управление ботом
     keyboard.add(InlineKeyboardButton("🤖 Управление ботом", callback_data="noop"))
     keyboard.add(
         InlineKeyboardButton("🌅 Утро", callback_data="mode_утро"),
@@ -67,18 +68,27 @@ def get_admin_menu():
         InlineKeyboardButton("⏱ Пинг 180", callback_data="ping_180")
     )
     
+    # Кнопка управления Алисой
+    config = load_config()
+    alisa_enabled = config.get("alisa", {}).get("enabled", True)
+    alisa_status = "✅" if alisa_enabled else "❌"
+    keyboard.add(InlineKeyboardButton(f"🤖 Старший брат {alisa_status}", callback_data="toggle_alisa"))
+    
+    # Блок 2: Управление контентом
     keyboard.add(InlineKeyboardButton("📝 Управление контентом", callback_data="noop"))
     keyboard.add(
         InlineKeyboardButton("📤 Публикации", callback_data="pub_menu"),
         InlineKeyboardButton("➕ Добавить пост", callback_data="add_post")
     )
     
+    # Блок 3: Диагностика
     keyboard.add(InlineKeyboardButton("🔧 Диагностика", callback_data="noop"))
     keyboard.add(
         InlineKeyboardButton("📋 Ошибки", callback_data="errors"),
         InlineKeyboardButton("📜 Лог", callback_data="log")
     )
     
+    # Блок 4: Выход
     keyboard.add(InlineKeyboardButton("🚪 Выйти", callback_data="logout"))
     
     return keyboard
@@ -91,7 +101,7 @@ def get_user_menu():
         InlineKeyboardButton("⚡ #Вспышка", callback_data="vspishka"),
         InlineKeyboardButton("🌬 #дышим", callback_data="dyshim"),
         InlineKeyboardButton("🗣 #говорим", callback_data="govorim"),
-        InlineKeyboardButton("📖 #помощь", callback_data="help")
+        InlineKeyboardButton("📖 #справка", callback_data="help")
     )
     return keyboard
 
@@ -158,6 +168,17 @@ def handle_callback_pub_menu(bot, chat_id, message_id, user_id):
         status = "✅" if p["status"] == "published" else "⏳"
         text += f"{status} `{p['text'][:50] if p['text'] else '[Без текста]'}...` ({p['chat_id']})\n"
     bot.edit_message_text(text, chat_id, message_id, parse_mode='Markdown')
+
+def handle_callback_toggle_alisa(bot, chat_id, message_id, user_id):
+    config = load_config()
+    if "alisa" not in config:
+        config["alisa"] = {}
+    config["alisa"]["enabled"] = not config["alisa"].get("enabled", True)
+    save_config(config)
+    status = "включён" if config["alisa"]["enabled"] else "выключен"
+    log_admin_action(user_id, "toggle_alisa", status)
+    bot.edit_message_text(f"🤖 Старший брат {status}", chat_id, message_id)
+    bot.send_message(chat_id, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
 
 def ask_for_post_text(bot, chat_id, message_id):
     msg = bot.send_message(chat_id, "✍️ Введите текст поста (можно с Markdown) или /skip для поста без текста")
