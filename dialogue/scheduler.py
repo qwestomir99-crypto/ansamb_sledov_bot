@@ -3,7 +3,7 @@ import threading
 import json
 from datetime import datetime
 from dialogue.ping_modes import apply_ping_mode
-from activity_modes import get_current_activity_mode
+from dialogue.activity_modes import get_current_activity_mode
 
 CONFIG_FILE = "config.json"
 
