@@ -4,6 +4,7 @@ import os
 import sys
 import threading
 import time
+import traceback
 import requests
 from flask import Flask, request
 from datetime import datetime
@@ -14,6 +15,16 @@ from dialogue.quotes import quotes_loop
 from dialogue.admin_commands import handle_admin_command
 from dialogue.activity_modes import should_respond_to_talk
 from dialogue.scheduler import scheduler_loop
+
+# ---------- ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК ----------
+def global_exception_handler(exc_type, exc_value, exc_traceback):
+    with open("error.log", "a", encoding="utf-8") as f:
+        f.write(f"{datetime.now()} | {exc_type.__name__}: {exc_value}\n")
+        f.write(''.join(traceback.format_tb(exc_traceback)))
+        f.write("\n" + "-"*50 + "\n")
+    print(f"Ошибка записана в error.log")
+
+sys.excepthook = global_exception_handler
 
 # ---------- КОНФИГУРАЦИЯ ----------
 TOKEN = os.environ.get("BOT_TOKEN")
@@ -98,6 +109,36 @@ def send_start(message):
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
     text = message.text.lower()
+
+    # --- ПОМОЩЬ ---
+    if text == "#помощь":
+        help_text = """
+📖 *Справочник команд*
+
+🌅 *Режимы и протокол*
+`#Тлеем` — войти в протокол, получить разлом
+`#Фиксируем` — подтвердить синхронизацию
+`#Вспышка` — завершить цикл
+`#дышим` — ручной пинг (бот не отвечает)
+
+🛡️ *Администрирование* (только для админа)
+`#админ <пароль>` — показать доступные режимы
+`#админ <пароль> mode <утро/день/вечер/сон>` — сменить режим
+`#админ <пароль> mode <режим> <время>` — отложенный режим
+`#админ <пароль> ping <секунды>` — изменить интервал пинга
+`#админ <пароль> ошибки` — получить последние ошибки
+
+📜 *Другое*
+`#говорим <текст>` — спросить у Старшего брата
+`#помощь` — показать это сообщение
+
+🔗 *Наши ресурсы*
+• Канал: @саперы_аутентичности
+• Бот: @ansamb_sledov6_bot
+• Хештеги: #СапёрыАутентичности #МихоельАв #2026плита
+"""
+        bot.reply_to(message, help_text, parse_mode='Markdown')
+        return
 
     # --- АДМИНКА ---
     if text.startswith("#админ"):
