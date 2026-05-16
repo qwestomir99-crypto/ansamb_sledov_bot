@@ -2,6 +2,7 @@ import threading
 import time
 import json
 from ping_utils import start_background_pinger
+from dialogue.ping_modes import apply_ping_mode
 
 CONFIG_FILE = "config.json"
 
