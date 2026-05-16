@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from dialogue.ping_modes import apply_ping_mode
 
 CONFIG_FILE = "config.json"
 
