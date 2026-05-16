@@ -2,7 +2,7 @@ import os
 import json
 import time
 from datetime import datetime
-from ping_modes import apply_ping_mode
+from dialogue.ping_modes import apply_ping_mode
 
 CONFIG_FILE = "config.json"
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
