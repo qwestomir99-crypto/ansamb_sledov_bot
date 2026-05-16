@@ -1,37 +1,38 @@
 import requests
 import os
 
-def post_to_telegram(bot, chat_id, message, file_path=None):
+def post_to_telegram(bot, chat_id, message, file_path=None, tags=None):
+    # Добавляем теги к сообщению, если они есть
+    full_message = message
+    if tags and message:
+        full_message = f"{message}\n\n{tags}"
+    elif tags and not message:
+        full_message = tags
+    
     try:
-        # Если есть файл и он существует
         if file_path and os.path.exists(file_path):
             ext = os.path.splitext(file_path)[1].lower()
-            
-            # Фото
             if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
                 with open(file_path, 'rb') as f:
-                    if message:
-                        bot.send_photo(chat_id, f, caption=message, parse_mode='Markdown')
+                    if full_message:
+                        bot.send_photo(chat_id, f, caption=full_message, parse_mode='Markdown')
                     else:
                         bot.send_photo(chat_id, f)
-            # Видео
             elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
                 with open(file_path, 'rb') as f:
-                    if message:
-                        bot.send_video(chat_id, f, caption=message, parse_mode='Markdown')
+                    if full_message:
+                        bot.send_video(chat_id, f, caption=full_message, parse_mode='Markdown')
                     else:
                         bot.send_video(chat_id, f)
-            # Документ (всё остальное)
             else:
                 with open(file_path, 'rb') as f:
-                    if message:
-                        bot.send_document(chat_id, f, caption=message, parse_mode='Markdown')
+                    if full_message:
+                        bot.send_document(chat_id, f, caption=full_message, parse_mode='Markdown')
                     else:
                         bot.send_document(chat_id, f)
         else:
-            # Только текст
-            if message:
-                bot.send_message(chat_id, message, parse_mode='Markdown')
+            if full_message:
+                bot.send_message(chat_id, full_message, parse_mode='Markdown')
             else:
                 print(f"[PUBLISHER] Нет текста и файла для публикации в {chat_id}")
                 return False
@@ -50,11 +51,9 @@ def post_to_vk(message, tags, access_token, owner_id, file_path=None):
         'from_group': 1
     }
     
-    # Если есть файл, загружаем его
     if file_path and os.path.exists(file_path):
         ext = os.path.splitext(file_path)[1].lower()
         if ext in ['.jpg', '.jpeg', '.png', '.gif']:
-            # Загружаем фото на стену
             upload_url = get_upload_url(access_token, owner_id)
             if upload_url:
                 photo_attachment = upload_photo_to_vk(upload_url, file_path, access_token)
@@ -97,7 +96,6 @@ def upload_photo_to_vk(upload_url, file_path, access_token):
             r = requests.post(upload_url, files=files)
             data = r.json()
         
-        # Сохраняем фото на сервере VK
         save_params = {
             'access_token': access_token,
             'v': '5.131',
