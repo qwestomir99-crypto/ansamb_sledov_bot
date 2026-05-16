@@ -4,12 +4,9 @@ import os
 import json
 from datetime import datetime
 import threading
+from dialogue.activity_modes import should_publish_quotes, get_quotes_interval, load_config
 
 CONFIG_FILE = "config.json"
-
-def load_config():
-    with open(CONFIG_FILE, "r") as f:
-        return json.load(f)
 
 def save_config(config):
     with open(CONFIG_FILE, "w") as f:
@@ -30,7 +27,9 @@ def load_quotes():
             "Тлеем. Фиксируем. Вспышка.",
             "След на контакте. QSL.",
             "Михоель Ав ведёт.",
-            "2026 плита. Готовность 0,8 Гц."
+            "2026 плита. Готовность 0,8 Гц.",
+            "Тишина в эфире — знак качества.",
+            "Сапёр не спит. Сапёр ждёт."
         ]
         with open(quotes_file, "w", encoding="utf-8") as f:
             for q in default_quotes:
@@ -88,27 +87,48 @@ def quotes_loop(bot, TG_CHAT_ID):
     quote_thread_running = True
     
     def _run():
+        last_interval = None
+        last_mode_check = 0
+        
         while quote_thread_running:
-            quotes = load_quotes()
-            if not quotes:
+            # Проверяем, можно ли публиковать цитаты
+            if not should_publish_quotes():
                 time.sleep(60)
                 continue
             
-            interval_minutes = get_quotes_interval_minutes()
-            interval_seconds = interval_minutes * 60
+            # Получаем интервал из текущего режима
+            current_interval = get_quotes_interval()
             
+            # Если интервал изменился или прошло больше 5 минут — обновляем
+            if current_interval != last_interval:
+                last_interval = current_interval
+                print(f"[QUOTES] Интервал обновлён: {current_interval} минут")
+            
+            if current_interval <= 0:
+                time.sleep(60)
+                continue
+            
+            interval_seconds = current_interval * 60
             time.sleep(interval_seconds)
             
             if not quote_thread_running:
                 break
+            
+            if not should_publish_quotes():
+                continue
+                
+            quotes = load_quotes()
+            if not quotes:
+                continue
                 
             quote = random.choice(quotes)
             message = f"📜 *Цитата дня* • {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n{quote}\n\n#ЦитатаДня #СапёрыАутентичности"
             try:
                 bot.send_message(TG_CHAT_ID, message, parse_mode='Markdown')
+                print(f"[QUOTES] Цитата отправлена (интервал {current_interval} мин)")
             except Exception as e:
                 print(f"[QUOTES] Ошибка отправки: {e}")
     
     quote_thread = threading.Thread(target=_run, daemon=True)
     quote_thread.start()
-    print(f"[QUOTES] Цитаты запущены, интервал {get_quotes_interval_minutes()} минут")
+    print(f"[QUOTES] Цитаты запущены")
