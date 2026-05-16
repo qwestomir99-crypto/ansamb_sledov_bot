@@ -4,6 +4,7 @@ import json
 import time
 from datetime import datetime
 from dialogue.ping_modes import apply_ping_mode
+from dialogue.activity_modes import get_current_activity_mode
 
 CONFIG_FILE = "config.json"
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
