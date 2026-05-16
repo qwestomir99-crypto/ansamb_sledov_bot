@@ -98,6 +98,21 @@ def handle_admin_command(message, bot):
             bot.reply_to(message, f"✅ Режим «{new_mode}» установлен сейчас\n\n{GREETINGS.get(new_mode, '')}")
             log_admin_action(user_id, f"mode {new_mode} now", "success")
 
+    elif command == "ошибки":
+        if os.path.exists("error.log"):
+            with open("error.log", "r", encoding="utf-8") as f:
+                errors = f.read().strip()
+            if errors:
+                # Отправляем частями, если много
+                for i in range(0, len(errors), 4000):
+                    bot.send_message(user_id, errors[i:i+4000])
+                bot.reply_to(message, "✅ Отчёт об ошибках отправлен в личку")
+            else:
+                bot.reply_to(message, "📭 Ошибок нет")
+        else:
+            bot.reply_to(message, "📭 Файл error.log не найден")
+        log_admin_action(user_id, "requested_errors", "success")
+
     else:
         bot.reply_to(message, "❌ Неизвестная команда")
         log_admin_action(user_id, f"unknown command: {command}", "failed")
