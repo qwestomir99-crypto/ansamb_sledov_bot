@@ -9,6 +9,7 @@ from dialogue.activity_modes import get_current_activity_mode
 CONFIG_FILE = "config.json"
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 ADMIN_USER_ID = int(os.environ.get("ADMIN_USER_ID", 0))
+MODES = ["утро", "день", "вечер", "сон"]
 
 def log_admin_action(user_id, action, result):
     with open("admin.log", "a", encoding="utf-8") as f:
