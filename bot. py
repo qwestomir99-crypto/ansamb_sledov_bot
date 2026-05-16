@@ -6,6 +6,7 @@ import threading
 import time
 import traceback
 import requests
+import json
 from flask import Flask, request
 from datetime import datetime
 from ping_utils import ping_self, start_background_pinger
@@ -24,6 +25,12 @@ from dialogue.admin_commands import (
 from dialogue.activity_modes import should_respond_to_talk
 from dialogue.scheduler import scheduler_loop
 
+CONFIG_FILE = "config.json"
+
+def load_config():
+    with open(CONFIG_FILE, "r") as f:
+        return json.load(f)
+
 # ---------- ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК ----------
 def global_exception_handler(exc_type, exc_value, exc_traceback):
     with open("error.log", "a", encoding="utf-8") as f:
@@ -39,11 +46,11 @@ TOKEN = os.environ.get("BOT_TOKEN")
 if not TOKEN:
     raise ValueError("BOT_TOKEN не задан")
 
-TOKEN_SECRET = os.environ.get("TOKEN_SECRET", "tleem2026")
-VK_TOKEN = os.environ.get("VK_TOKEN")
-OWNER_ID = 607754499
-TG_CHAT_ID = "@саперы_аутентичности"
-AGENT_URL = "https://agent-3kek.onrender.com/ask"
+config = load_config()
+TG_CHAT_ID = config.get("telegram", {}).get("publish_channel", "@qwestomir")
+AGENT_URL = config.get("agent", {}).get("url", "https://agent-3kek.onrender.com/ask")
+VK_TOKEN = config.get("vk", {}).get("token")
+OWNER_ID = config.get("vk", {}).get("owner_id", 607754499)
 
 bot = telebot.TeleBot(TOKEN)
 silence_answers = ["👁️", "⏚"]
@@ -61,7 +68,7 @@ def health():
 @flask_app.route('/token', methods=['GET'])
 def get_token():
     secret = request.args.get('secret')
-    if secret != TOKEN_SECRET:
+    if secret != os.environ.get("TOKEN_SECRET", "tleem2026"):
         return "Forbidden", 403
     return TOKEN, 200
 
@@ -206,10 +213,8 @@ def handle_callback(call):
         if not is_admin_authorized(user_id):
             bot.answer_callback_query(call.id, "❌ Не авторизован")
             return
-        from dialogue.admin_commands import ask_for_post_text
         ask_for_post_text(bot, chat_id, message_id)
 
-    # Пользовательские кнопки
     elif data == "tleem":
         bot.send_message(chat_id, "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем.")
     elif data == "fixiruem":
