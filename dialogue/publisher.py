@@ -19,29 +19,49 @@ def save_publications(pubs):
 def add_publication(chat_id, text, delay_seconds, tags=None):
     pubs = load_publications()
     publish_at = time.time() + delay_seconds
-    pubs.append({
-        "id": len(pubs) + 1,
+    new_id = len(pubs) + 1
+    new_pub = {
+        "id": new_id,
         "chat_id": chat_id,
         "text": text,
         "tags": tags,
         "publish_at": publish_at,
         "status": "pending"
-    })
+    }
+    pubs.append(new_pub)
     save_publications(pubs)
+    print(f"[PUBLISHER] Добавлена публикация #{new_id} через {delay_seconds} сек")
     return True
 
 def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
+    print("[PUBLISHER] Поток публикатора запущен, проверка каждые 30 секунд")
     while True:
-        now = time.time()
-        pubs = load_publications()
-        for pub in pubs:
-            if pub["status"] == "pending" and pub["publish_at"] <= now:
-                if pub["chat_id"] == "vk":
-                    ok = post_to_vk(pub["text"], pub.get("tags", ""), vk_token, vk_owner_id)
-                else:
-                    ok = post_to_telegram(bot, tg_chat_id, pub["text"])
-                if ok:
-                    pub["status"] = "published"
-                    pub["published_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    save_publications(pubs)
+        try:
+            now = time.time()
+            pubs = load_publications()
+            changed = False
+            
+            for pub in pubs:
+                if pub["status"] == "pending" and pub["publish_at"] <= now:
+                    print(f"[PUBLISHER] Публикую #{pub['id']}: {pub['text'][:50]}...")
+                    
+                    if pub["chat_id"] == "vk":
+                        ok = post_to_vk(pub["text"], pub.get("tags", ""), vk_token, vk_owner_id)
+                    else:
+                        ok = post_to_telegram(bot, tg_chat_id, pub["text"])
+                    
+                    if ok:
+                        pub["status"] = "published"
+                        pub["published_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        changed = True
+                        print(f"[PUBLISHER] Публикация #{pub['id']} успешна")
+                    else:
+                        print(f"[PUBLISHER] Ошибка публикации #{pub['id']}")
+            
+            if changed:
+                save_publications(pubs)
+                
+        except Exception as e:
+            print(f"[PUBLISHER] Ошибка в цикле: {e}")
+        
         time.sleep(30)
