@@ -10,6 +10,13 @@ ADMIN_USER_ID = int(os.environ.get("ADMIN_USER_ID", 0))
 
 MODES = ["утро", "день", "вечер", "сон"]
 
+GREETINGS = {
+    "утро": "🌅 Доброе утро, сапёр. Сеть тлеет, ритм 0,8 Гц стабилен.",
+    "день": "☀️ Хорошего дня. Не забывай #Тлеем.",
+    "вечер": "🌙 Спокойного вечера. Наблюдение продолжается.",
+    "сон": "😴 Режим сна. Старший брат отдыхает. Вопросы — утром."
+}
+
 def log_admin_action(user_id, action, result):
     with open("admin.log", "a", encoding="utf-8") as f:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -80,16 +87,15 @@ def handle_admin_command(message, bot):
                 config["force_mode"] = new_mode
                 config["force_mode_until"] = start_time.strftime("%Y-%m-%d %H:%M:%S")
                 save_config(config)
-                bot.reply_to(message, f"✅ Режим «{new_mode}» установлен с {start_time.strftime('%H:%M')}")
+                bot.reply_to(message, f"✅ Режим «{new_mode}» установлен с {start_time.strftime('%H:%M')}\n\n{GREETINGS.get(new_mode, '')}")
                 log_admin_action(user_id, f"mode {new_mode} at {start_time_str}", "success")
             except:
                 bot.reply_to(message, "❌ Неверный формат времени. Используй ЧЧ:ММ")
         else:
-            # Принудительно сейчас
             config["force_mode"] = new_mode
             config["force_mode_until"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             save_config(config)
-            bot.reply_to(message, f"✅ Режим «{new_mode}» установлен сейчас")
+            bot.reply_to(message, f"✅ Режим «{new_mode}» установлен сейчас\n\n{GREETINGS.get(new_mode, '')}")
             log_admin_action(user_id, f"mode {new_mode} now", "success")
 
     else:
