@@ -39,6 +39,11 @@ def authorize_admin(user_id, password):
 def logout_admin(user_id):
     admin_sessions.pop(user_id, None)
 
+def log_admin_action(user_id, action, result):
+    with open("admin.log", "a", encoding="utf-8") as f:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        f.write(f"{timestamp} | user:{user_id} | {action} | {result}\n")
+
 def get_admin_menu():
     keyboard = InlineKeyboardMarkup(row_width=2)
     keyboard.add(
@@ -67,11 +72,6 @@ def get_user_menu():
     )
     return keyboard
 
-def log_admin_action(user_id, action, result):
-    with open("admin.log", "a", encoding="utf-8") as f:
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        f.write(f"{timestamp} | user:{user_id} | {action} | {result}\n")
-
 def load_config():
     with open(CONFIG_FILE, "r") as f:
         return json.load(f)
@@ -80,22 +80,24 @@ def save_config(config):
     with open(CONFIG_FILE, "w") as f:
         json.dump(config, f, indent=2)
 
-def handle_callback_mode(mode, bot, chat_id, message_id):
+def handle_callback_mode(mode, bot, chat_id, message_id, user_id):
     config = load_config()
     config["force_mode"] = mode
     config["force_mode_until"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_config(config)
     apply_ping_mode()
+    log_admin_action(user_id, f"mode {mode}", "success")
     bot.edit_message_text(
         f"✅ Режим «{mode}» установлен сейчас\n\n{GREETINGS.get(mode, '')}",
         chat_id, message_id
     )
 
-def handle_callback_ping(interval, bot, chat_id, message_id):
+def handle_callback_ping(interval, bot, chat_id, message_id, user_id):
     config = load_config()
     config["ping_interval"] = interval
     save_config(config)
     apply_ping_mode()
+    log_admin_action(user_id, f"ping {interval}", "success")
     bot.edit_message_text(f"✅ Пинг установлен на {interval} секунд", chat_id, message_id)
 
 def handle_callback_errors(user_id, bot, chat_id, message_id):
@@ -126,6 +128,7 @@ def handle_callback_log(user_id, bot, chat_id, message_id):
 
 def handle_callback_logout(user_id, bot, chat_id, message_id):
     logout_admin(user_id)
+    log_admin_action(user_id, "logout", "success")
     bot.edit_message_text("🔓 Вы вышли из админ-панели", chat_id, message_id)
 
 def handle_admin_command(message, bot):
@@ -137,6 +140,7 @@ def handle_admin_command(message, bot):
     parts = message.text.split()
     if len(parts) == 2 and parts[1] == ADMIN_PASSWORD:
         authorize_admin(user_id, parts[1])
+        log_admin_action(user_id, "login", "success")
         bot.reply_to(message, "✅ Авторизован. Ваше меню:", reply_markup=get_admin_menu())
     else:
         bot.reply_to(message, "❌ Неверный пароль. Попробуйте: #админ <пароль>")
