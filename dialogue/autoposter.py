@@ -1,7 +1,7 @@
 import time
 import threading
 import requests
-from dialogue.publisher_utils import post_to_vk
+from dialogue.publisher_utils import post_to_telegram, post_to_vk
 
 def setup_autoposter(bot, config, vk_token, vk_owner_id):
     """
@@ -24,18 +24,21 @@ def setup_autoposter(bot, config, vk_token, vk_owner_id):
         if not text or text.startswith('/') or text.startswith('#'):
             return
         
-        # Отправляем копию в целевую группу
+        # Отправляем в Telegram через общую функцию
         try:
-            bot.send_message(target_chat_id, text, parse_mode='Markdown')
-            print(f"[AUTOPOSTER] Отправлено в {target_chat_id}")
+            post_to_telegram(bot, target_chat_id, text, file_path=None, tags=None)
+            print(f"[AUTOPOSTER] Отправлено в Telegram: {target_chat_id}")
         except Exception as e:
-            print(f"[AUTOPOSTER] Ошибка: {e}")
+            print(f"[AUTOPOSTER] Ошибка Telegram: {e}")
         
-        # Отправляем в VK, если есть токен
+        # Отправляем в VK, если включено
         if vk_token and autoposter_config.get("vk_enabled", True):
             tags = autoposter_config.get("vk_tags", "#Ансамбль #СледНаКонтаке")
-            ok = post_to_vk(text, tags, vk_token, vk_owner_id)
-            if ok:
-                print(f"[AUTOPOSTER] Отправлено в VK")
+            try:
+                ok = post_to_vk(text, tags, vk_token, vk_owner_id, file_path=None)
+                if ok:
+                    print(f"[AUTOPOSTER] Отправлено в VK")
+            except Exception as e:
+                print(f"[AUTOPOSTER] Ошибка VK: {e}")
     
     print(f"[AUTOPOSTER] Автопостинг настроен: {source_chat_id} → {target_chat_id} + VK")
