@@ -57,10 +57,7 @@ def get_admin_menu():
     keyboard = InlineKeyboardMarkup(row_width=2)
     
     # Блок 1: Управление ботом
-    keyboard.add(
-        InlineKeyboardButton("🤖 Управление ботом", callback_data="noop"),
-        row_width=1
-    )
+    keyboard.add(InlineKeyboardButton("🤖 Управление ботом", callback_data="noop"))
     keyboard.add(
         InlineKeyboardButton("🌅 Утро", callback_data="mode_утро"),
         InlineKeyboardButton("☀️ День", callback_data="mode_день"),
@@ -72,29 +69,21 @@ def get_admin_menu():
     )
     
     # Блок 2: Управление контентом
-    keyboard.add(
-        InlineKeyboardButton("📝 Управление контентом", callback_data="noop"),
-        row_width=1
-    )
+    keyboard.add(InlineKeyboardButton("📝 Управление контентом", callback_data="noop"))
     keyboard.add(
         InlineKeyboardButton("📤 Публикации", callback_data="pub_menu"),
         InlineKeyboardButton("➕ Добавить пост", callback_data="add_post")
     )
     
     # Блок 3: Диагностика
-    keyboard.add(
-        InlineKeyboardButton("🔧 Диагностика", callback_data="noop"),
-        row_width=1
-    )
+    keyboard.add(InlineKeyboardButton("🔧 Диагностика", callback_data="noop"))
     keyboard.add(
         InlineKeyboardButton("📋 Ошибки", callback_data="errors"),
         InlineKeyboardButton("📜 Лог", callback_data="log")
     )
     
     # Блок 4: Выход
-    keyboard.add(
-        InlineKeyboardButton("🚪 Выйти", callback_data="logout")
-    )
+    keyboard.add(InlineKeyboardButton("🚪 Выйти", callback_data="logout"))
     
     return keyboard
 
@@ -138,7 +127,7 @@ def handle_callback_errors(user_id, bot, chat_id, message_id):
             errors = f.read().strip()
         if errors:
             for i in range(0, len(errors), 4000):
-                bot.send_message(user_id, errors[i:i+4000])
+                bot.send_message(user_id, f"```\n{errors[i:i+4000]}\n```", parse_mode='Markdown')
             bot.edit_message_text("✅ Ошибки отправлены в личку", chat_id, message_id)
         else:
             bot.edit_message_text("📭 Ошибок нет", chat_id, message_id)
@@ -151,7 +140,7 @@ def handle_callback_log(user_id, bot, chat_id, message_id):
             log_data = f.read().strip()
         if log_data:
             for i in range(0, len(log_data), 4000):
-                bot.send_message(user_id, log_data[i:i+4000])
+                bot.send_message(user_id, f"```log\n{log_data[i:i+4000]}\n```", parse_mode='Markdown')
             bot.edit_message_text("✅ Лог отправлен в личку", chat_id, message_id)
         else:
             bot.edit_message_text("📭 Лог пуст", chat_id, message_id)
@@ -250,8 +239,3 @@ def handle_admin_command(message, bot):
         bot.reply_to(message, "✅ Авторизован. Ваше меню:", reply_markup=get_admin_menu())
     else:
         bot.reply_to(message, "❌ Неверный пароль. Попробуйте: #админ <пароль>")
-
-# Заглушка для кнопок-разделителей (чтобы не было ошибки)
-@bot.callback_query_handler(func=lambda call: call.data == "noop")
-def noop_callback(call):
-    bot.answer_callback_query(call.id)
