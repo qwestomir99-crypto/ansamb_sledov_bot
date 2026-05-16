@@ -1,15 +1,10 @@
 import json
 import time
-import threading
+import os
 from datetime import datetime
 from dialogue.publisher_utils import post_to_telegram, post_to_vk
 
-CONFIG_FILE = "config.json"
 PUBLICATIONS_FILE = "publications.json"
-
-def load_config():
-    with open(CONFIG_FILE, "r") as f:
-        return json.load(f)
 
 def load_publications():
     if not os.path.exists(PUBLICATIONS_FILE):
@@ -25,7 +20,7 @@ def add_publication(chat_id, text, delay_seconds, tags=None):
     pubs = load_publications()
     publish_at = time.time() + delay_seconds
     pubs.append({
-        "id": len(pubs),
+        "id": len(pubs) + 1,
         "chat_id": chat_id,
         "text": text,
         "tags": tags,
@@ -35,7 +30,7 @@ def add_publication(chat_id, text, delay_seconds, tags=None):
     save_publications(pubs)
     return True
 
-def publish_loop(bot, vk_token, vk_owner_id, tg_channel_id):
+def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
     while True:
         now = time.time()
         pubs = load_publications()
