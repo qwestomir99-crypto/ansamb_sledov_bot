@@ -46,5 +46,12 @@
     "enabled": true,
     "interval_hours": 24,
     "news_file": "news.txt"
+  },
+  "autoposter": {
+    "enabled": true,
+    "source_chat_id": -1003952512259,
+    "target_chat_id": "@qwestomir",
+    "vk_enabled": true,
+    "vk_tags": "#Ансамбль #СледНаКонтаке"
   }
 }
