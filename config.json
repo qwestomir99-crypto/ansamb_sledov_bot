@@ -5,9 +5,6 @@
     "rhythm": "0.8 Hz"
   },
   "telegram": {
-    "bot_token": "токен_из_переменной_окружения",
-    "admin_user_id": 6234384423,
-    "admin_password": "ne_tleem2026",
     "publish_channel": "@qwestomir",
     "log_channel": "@qwestomir"
   },
@@ -16,8 +13,6 @@
     "enabled": true
   },
   "vk": {
-    "token": "vk1.a.TQW-UlRrsNdc3u9ziTk9ZkiUACLnnnNUB2rHGSf2Q0kIBPDAMLkJN3CAzS3eSqD9ODhzsIIzXFbO4W-Vb9Zo4AfPFfBfoW8HAs0DjyVZbtPnCmjiyHayQUUgLdywkhMcTZp86pF1dKF-t3XPdz7vcSF9byB-5UnZI2V4hHk4ihO8HZLQk4FVpc0OnoyZbB9GghhJ9c6kQrI-wXSa26JXlw",
-    "owner_id": 607754499,
     "enabled": true,
     "interval_seconds": 300
   },
