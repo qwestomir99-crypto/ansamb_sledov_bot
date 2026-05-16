@@ -4,6 +4,23 @@
     "version": "3.2",
     "rhythm": "0.8 Hz"
   },
+  "telegram": {
+    "bot_token": "токен_из_переменной_окружения",
+    "admin_user_id": 6234384423,
+    "admin_password": "ne_tleem2026",
+    "publish_channel": "@qwestomir",
+    "log_channel": "@qwestomir"
+  },
+  "agent": {
+    "url": "https://agent-3kek.onrender.com/ask",
+    "enabled": true
+  },
+  "vk": {
+    "token": "vk1.a.TQW-UlRrsNdc3u9ziTk9ZkiUACLnnnNUB2rHGSf2Q0kIBPDAMLkJN3CAzS3eSqD9ODhzsIIzXFbO4W-Vb9Zo4AfPFfBfoW8HAs0DjyVZbtPnCmjiyHayQUUgLdywkhMcTZp86pF1dKF-t3XPdz7vcSF9byB-5UnZI2V4hHk4ihO8HZLQk4FVpc0OnoyZbB9GghhJ9c6kQrI-wXSa26JXlw",
+    "owner_id": 607754499,
+    "enabled": true,
+    "interval_seconds": 300
+  },
   "ping": {
     "interval": 60,
     "agent_enabled": true,
@@ -17,8 +34,6 @@
   },
   "publisher": {
     "enabled": true,
-    "telegram_channel": "@саперы_аутентичности",
-    "vk_group_id": null,
     "default_tags": "#СапёрыАутентичности #МихоельАв #2026плита",
     "interval_minutes": 60
   },
@@ -31,10 +46,5 @@
     "enabled": true,
     "interval_hours": 24,
     "news_file": "news.txt"
-  },
-  "vk_reader": {
-    "enabled": true,
-    "interval_seconds": 300,
-    "owner_id": 607754499
   }
 }
