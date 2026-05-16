@@ -13,8 +13,10 @@ def save_config(config):
 
 def get_current_activity_mode():
     config = load_config()
+    if config is None:
+        return "утро"
     
-    # Проверяем принудительный режим (force_mode)
+    # Проверяем принудительный режим
     force_mode = config.get("force_mode")
     force_until_str = config.get("force_mode_until")
     
@@ -24,47 +26,40 @@ def get_current_activity_mode():
             if datetime.now() < force_until:
                 return force_mode
             else:
-                # Принудительный режим истёк — удаляем
                 config.pop("force_mode", None)
                 config.pop("force_mode_until", None)
                 save_config(config)
         except:
             pass
     
-    # Если принудительного режима нет — используем расписание по часам
+    # Определяем режим по часам
     now = datetime.now()
     hour = now.hour
-    schedule = config.get("schedule", {
-        "утро": {"hour_start": 6, "hour_end": 12},
-        "день": {"hour_start": 12, "hour_end": 20},
-        "вечер": {"hour_start": 20, "hour_end": 23},
-        "сон": {"hour_start": 23, "hour_end": 6}
-    })
+    modes = config.get("modes", {})
     
-    for mode, times in schedule.items():
-        start = times["hour_start"]
-        end = times["hour_end"]
-        # Обрабатываем переход через полночь (например, сон 23 → 6)
+    for mode, times in modes.items():
+        start = times.get("hour_start", 0)
+        end = times.get("hour_end", 24)
         if start <= hour < end or (start > end and (hour >= start or hour < end)):
             return mode
     
-    return "сон"  # fallback
+    return "сон"
 
 def should_respond_to_talk():
     mode = get_current_activity_mode()
-    # В режиме "сон" не отвечаем на #говорим
-    return mode != "сон"
+    config = load_config()
+    modes = config.get("modes", {})
+    return modes.get(mode, {}).get("talk", True)
 
 def should_publish_quotes():
     mode = get_current_activity_mode()
-    # Цитаты публикуем только в "утро" и "день"
-    return mode in ["утро", "день"]
+    config = load_config()
+    modes = config.get("modes", {})
+    return modes.get(mode, {}).get("quotes", False)
 
 def get_ping_interval_for_mode(mode=None):
     if mode is None:
         mode = get_current_activity_mode()
     config = load_config()
-    schedule = config.get("schedule", {})
-    if mode in schedule:
-        return schedule[mode].get("ping_interval", 60)
-    return 60
+    modes = config.get("modes", {})
+    return modes.get(mode, {}).get("ping_interval", 60)
