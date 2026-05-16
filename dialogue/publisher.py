@@ -39,7 +39,7 @@ def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
                 if pub["chat_id"] == "vk":
                     ok = post_to_vk(pub["text"], pub.get("tags", ""), vk_token, vk_owner_id)
                 else:
-                    ok = post_to_telegram(bot, pub["chat_id"], pub["text"])
+                    ok = post_to_telegram(bot, tg_chat_id, pub["text"])
                 if ok:
                     pub["status"] = "published"
                     pub["published_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
