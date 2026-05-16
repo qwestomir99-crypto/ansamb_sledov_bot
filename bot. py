@@ -25,6 +25,7 @@ from dialogue.admin_commands import (
 from dialogue.activity_modes import should_respond_to_talk
 from dialogue.scheduler import scheduler_loop
 from dialogue.autoposter import setup_autoposter
+from dialogue.exception_handler import global_exception_handler
 
 CONFIG_FILE = "config.json"
 
@@ -32,26 +33,20 @@ def load_config():
     with open(CONFIG_FILE, "r") as f:
         return json.load(f)
 
-# ---------- ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК ----------
-def global_exception_handler(exc_type, exc_value, exc_traceback):
-    with open("error.log", "a", encoding="utf-8") as f:
-        f.write(f"{datetime.now()} | {exc_type.__name__}: {exc_value}\n")
-        f.write(''.join(traceback.format_tb(exc_traceback)))
-        f.write("\n" + "-"*50 + "\n")
-    print(f"Ошибка записана в error.log")
-
-sys.excepthook = global_exception_handler
-
-# ---------- КОНФИГУРАЦИЯ ----------
+# ---------- КОНФИГУРАЦИЯ ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ ----------
 TOKEN = os.environ.get("BOT_TOKEN")
 if not TOKEN:
     raise ValueError("BOT_TOKEN не задан")
 
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
+ADMIN_USER_ID = int(os.environ.get("ADMIN_USER_ID", 0))
+VK_TOKEN = os.environ.get("VK_TOKEN")
+VK_OWNER_ID = os.environ.get("VK_OWNER_ID")
+PUBLISH_CHANNEL = os.environ.get("PUBLISH_CHANNEL", "@qwestomir")
+AGENT_URL = os.environ.get("AGENT_URL", "https://agent-3kek.onrender.com/ask")
+
 config = load_config()
-TG_CHAT_ID = config.get("telegram", {}).get("publish_channel", "@qwestomir")
-AGENT_URL = config.get("agent", {}).get("url", "https://agent-3kek.onrender.com/ask")
-VK_TOKEN = config.get("vk", {}).get("token")
-OWNER_ID = config.get("vk", {}).get("owner_id", 607754499)
+TG_CHAT_ID = config.get("telegram", {}).get("publish_channel", PUBLISH_CHANNEL)
 
 bot = telebot.TeleBot(TOKEN)
 silence_answers = ["👁️", "⏚"]
@@ -95,11 +90,11 @@ def keep_alive():
 threading.Thread(target=keep_alive, daemon=True).start()
 
 # ---------- ПОТОКИ ДИАЛОГА ----------
-threading.Thread(target=vk_reader_loop, args=(bot, VK_TOKEN, OWNER_ID, TG_CHAT_ID), daemon=True).start()
+threading.Thread(target=vk_reader_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
 threading.Thread(target=journalist_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
 threading.Thread(target=quotes_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
 threading.Thread(target=scheduler_loop, daemon=True).start()
-threading.Thread(target=publish_loop, args=(bot, VK_TOKEN, OWNER_ID, TG_CHAT_ID), daemon=True).start()
+threading.Thread(target=publish_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
 
 # ---------- ВЫЗОВ АГЕНТА ----------
 def ask_agent(phrase):
@@ -171,7 +166,6 @@ def handle_callback(call):
         if not is_admin_authorized(user_id):
             bot.answer_callback_query(call.id, "❌ Не авторизован. Введите #админ <пароль>")
             return
-        from dialogue.admin_commands import handle_callback_mode
         handle_callback_mode(mode, bot, chat_id, message_id, user_id)
 
     elif data.startswith("ping_"):
@@ -179,35 +173,30 @@ def handle_callback(call):
         if not is_admin_authorized(user_id):
             bot.answer_callback_query(call.id, "❌ Не авторизован. Введите #админ <пароль>")
             return
-        from dialogue.admin_commands import handle_callback_ping
         handle_callback_ping(interval, bot, chat_id, message_id, user_id)
 
     elif data == "errors":
         if not is_admin_authorized(user_id):
             bot.answer_callback_query(call.id, "❌ Не авторизован. Введите #админ <пароль>")
             return
-        from dialogue.admin_commands import handle_callback_errors
         handle_callback_errors(user_id, bot, chat_id, message_id)
 
     elif data == "log":
         if not is_admin_authorized(user_id):
             bot.answer_callback_query(call.id, "❌ Не авторизован. Введите #админ <пароль>")
             return
-        from dialogue.admin_commands import handle_callback_log
         handle_callback_log(user_id, bot, chat_id, message_id)
 
     elif data == "logout":
         if not is_admin_authorized(user_id):
             bot.answer_callback_query(call.id, "❌ Не авторизован")
             return
-        from dialogue.admin_commands import handle_callback_logout
         handle_callback_logout(user_id, bot, chat_id, message_id)
 
     elif data == "pub_menu":
         if not is_admin_authorized(user_id):
             bot.answer_callback_query(call.id, "❌ Не авторизован")
             return
-        from dialogue.admin_commands import handle_callback_pub_menu
         handle_callback_pub_menu(bot, chat_id, message_id, user_id)
 
     elif data == "add_post":
@@ -239,7 +228,7 @@ start_background_pinger(60)
 # Автопостинг из чата админа
 if config.get("autoposter", {}).get("enabled", False):
     try:
-        setup_autoposter(bot, config, config["vk"]["token"], config["vk"]["owner_id"])
+        setup_autoposter(bot, config, VK_TOKEN, VK_OWNER_ID)
         print("[BOT] Автопостинг запущен")
     except Exception as e:
         print(f"[BOT] Ошибка автопостинга: {e}")
