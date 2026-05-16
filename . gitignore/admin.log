@@ -1,0 +1,6 @@
+admin.log
+config.json
+*.session
+last_post.txt
+limit_counter.txt
+news.txt
