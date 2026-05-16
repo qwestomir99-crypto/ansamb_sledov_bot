@@ -45,6 +45,14 @@ def log_admin_action(user_id, action, result):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         f.write(f"{timestamp} | user:{user_id} | {action} | {result}\n")
 
+def load_config():
+    with open(CONFIG_FILE, "r") as f:
+        return json.load(f)
+
+def save_config(config):
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(config, f, indent=2)
+
 def get_admin_menu():
     keyboard = InlineKeyboardMarkup(row_width=2)
     keyboard.add(
@@ -75,16 +83,10 @@ def get_user_menu():
     )
     return keyboard
 
-def load_config():
-    with open(CONFIG_FILE, "r") as f:
-        return json.load(f)
-
-def save_config(config):
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(config, f, indent=2)
-
 def handle_callback_mode(mode, bot, chat_id, message_id, user_id):
     config = load_config()
+    if "force_mode" not in config:
+        config["force_mode"] = {}
     config["force_mode"] = mode
     config["force_mode_until"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_config(config)
@@ -97,7 +99,9 @@ def handle_callback_mode(mode, bot, chat_id, message_id, user_id):
 
 def handle_callback_ping(interval, bot, chat_id, message_id, user_id):
     config = load_config()
-    config["ping_interval"] = interval
+    if "ping" not in config:
+        config["ping"] = {}
+    config["ping"]["interval"] = interval
     save_config(config)
     apply_ping_mode()
     log_admin_action(user_id, f"ping {interval}", "success")
@@ -147,20 +151,20 @@ def handle_callback_pub_menu(bot, chat_id, message_id, user_id):
 
 def ask_for_post_text(bot, chat_id, message_id):
     msg = bot.send_message(chat_id, "✍️ Введите текст поста (можно с Markdown):")
-    bot.register_next_step_handler(msg, process_post_text, bot, chat_id, user_id)
+    bot.register_next_step_handler(msg, process_post_text, bot, chat_id)
 
-def process_post_text(message, bot, chat_id, user_id):
+def process_post_text(message, bot, chat_id):
     text = message.text
     if not text:
         bot.send_message(chat_id, "❌ Текст не может быть пустым")
         return
-    ask_for_post_delay(bot, chat_id, user_id, text)
+    ask_for_post_delay(bot, chat_id, text)
 
-def ask_for_post_delay(bot, chat_id, user_id, text):
+def ask_for_post_delay(bot, chat_id, text):
     msg = bot.send_message(chat_id, "⏱ Через сколько минут опубликовать? (число)")
-    bot.register_next_step_handler(msg, process_post_delay, bot, chat_id, user_id, text)
+    bot.register_next_step_handler(msg, process_post_delay, bot, chat_id, text)
 
-def process_post_delay(message, bot, chat_id, user_id, text):
+def process_post_delay(message, bot, chat_id, text):
     try:
         delay_minutes = int(message.text.strip())
         if delay_minutes <= 0:
@@ -174,6 +178,7 @@ def process_post_delay(message, bot, chat_id, user_id, text):
     default_tags = pub_config.get("default_tags", "#СапёрыАутентичности")
     
     add_publication("telegram", text, delay_seconds, default_tags)
+    user_id = message.from_user.id
     log_admin_action(user_id, f"add_post in {delay_minutes} min", "success")
     bot.send_message(chat_id, f"✅ Пост запланирован через {delay_minutes} минут")
 
