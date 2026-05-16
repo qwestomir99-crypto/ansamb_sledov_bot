@@ -56,7 +56,6 @@ def save_config(config):
 def get_admin_menu():
     keyboard = InlineKeyboardMarkup(row_width=2)
     
-    # Блок 1: Управление ботом
     keyboard.add(InlineKeyboardButton("🤖 Управление ботом", callback_data="noop"))
     keyboard.add(
         InlineKeyboardButton("🌅 Утро", callback_data="mode_утро"),
@@ -68,21 +67,18 @@ def get_admin_menu():
         InlineKeyboardButton("⏱ Пинг 180", callback_data="ping_180")
     )
     
-    # Блок 2: Управление контентом
     keyboard.add(InlineKeyboardButton("📝 Управление контентом", callback_data="noop"))
     keyboard.add(
         InlineKeyboardButton("📤 Публикации", callback_data="pub_menu"),
         InlineKeyboardButton("➕ Добавить пост", callback_data="add_post")
     )
     
-    # Блок 3: Диагностика
     keyboard.add(InlineKeyboardButton("🔧 Диагностика", callback_data="noop"))
     keyboard.add(
         InlineKeyboardButton("📋 Ошибки", callback_data="errors"),
         InlineKeyboardButton("📜 Лог", callback_data="log")
     )
     
-    # Блок 4: Выход
     keyboard.add(InlineKeyboardButton("🚪 Выйти", callback_data="logout"))
     
     return keyboard
