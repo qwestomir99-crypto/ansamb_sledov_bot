@@ -16,21 +16,22 @@ def save_publications(pubs):
     with open(PUBLICATIONS_FILE, "w") as f:
         json.dump(pubs, f, indent=2)
 
-def add_publication(chat_id, text, delay_seconds, tags=None):
+def add_publication(chat_id, text, delay_seconds, tags=None, file_path=None):
     pubs = load_publications()
     publish_at = time.time() + delay_seconds
     new_id = len(pubs) + 1
     new_pub = {
         "id": new_id,
         "chat_id": chat_id,
-        "text": text,
+        "text": text or "",
         "tags": tags,
+        "file_path": file_path,
         "publish_at": publish_at,
         "status": "pending"
     }
     pubs.append(new_pub)
     save_publications(pubs)
-    print(f"[PUBLISHER] Добавлена публикация #{new_id} через {delay_seconds} сек")
+    print(f"[PUBLISHER] Добавлена публикация #{new_id} через {delay_seconds} сек, текст: {bool(text)}, файл: {bool(file_path)}")
     return True
 
 def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
@@ -43,12 +44,23 @@ def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
             
             for pub in pubs:
                 if pub["status"] == "pending" and pub["publish_at"] <= now:
-                    print(f"[PUBLISHER] Публикую #{pub['id']}: {pub['text'][:50]}...")
+                    print(f"[PUBLISHER] Публикую #{pub['id']}: текст={bool(pub['text'])}, файл={bool(pub.get('file_path'))}")
                     
                     if pub["chat_id"] == "vk":
-                        ok = post_to_vk(pub["text"], pub.get("tags", ""), vk_token, vk_owner_id)
+                        ok = post_to_vk(
+                            pub["text"], 
+                            pub.get("tags", ""), 
+                            vk_token, 
+                            vk_owner_id, 
+                            pub.get("file_path")
+                        )
                     else:
-                        ok = post_to_telegram(bot, tg_chat_id, pub["text"])
+                        ok = post_to_telegram(
+                            bot, 
+                            tg_chat_id, 
+                            pub["text"], 
+                            pub.get("file_path")
+                        )
                     
                     if ok:
                         pub["status"] = "published"
