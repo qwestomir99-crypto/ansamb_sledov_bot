@@ -1,5 +1,3 @@
-import threading
-import time
 import json
 from ping_utils import start_background_pinger
 
@@ -11,7 +9,6 @@ def load_config():
 
 def apply_ping_mode():
     config = load_config()
-    interval = config.get("ping_interval", 60)
-    # Перезапускаем пингер с новым интервалом
+    interval = config.get("ping", {}).get("interval", 60)
     start_background_pinger(interval)
     print(f"Пингер установлен на {interval} секунд")
