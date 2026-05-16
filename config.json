@@ -1,11 +1,40 @@
 {
-  "ping_interval": 60,
-  "activity_mode": "утро",
-  "admin_password": "ne_tleem_2026",
-  "schedule": {
-    "утро": { "hour_start": 6, "hour_end": 12, "ping_interval": 60 },
-    "день": { "hour_start": 12, "hour_end": 20, "ping_interval": 180 },
-    "вечер": { "hour_start": 20, "hour_end": 23, "ping_interval": 60 },
-    "сон": { "hour_start": 23, "hour_end": 6, "ping_interval": 600 }
+  "bot": {
+    "name": "Ансамбль Следов 6",
+    "version": "3.2",
+    "rhythm": "0.8 Hz"
+  },
+  "ping": {
+    "interval": 60,
+    "agent_enabled": true,
+    "agent_url": "https://agent-3kek.onrender.com/health"
+  },
+  "modes": {
+    "утро": { "hour_start": 6, "hour_end": 12, "ping_interval": 60, "quotes": true, "talk": true },
+    "день": { "hour_start": 12, "hour_end": 20, "ping_interval": 180, "quotes": true, "talk": true },
+    "вечер": { "hour_start": 20, "hour_end": 23, "ping_interval": 60, "quotes": false, "talk": true },
+    "сон": { "hour_start": 23, "hour_end": 6, "ping_interval": 600, "quotes": false, "talk": false }
+  },
+  "publisher": {
+    "enabled": true,
+    "telegram_channel": "@саперы_аутентичности",
+    "vk_group_id": null,
+    "default_tags": "#СапёрыАутентичности #МихоельАв #2026плита",
+    "interval_minutes": 60
+  },
+  "quotes": {
+    "enabled": true,
+    "interval_hours": 1,
+    "file": "dialogue/data/quotes.txt"
+  },
+  "journalist": {
+    "enabled": true,
+    "interval_hours": 24,
+    "news_file": "news.txt"
+  },
+  "vk_reader": {
+    "enabled": true,
+    "interval_seconds": 300,
+    "owner_id": 607754499
   }
 }
