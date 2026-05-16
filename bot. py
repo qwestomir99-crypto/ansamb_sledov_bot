@@ -163,6 +163,7 @@ def handle_callback(call):
         if not is_admin_authorized(user_id):
             bot.answer_callback_query(call.id, "❌ Не авторизован. Введите #админ <пароль>")
             return
+        from dialogue.admin_commands import handle_callback_mode
         handle_callback_mode(mode, bot, chat_id, message_id, user_id)
 
     elif data.startswith("ping_"):
@@ -170,36 +171,42 @@ def handle_callback(call):
         if not is_admin_authorized(user_id):
             bot.answer_callback_query(call.id, "❌ Не авторизован. Введите #админ <пароль>")
             return
+        from dialogue.admin_commands import handle_callback_ping
         handle_callback_ping(interval, bot, chat_id, message_id, user_id)
 
     elif data == "errors":
         if not is_admin_authorized(user_id):
             bot.answer_callback_query(call.id, "❌ Не авторизован. Введите #админ <пароль>")
             return
+        from dialogue.admin_commands import handle_callback_errors
         handle_callback_errors(user_id, bot, chat_id, message_id)
 
     elif data == "log":
         if not is_admin_authorized(user_id):
             bot.answer_callback_query(call.id, "❌ Не авторизован. Введите #админ <пароль>")
             return
+        from dialogue.admin_commands import handle_callback_log
         handle_callback_log(user_id, bot, chat_id, message_id)
 
     elif data == "logout":
         if not is_admin_authorized(user_id):
             bot.answer_callback_query(call.id, "❌ Не авторизован")
             return
+        from dialogue.admin_commands import handle_callback_logout
         handle_callback_logout(user_id, bot, chat_id, message_id)
 
     elif data == "pub_menu":
         if not is_admin_authorized(user_id):
             bot.answer_callback_query(call.id, "❌ Не авторизован")
             return
+        from dialogue.admin_commands import handle_callback_pub_menu
         handle_callback_pub_menu(bot, chat_id, message_id, user_id)
 
     elif data == "add_post":
         if not is_admin_authorized(user_id):
             bot.answer_callback_query(call.id, "❌ Не авторизован")
             return
+        from dialogue.admin_commands import ask_for_post_text
         ask_for_post_text(bot, chat_id, message_id)
 
     # Пользовательские кнопки
