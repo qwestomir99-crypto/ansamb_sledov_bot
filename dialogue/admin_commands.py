@@ -1,14 +1,13 @@
-
 import os
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from dialogue.ping_modes import apply_ping_mode
-from dialogue.activity_modes import get_current_activity_mode
 
 CONFIG_FILE = "config.json"
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 ADMIN_USER_ID = int(os.environ.get("ADMIN_USER_ID", 0))
+
 MODES = ["утро", "день", "вечер", "сон"]
 
 def log_admin_action(user_id, action, result):
@@ -33,7 +32,7 @@ def handle_admin_command(message, bot):
 
     text = message.text.split()
     if len(text) < 2:
-        bot.reply_to(message, "❌ Неверный формат. Используй: #админ <пароль> <команда>")
+        bot.reply_to(message, f"❌ Используй: #админ <пароль> <команда>\nДоступные режимы: {', '.join(MODES)}")
         return
 
     password = text[1]
@@ -42,8 +41,8 @@ def handle_admin_command(message, bot):
         log_admin_action(user_id, "wrong_password", "blocked")
         return
 
-    if len(text) < 3:
-        bot.reply_to(message, "❌ Укажи команду: ping <секунды> | mode <утро/день/вечер/сон>")
+    if len(text) == 2:
+        bot.reply_to(message, f"📋 Доступные режимы: {', '.join(MODES)}. Используй: #админ <пароль> mode <режим> [время]")
         return
 
     command = text[2]
@@ -60,15 +59,38 @@ def handle_admin_command(message, bot):
         except ValueError:
             bot.reply_to(message, "❌ Интервал должен быть числом")
 
-    elif command == "mode" and len(text) >= 4:
+    elif command == "mode":
+        if len(text) < 4:
+            bot.reply_to(message, f"❌ Укажи режим: {', '.join(MODES)}. Пример: #админ {ADMIN_PASSWORD} mode утро 14:30")
+            return
+        
         new_mode = text[3]
-        if new_mode in ["утро", "день", "вечер", "сон"]:
-            config["activity_mode"] = new_mode
-            save_config(config)
-            bot.reply_to(message, f"✅ Режим активности установлен на {new_mode}")
-            log_admin_action(user_id, f"mode {new_mode}", "success")
+        if new_mode not in MODES:
+            bot.reply_to(message, f"❌ Режим должен быть: {', '.join(MODES)}")
+            return
+        
+        start_time_str = text[4] if len(text) > 4 else None
+        
+        if start_time_str:
+            try:
+                start_hour, start_minute = map(int, start_time_str.split(':'))
+                start_time = datetime.now().replace(hour=start_hour, minute=start_minute, second=0, microsecond=0)
+                if start_time < datetime.now():
+                    start_time = start_time + timedelta(days=1)
+                config["force_mode"] = new_mode
+                config["force_mode_until"] = start_time.strftime("%Y-%m-%d %H:%M:%S")
+                save_config(config)
+                bot.reply_to(message, f"✅ Режим «{new_mode}» установлен с {start_time.strftime('%H:%M')}")
+                log_admin_action(user_id, f"mode {new_mode} at {start_time_str}", "success")
+            except:
+                bot.reply_to(message, "❌ Неверный формат времени. Используй ЧЧ:ММ")
         else:
-            bot.reply_to(message, "❌ Режим должен быть: утро, день, вечер, сон")
+            # Принудительно сейчас
+            config["force_mode"] = new_mode
+            config["force_mode_until"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            save_config(config)
+            bot.reply_to(message, f"✅ Режим «{new_mode}» установлен сейчас")
+            log_admin_action(user_id, f"mode {new_mode} now", "success")
 
     else:
         bot.reply_to(message, "❌ Неизвестная команда")
