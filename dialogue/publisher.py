@@ -59,7 +59,8 @@ def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
                             bot, 
                             tg_chat_id, 
                             pub["text"], 
-                            pub.get("file_path")
+                            pub.get("file_path"), 
+                            pub.get("tags")
                         )
                     
                     if ok:
