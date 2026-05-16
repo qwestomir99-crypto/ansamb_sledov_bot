@@ -55,6 +55,12 @@ def save_config(config):
 
 def get_admin_menu():
     keyboard = InlineKeyboardMarkup(row_width=2)
+    
+    # Блок 1: Управление ботом
+    keyboard.add(
+        InlineKeyboardButton("🤖 Управление ботом", callback_data="noop"),
+        row_width=1
+    )
     keyboard.add(
         InlineKeyboardButton("🌅 Утро", callback_data="mode_утро"),
         InlineKeyboardButton("☀️ День", callback_data="mode_день"),
@@ -62,13 +68,34 @@ def get_admin_menu():
         InlineKeyboardButton("😴 Сон", callback_data="mode_сон"),
         InlineKeyboardButton("⏱ Пинг 30", callback_data="ping_30"),
         InlineKeyboardButton("⏱ Пинг 60", callback_data="ping_60"),
-        InlineKeyboardButton("⏱ Пинг 180", callback_data="ping_180"),
-        InlineKeyboardButton("📋 Ошибки", callback_data="errors"),
-        InlineKeyboardButton("📜 Лог", callback_data="log"),
-        InlineKeyboardButton("📤 Публикации", callback_data="pub_menu"),
-        InlineKeyboardButton("➕ Добавить пост", callback_data="add_post"),
-        InlineKeyboardButton("❌ Выйти", callback_data="logout")
+        InlineKeyboardButton("⏱ Пинг 180", callback_data="ping_180")
     )
+    
+    # Блок 2: Управление контентом
+    keyboard.add(
+        InlineKeyboardButton("📝 Управление контентом", callback_data="noop"),
+        row_width=1
+    )
+    keyboard.add(
+        InlineKeyboardButton("📤 Публикации", callback_data="pub_menu"),
+        InlineKeyboardButton("➕ Добавить пост", callback_data="add_post")
+    )
+    
+    # Блок 3: Диагностика
+    keyboard.add(
+        InlineKeyboardButton("🔧 Диагностика", callback_data="noop"),
+        row_width=1
+    )
+    keyboard.add(
+        InlineKeyboardButton("📋 Ошибки", callback_data="errors"),
+        InlineKeyboardButton("📜 Лог", callback_data="log")
+    )
+    
+    # Блок 4: Выход
+    keyboard.add(
+        InlineKeyboardButton("🚪 Выйти", callback_data="logout")
+    )
+    
     return keyboard
 
 def get_user_menu():
@@ -223,3 +250,8 @@ def handle_admin_command(message, bot):
         bot.reply_to(message, "✅ Авторизован. Ваше меню:", reply_markup=get_admin_menu())
     else:
         bot.reply_to(message, "❌ Неверный пароль. Попробуйте: #админ <пароль>")
+
+# Заглушка для кнопок-разделителей (чтобы не было ошибки)
+@bot.callback_query_handler(func=lambda call: call.data == "noop")
+def noop_callback(call):
+    bot.answer_callback_query(call.id)
