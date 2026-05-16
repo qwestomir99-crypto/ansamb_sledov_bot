@@ -4,6 +4,7 @@ import time
 from datetime import datetime, timedelta
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dialogue.ping_modes import apply_ping_mode
+from dialogue.publisher import add_publication, load_publications
 
 CONFIG_FILE = "config.json"
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
@@ -56,6 +57,8 @@ def get_admin_menu():
         InlineKeyboardButton("⏱ Пинг 180", callback_data="ping_180"),
         InlineKeyboardButton("📋 Ошибки", callback_data="errors"),
         InlineKeyboardButton("📜 Лог", callback_data="log"),
+        InlineKeyboardButton("📤 Публикации", callback_data="pub_menu"),
+        InlineKeyboardButton("➕ Добавить пост", callback_data="add_post"),
         InlineKeyboardButton("❌ Выйти", callback_data="logout")
     )
     return keyboard
@@ -130,6 +133,49 @@ def handle_callback_logout(user_id, bot, chat_id, message_id):
     logout_admin(user_id)
     log_admin_action(user_id, "logout", "success")
     bot.edit_message_text("🔓 Вы вышли из админ-панели", chat_id, message_id)
+
+def handle_callback_pub_menu(bot, chat_id, message_id, user_id):
+    pubs = load_publications()
+    if not pubs:
+        bot.edit_message_text("📭 Нет отложенных публикаций", chat_id, message_id)
+        return
+    text = "📋 *Отложенные публикации:*\n\n"
+    for p in pubs:
+        status = "✅" if p["status"] == "published" else "⏳"
+        text += f"{status} `{p['text'][:50]}...` ({p['chat_id']})\n"
+    bot.edit_message_text(text, chat_id, message_id, parse_mode='Markdown')
+
+def ask_for_post_text(bot, chat_id, message_id):
+    msg = bot.send_message(chat_id, "✍️ Введите текст поста (можно с Markdown):")
+    bot.register_next_step_handler(msg, process_post_text, bot, chat_id, user_id)
+
+def process_post_text(message, bot, chat_id, user_id):
+    text = message.text
+    if not text:
+        bot.send_message(chat_id, "❌ Текст не может быть пустым")
+        return
+    ask_for_post_delay(bot, chat_id, user_id, text)
+
+def ask_for_post_delay(bot, chat_id, user_id, text):
+    msg = bot.send_message(chat_id, "⏱ Через сколько минут опубликовать? (число)")
+    bot.register_next_step_handler(msg, process_post_delay, bot, chat_id, user_id, text)
+
+def process_post_delay(message, bot, chat_id, user_id, text):
+    try:
+        delay_minutes = int(message.text.strip())
+        if delay_minutes <= 0:
+            raise ValueError
+    except:
+        bot.send_message(chat_id, "❌ Введите положительное число минут")
+        return
+    delay_seconds = delay_minutes * 60
+    config = load_config()
+    pub_config = config.get("publisher", {})
+    default_tags = pub_config.get("default_tags", "#СапёрыАутентичности")
+    
+    add_publication("telegram", text, delay_seconds, default_tags)
+    log_admin_action(user_id, f"add_post in {delay_minutes} min", "success")
+    bot.send_message(chat_id, f"✅ Пост запланирован через {delay_minutes} минут")
 
 def handle_admin_command(message, bot):
     user_id = message.from_user.id
