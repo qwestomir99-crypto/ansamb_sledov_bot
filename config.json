@@ -40,7 +40,7 @@
   "journalist": {
     "enabled": true,
     "interval_hours": 24,
-    "news_file": "news.txt"
+    "news_file": "dialogue/data/news.txt"
   },
   "autoposter": {
     "enabled": true,
@@ -50,7 +50,7 @@
     "vk_tags": "#Ансамбль #СледНаКонтаке"
   },
   "alisa": {
-    "enabled": true,
+    "enabled": false,
     "timeout": 30
   },
   "ritual": {
