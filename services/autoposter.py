@@ -5,6 +5,7 @@ import requests
 import threading
 from datetime import datetime
 from telethon import TelegramClient, events
+from telethon.tl.types import Channel, Chat, ChannelParticipantsAdmins
 
 POST_POOL_FILE = "dialogue/data/post_pool.json"
 CONFIG_FILE = "config.json"
@@ -98,9 +99,8 @@ def start_autoposter(config, vk_token, vk_owner_id):
 
     source_chat_id = int(ap_config.get("source_chat_id"))
     target_chat_id = ap_config.get("target_chat_id")
-    admin_user_id = config.get("telegram", {}).get("admin_user_id")
 
-    if not source_chat_id or not target_chat_id or not admin_user_id:
+    if not source_chat_id or not target_chat_id:
         print("[AUTOPOSTER] Ошибка: не хватает настроек в конфиге")
         return
 
@@ -119,19 +119,57 @@ def start_autoposter(config, vk_token, vk_owner_id):
 
         @client.on(events.NewMessage(chats=source_chat_id))
         async def handler(event):
-            msg = event.message
-            if msg.out or not msg.text:
+            message = event.message
+            sender = await event.get_sender()
+            
+            # Игнорируем ботов
+            if sender.bot:
+                print(f"[AUTOPOSTER] Игнор: сообщение от бота {sender.id}")
                 return
-            text = msg.text.strip()
+            
+            # Проверяем, является ли отправитель администратором группы
+            try:
+                chat = await event.get_chat()
+                if not isinstance(chat, (Channel, Chat)):
+                    return
+                
+                is_admin = False
+                async for user in client.iter_participants(chat, filter=ChannelParticipantsAdmins):
+                    if user.id == sender.id:
+                        is_admin = True
+                        break
+                
+                if not is_admin:
+                    print(f"[AUTOPOSTER] Игнор: {sender.id} не администратор")
+                    return
+                    
+                print(f"[AUTOPOSTER] ✅ Сообщение от администратора {sender.id}")
+                
+            except Exception as e:
+                print(f"[AUTOPOSTER] Ошибка проверки прав: {e}")
+                return
+            
+            if not message.text:
+                return
+            
+            text = message.text.strip()
             print(f"[AUTOPOSTER] Перехвачено: {text[:50]}...")
-            post = find_or_create_post(text, admin_user_id)
-            tg_tags = build_tg_tags(post)
-            await client.send_message(target_chat_id, f"{text}\n\n{tg_tags}")
-            print(f"[AUTOPOSTER] ✅ Telegram")
+            
+            post = find_or_create_post(text, sender.id)
+            
+            # Telegram канал
+            try:
+                tg_tags = build_tg_tags(post)
+                await client.send_message(target_chat_id, f"{text}\n\n{tg_tags}")
+                print(f"[AUTOPOSTER] ✅ Telegram")
+            except Exception as e:
+                print(f"[AUTOPOSTER] ❌ Telegram: {e}")
+            
+            # VK
             send_to_vk(text, post, vk_token, vk_owner_id)
 
         await client.start(phone=phone)
-        print(f"[AUTOPOSTER] ✅ Мониторинг запущен: {source_chat_id} → {target_chat_id}")
+        print(f"[AUTOPOSTER] ✅ Мониторинг запущен. Слушаю чат {source_chat_id} → {target_chat_id}")
         await client.run_until_disconnected()
 
     def start_loop():
