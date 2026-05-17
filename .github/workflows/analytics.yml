@@ -1,0 +1,24 @@
+name: Daily Analytics
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Каждый день в 00:00 UTC
+  workflow_dispatch:      # Можно запустить вручную
+
+jobs:
+  run-analytics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Install dependencies
+        run: pip install requests
+      - name: Run tag analyzer
+        run: python tag_analyzer.py --export --report
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: analytics
+          path: analytics/
