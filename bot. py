@@ -30,7 +30,7 @@ from dialogue.admin_commands import (
 from dialogue.activity_modes import should_respond_to_talk
 from dialogue.scheduler import scheduler_loop
 from services.autoposter import start_autoposter
-# from alisa_client import ask_alisa  # Временно отключено
+from dialogue.agent import ask_agent
 
 CONFIG_FILE = "config.json"
 
@@ -152,7 +152,6 @@ def handle_message(message):
             return
         bot.send_chat_action(message.chat.id, 'typing')
         
-        # Алиса временно отключена, используем резервного агента
         answer = ask_agent(phrase)
         
         if answer:
