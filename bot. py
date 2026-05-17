@@ -108,7 +108,7 @@ threading.Thread(target=keep_alive, daemon=True).start()
 threading.Thread(target=vk_reader_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
 threading.Thread(target=journalist_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
 threading.Thread(target=quotes_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
-threading.Thread(target=scheduler_loop, daemon=True).start()
+threading.Thread(target=scheduler_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
 threading.Thread(target=publish_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
 
 # ---------- ВЫЗОВ АГЕНТА (РЕЗЕРВ) ----------
