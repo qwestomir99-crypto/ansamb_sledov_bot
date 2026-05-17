@@ -1,0 +1,74 @@
+name: Analytics Daily
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  run-analytics:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      
+      - name: Install dependencies
+        run: pip install requests
+      
+      - name: Create analytics directory
+        run: mkdir -p analytics
+      
+      - name: Run tag analyzer
+        run: python tag_analyzer.py --combined --export --report
+      
+      - name: Upload analytics reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: analytics-reports
+          path: analytics/
+          retention-days: 30
+      
+      - name: Send report to Telegram
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          ADMIN_USER_ID: ${{ secrets.ADMIN_USER_ID }}
+        run: |
+          LATEST=$(ls -t analytics/combined_report_*.json | head -1)
+          if [ -n "$LATEST" ] && [ -f "$LATEST" ]; then
+            python -c "
+import json
+import requests
+import os
+
+with open('$LATEST', 'r') as f:
+    data = json.load(f)
+
+vk_top = data.get('vk', {}).get('top_tags', [])[:5]
+pool_top = data.get('pool', {}).get('top_tags', [])[:5]
+
+if vk_top:
+    tags = ', '.join([f'#{t[0]}' for t in vk_top])
+    text = f'📊 *Аналитика за сутки*\\n\\n🔥 Топ-5 тегов VK:\\n{tags}'
+else:
+    text = '📊 Аналитика: новых данных нет'
+
+if pool_top:
+    pool_tags = ', '.join([f'#{t[0]}' for t in pool_top])
+    text += f'\\n\\n📚 Топ-5 тегов в пуле:\\n{pool_tags}'
+
+bot_token = os.environ.get('BOT_TOKEN')
+admin_id = os.environ.get('ADMIN_USER_ID')
+
+if bot_token and admin_id:
+    requests.post(
+        f'https://api.telegram.org/bot{bot_token}/sendMessage',
+        json={'chat_id': admin_id, 'text': text, 'parse_mode': 'Markdown'}
+    )
+"
+          fi
