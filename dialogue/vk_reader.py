@@ -1,65 +1,102 @@
 import time
-import os
 import json
+import os
 import requests
+from datetime import datetime
 
 CONFIG_FILE = "config.json"
-LAST_POST_FILE = "last_post.txt"
+VK_POSTS_FILE = "dialogue/data/vk_posts.json"
 
 def load_config():
     with open(CONFIG_FILE, "r") as f:
         return json.load(f)
 
-def load_last_post_id():
-    if os.path.exists(LAST_POST_FILE):
-        try:
-            with open(LAST_POST_FILE, "r") as f:
-                return int(f.read().strip())
-        except:
-            return 0
-    return 0
+def load_vk_posts():
+    """Загружает сохранённые посты VK из файла"""
+    if not os.path.exists(VK_POSTS_FILE):
+        return []
+    with open(VK_POSTS_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
 
-def save_last_post_id(post_id):
-    with open(LAST_POST_FILE, "w") as f:
-        f.write(str(post_id))
+def save_vk_posts(posts):
+    """Сохраняет посты VK в файл"""
+    os.makedirs(os.path.dirname(VK_POSTS_FILE), exist_ok=True)
+    with open(VK_POSTS_FILE, "w", encoding="utf-8") as f:
+        json.dump(posts, f, indent=2, ensure_ascii=False)
 
-def vk_reader_loop(bot, VK_TOKEN, OWNER_ID, TG_CHAT_ID):
-    if not VK_TOKEN:
-        print("VK Reader: VK_TOKEN не задан")
+def add_vk_post(post):
+    """Добавляет новый пост в историю (если ещё нет)"""
+    posts = load_vk_posts()
+    # Проверяем, нет ли уже такого поста (по id)
+    for p in posts:
+        if p.get("id") == post.get("id"):
+            return
+    posts.append(post)
+    save_vk_posts(posts)
+    print(f"[VK_READER] Новый пост сохранён: {post.get('text', '')[:50]}...")
+
+def fetch_last_posts(vk_token, owner_id, count=5):
+    """Получает последние посты из VK"""
+    params = {
+        "access_token": vk_token,
+        "v": "5.199",
+        "owner_id": owner_id,
+        "count": count,
+        "filter": "owner"
+    }
+    try:
+        r = requests.get("https://api.vk.com/method/wall.get", params=params, timeout=10)
+        data = r.json()
+        if "response" in data:
+            items = data["response"].get("items", [])
+            posts = []
+            for item in items:
+                posts.append({
+                    "id": item["id"],
+                    "text": item.get("text", ""),
+                    "date": datetime.fromtimestamp(item["date"]).isoformat(),
+                    "likes": item.get("likes", {}).get("count", 0),
+                    "reposts": item.get("reposts", {}).get("count", 0),
+                    "views": item.get("views", {}).get("count", 0),
+                    "comments": item.get("comments", {}).get("count", 0)
+                })
+            return posts
+        else:
+            print(f"[VK_READER] Ошибка API: {data}")
+            return []
+    except Exception as e:
+        print(f"[VK_READER] Ошибка запроса: {e}")
+        return []
+
+def vk_reader_loop(bot, vk_token, owner_id, tg_chat_id):
+    """Основной цикл чтения VK"""
+    if not vk_token or not owner_id:
+        print("[VK_READER] Нет токена или owner_id, выход")
         return
     
-    config = load_config()
-    interval_seconds = config.get("vk_reader", {}).get("interval_seconds", 300)
-    last_id = load_last_post_id()
-    print(f"VK Reader: поток запущен, последний ID = {last_id}")
+    print("[VK_READER] Поток запущен, последний ID = 0")
+    
+    last_post_id = None
+    posts = load_vk_posts()
+    if posts:
+        last_post_id = posts[-1].get("id")
     
     while True:
-        params = {
-            'access_token': VK_TOKEN,
-            'v': '5.131',
-            'owner_id': OWNER_ID,
-            'count': 1,
-            'filter': 'owner'
-        }
         try:
-            response = requests.get('https://api.vk.com/method/wall.get', params=params, timeout=10)
-            data = response.json()
-            if 'response' in data and data['response']['items']:
-                post = data['response']['items'][0]
-                post_id = post['id']
-                if post_id > last_id:
-                    last_id = post_id
-                    save_last_post_id(post_id)
-                    text = post.get('text', '')[:500]
-                    url = f"https://vk.com/wall{OWNER_ID}_{post_id}"
-                    message = f"📢 **Новый пост в VK**\n\n{text}\n\n🔗 [Читать дальше]({url})"
-                    bot.send_message(TG_CHAT_ID, message, parse_mode='Markdown')
-                    print(f"VK Reader: отправлен пост {post_id}")
-                else:
-                    print(f"VK Reader: новых постов нет")
-            else:
-                print(f"VK Reader: ошибка API: {data}")
+            new_posts = fetch_last_posts(vk_token, owner_id, count=3)
+            if not new_posts:
+                time.sleep(60)
+                continue
+            
+            # Сохраняем новые посты (которых ещё нет в файле)
+            for post in reversed(new_posts):
+                if last_post_id is None or post["id"] > last_post_id:
+                    add_vk_post(post)
+                    if post["text"]:
+                        print(f"[VK_READER] Новый пост: {post['text'][:50]}...")
+                    last_post_id = post["id"]
+            
         except Exception as e:
-            print(f"VK Reader ошибка: {e}")
+            print(f"[VK_READER] Ошибка цикла: {e}")
         
-        time.sleep(interval_seconds)
+        time.sleep(60)
