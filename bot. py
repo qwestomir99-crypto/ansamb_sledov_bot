@@ -29,7 +29,7 @@ from dialogue.admin_commands import (
 )
 from dialogue.activity_modes import should_respond_to_talk
 from dialogue.scheduler import scheduler_loop
-from services.autoposter import start_autoposter
+# from services.autoposter import start_autoposter  # Временно отключён
 from dialogue.agent import ask_agent
 
 CONFIG_FILE = "config.json"
@@ -307,12 +307,13 @@ def handle_callback(call):
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
 start_background_pinger(60)
 
-# Автопостинг из чата админа
-if config.get("autoposter", {}).get("enabled", False):
-    try:
-        start_autoposter(config, VK_TOKEN, VK_OWNER_ID)
-        print("[BOT] Автопостинг запущен")
-    except Exception as e:
-        print(f"[BOT] Ошибка автопостинга: {e}")
+# Автопостинг временно отключён (ошибка 409, Telethon не работает)
+# if config.get("autoposter", {}).get("enabled", False):
+#     try:
+#         start_autoposter(config, VK_TOKEN, VK_OWNER_ID)
+#         print("[BOT] Автопостинг запущен")
+#     except Exception as e:
+#         print(f"[BOT] Ошибка автопостинга: {e}")
+print("[BOT] Автопостинг временно отключён (режим стабильной работы)")
 
 bot.infinity_polling()
