@@ -52,5 +52,8 @@
   "alisa": {
     "enabled": true,
     "timeout": 30
+  },
+  "ritual": {
+    "last_midnight": null
   }
 }
