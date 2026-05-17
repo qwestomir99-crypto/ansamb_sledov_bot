@@ -11,12 +11,24 @@ def load_config():
 
 def load_news():
     config = load_config()
-    news_file = config.get("journalist", {}).get("news_file", "news.txt")
+    news_file = config.get("journalist", {}).get("news_file", "dialogue/data/news.txt")
+    
+    # Создаём папку, если её нет
+    os.makedirs(os.path.dirname(news_file), exist_ok=True)
     
     if not os.path.exists(news_file):
         with open(news_file, "w", encoding="utf-8") as f:
-            f.write("🔹 Ритм 0,8 Гц стабилен. Сеть тлеет.\n")
-            f.write("🔹 #Тлеем → #Фиксируем → #Вспышка.\n")
+            default_news = [
+                "🔹 Ритм 0,8 Гц стабилен. Сеть тлеет.",
+                "🔹 #Тлеем → #Фиксируем → #Вспышка.",
+                "🔹 Феникс ждёт возрождения. Наблюдение продолжается.",
+                "🔹 Сапёр на посту. Тишина в эфире — знак качества.",
+                "🔹 Михоель Ав ведёт. След на контакте. QSL.",
+                "🔹 Плита 2026. Готовность 0,8 Гц."
+            ]
+            for line in default_news:
+                f.write(line + "\n")
+    
     with open(news_file, "r", encoding="utf-8") as f:
         return [line.strip() for line in f if line.strip()]
 
@@ -37,5 +49,5 @@ def journalist_loop(bot, TG_CHAT_ID):
             bot.send_message(TG_CHAT_ID, full_message, parse_mode='Markdown')
             index += 1
         except Exception as e:
-            print(f"Журналист ошибка: {e}")
+            print(f"[JOURNALIST] Ошибка: {e}")
         time.sleep(interval_seconds)
