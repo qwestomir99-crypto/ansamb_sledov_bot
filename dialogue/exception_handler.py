@@ -1,10 +1,8 @@
 import sys
 import traceback
 from datetime import datetime
-import os
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ERROR_LOG = os.path.join(BASE_DIR, "error.log")
+ERROR_LOG = "error.log"
 
 def global_exception_handler(exc_type, exc_value, exc_traceback):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -17,4 +15,6 @@ def global_exception_handler(exc_type, exc_value, exc_traceback):
     
     print(f"[EXCEPTION] {exc_type.__name__}: {exc_value}")
 
-sys.excepthook = global_exception_handler
+def setup_exception_handler():
+    """Устанавливает глобальный обработчик ошибок"""
+    sys.excepthook = global_exception_handler
