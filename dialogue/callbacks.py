@@ -8,7 +8,8 @@ from dialogue.admin_commands import (
     handle_callback_quotes_add_start,
     handle_callback_quotes_interval,
     handle_callback_quotes_set_interval,
-    ask_for_post_text
+    ask_for_post_text,
+    get_admin_menu
 )
 from ping_utils import ping_self
 
@@ -21,6 +22,19 @@ def register_callback_handlers(bot, config):
         data = call.data
         chat_id = call.message.chat.id
         message_id = call.message.message_id
+
+        # ---------- ВОЗВРАТ В АДМИН-МЕНЮ ----------
+        if data == "admin_menu":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            bot.edit_message_text(
+                "🛡️ Админ-меню:",
+                chat_id, message_id,
+                reply_markup=get_admin_menu()
+            )
+            bot.answer_callback_query(call.id)
+            return
 
         # ---------- РЕЖИМЫ ----------
         if data.startswith("mode_"):
@@ -128,5 +142,9 @@ def register_callback_handlers(bot, config):
 🔹 *#меню* — меню
             """
             bot.send_message(chat_id, help_text, parse_mode='Markdown')
+
+        else:
+            # Неизвестный callback — просто отвечаем
+            bot.answer_callback_query(call.id)
 
         bot.answer_callback_query(call.id)
