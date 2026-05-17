@@ -14,8 +14,6 @@ def ask_agent(phrase: str) -> str:
         resp = requests.post(AGENT_URL, json={"prompt": phrase}, timeout=20)
         if resp.status_code == 200:
             return resp.json().get("answer", "Ошибка: агент не вернул ответ")
-        elif resp.status_code == 502:
-            return random.choice(["Связь с агентом прервана. Жду сигнала...", "Тишина в эфире..."])
         else:
             return f"Ошибка агента: статус {resp.status_code}"
     except requests.exceptions.Timeout:
