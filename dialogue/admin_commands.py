@@ -10,18 +10,56 @@ CONFIG_FILE = "config.json"
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 ADMIN_USER_ID = int(os.environ.get("ADMIN_USER_ID", 0))
 
-MODES = ["утро", "день", "вечер", "сон"]
+MODES = ["утро", "день", "вечер", "ночь"]
 
 GREETINGS = {
     "утро": "🌅 Доброе утро, сапёр. Сеть тлеет, ритм 0,8 Гц стабилен.",
     "день": "☀️ Хорошего дня. Не забывай #Тлеем.",
     "вечер": "🌙 Спокойного вечера. Наблюдение продолжается.",
-    "сон": "😴 Режим сна. Старший брат отдыхает. Вопросы — утром."
+    "ночь": "😴 Режим сна. Старший брат отдыхает. Вопросы — утром."
 }
 
 # Хранилище активных сессий админа
 admin_sessions = {}
 SESSION_TIMEOUT = 1800  # 30 минут
+
+# Блокировка после 3 попыток
+failed_attempts = {}
+BLOCK_TIME = 3600  # 1 час
+MAX_ATTEMPTS = 3
+
+def is_blocked(user_id):
+    """Проверяет, заблокирован ли пользователь"""
+    if user_id in failed_attempts:
+        attempts, block_until = failed_attempts[user_id]
+        if time.time() < block_until:
+            return True
+        else:
+            del failed_attempts[user_id]
+    return False
+
+def register_failed_attempt(user_id, bot):
+    """Регистрирует неудачную попытку и при необходимости блокирует"""
+    attempts, block_until = failed_attempts.get(user_id, (0, 0))
+    attempts += 1
+    
+    if attempts >= MAX_ATTEMPTS:
+        block_until = time.time() + BLOCK_TIME
+        # Отправляем уведомление в личку админу
+        try:
+            bot.send_message(
+                ADMIN_USER_ID,
+                f"⚠️ *Попытка взлома админки!*\n\n"
+                f"User ID: `{user_id}`\n"
+                f"Заблокирован на 1 час.\n"
+                f"Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                parse_mode='Markdown'
+            )
+        except:
+            pass
+        print(f"[ADMIN] Блокировка user_id {user_id} на 1 час")
+    
+    failed_attempts[user_id] = (attempts, block_until)
 
 def is_admin_authorized(user_id):
     if user_id != ADMIN_USER_ID:
@@ -56,32 +94,28 @@ def save_config(config):
 def get_admin_menu():
     keyboard = InlineKeyboardMarkup(row_width=2)
     
-    # Блок 1: Управление ботом
     keyboard.add(InlineKeyboardButton("🤖 Управление ботом", callback_data="noop"))
     keyboard.add(
         InlineKeyboardButton("🌅 Утро", callback_data="mode_утро"),
         InlineKeyboardButton("☀️ День", callback_data="mode_день"),
         InlineKeyboardButton("🌙 Вечер", callback_data="mode_вечер"),
-        InlineKeyboardButton("😴 Сон", callback_data="mode_сон"),
+        InlineKeyboardButton("😴 Ночь", callback_data="mode_ночь"),
         InlineKeyboardButton("⏱ Пинг 30", callback_data="ping_30"),
         InlineKeyboardButton("⏱ Пинг 60", callback_data="ping_60"),
         InlineKeyboardButton("⏱ Пинг 180", callback_data="ping_180")
     )
     
-    # Кнопка управления Алисой
     config = load_config()
     alisa_enabled = config.get("alisa", {}).get("enabled", True)
     alisa_status = "✅" if alisa_enabled else "❌"
     keyboard.add(InlineKeyboardButton(f"🤖 Старший брат {alisa_status}", callback_data="toggle_alisa"))
     
-    # Блок 2: Управление контентом
     keyboard.add(InlineKeyboardButton("📝 Управление контентом", callback_data="noop"))
     keyboard.add(
         InlineKeyboardButton("📤 Публикации", callback_data="pub_menu"),
         InlineKeyboardButton("➕ Добавить пост", callback_data="add_post")
     )
     
-    # Блок 3: Управление цитатами
     keyboard.add(InlineKeyboardButton("📜 Управление цитатами", callback_data="noop"))
     keyboard.add(
         InlineKeyboardButton("📋 Список цитат", callback_data="quotes_list"),
@@ -89,14 +123,12 @@ def get_admin_menu():
         InlineKeyboardButton("⏱ Интервал цитат", callback_data="quotes_interval")
     )
     
-    # Блок 4: Диагностика
     keyboard.add(InlineKeyboardButton("🔧 Диагностика", callback_data="noop"))
     keyboard.add(
         InlineKeyboardButton("📋 Ошибки", callback_data="errors"),
         InlineKeyboardButton("📜 Лог", callback_data="log")
     )
     
-    # Блок 5: Выход
     keyboard.add(InlineKeyboardButton("🚪 Выйти", callback_data="logout"))
     
     return keyboard
@@ -188,14 +220,12 @@ def handle_callback_toggle_alisa(bot, chat_id, message_id, user_id):
     bot.edit_message_text(f"🤖 Старший брат {status}", chat_id, message_id)
     bot.send_message(chat_id, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
 
-# ---------- УПРАВЛЕНИЕ ЦИТАТАМИ ----------
 def handle_callback_quotes_list(bot, chat_id, message_id, user_id):
     from dialogue.quotes import get_quotes_list
     quotes = get_quotes_list()
     if not quotes:
         bot.edit_message_text("📭 Список цитат пуст", chat_id, message_id)
         return
-    
     text = "📜 *Список цитат:*\n\n"
     for i, q in enumerate(quotes):
         text += f"`{i+1}.` {q[:60]}{'...' if len(q) > 60 else ''}\n"
@@ -214,7 +244,6 @@ def process_quote_add(message, bot, chat_id, user_id):
     if not text:
         bot.send_message(chat_id, "❌ Цитата не может быть пустой")
         return
-    
     from dialogue.quotes import add_quote
     add_quote(text)
     log_admin_action(user_id, f"add_quote: {text[:50]}", "success")
@@ -223,35 +252,28 @@ def process_quote_add(message, bot, chat_id, user_id):
 def handle_callback_quotes_interval(bot, chat_id, message_id, user_id):
     from dialogue.quotes import get_quotes_interval_minutes
     current = get_quotes_interval_minutes()
-    
     keyboard = InlineKeyboardMarkup(row_width=3)
     for minutes in [15, 30, 60, 120, 240, 480]:
         marker = "✅" if minutes == current else ""
         keyboard.add(InlineKeyboardButton(f"{minutes} мин {marker}", callback_data=f"quote_int_{minutes}"))
     keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="admin_menu"))
-    
     bot.edit_message_text(
         f"⏱ *Интервал публикации цитат*\n\nТекущий: {current} минут\n\nВыбери новый:",
         chat_id, message_id, parse_mode='Markdown', reply_markup=keyboard
     )
 
 def handle_callback_quotes_set_interval(interval, bot, chat_id, message_id, user_id):
-    from dialogue.quotes import set_quotes_interval_minutes, quotes_loop, load_config
+    from dialogue.quotes import set_quotes_interval_minutes, quotes_loop, load_config as load_cfg
     set_quotes_interval_minutes(interval)
-    
     import dialogue.quotes as quotes_module
     quotes_module.quote_thread_running = False
     time.sleep(1)
-    
-    config = load_config()
-    TG_CHAT_ID = config.get("telegram", {}).get("publish_channel", "@qwestomir")
-    
+    cfg = load_cfg()
+    TG_CHAT_ID = cfg.get("telegram", {}).get("publish_channel", "@qwestomir")
     quotes_module.quotes_loop(bot, TG_CHAT_ID)
-    
     log_admin_action(user_id, f"quotes_interval {interval}", "success")
     bot.edit_message_text(f"✅ Интервал цитат установлен: {interval} минут", chat_id, message_id)
 
-# ---------- КОМАНДА АДМИНА ----------
 def ask_for_post_text(bot, chat_id, message_id):
     msg = bot.send_message(chat_id, "✍️ Введите текст поста (можно с Markdown) или /skip для поста без текста")
     bot.register_next_step_handler(msg, process_post_text, bot, chat_id)
@@ -290,7 +312,6 @@ def process_post_file(message, bot, chat_id, text):
             f.write(downloaded_file)
     else:
         bot.send_message(chat_id, "❌ Неподдерживаемый тип файла. Пост будет без вложения.")
-    
     ask_for_post_delay(bot, chat_id, text, file_path)
 
 def ask_for_post_delay(bot, chat_id, text, file_path):
@@ -309,7 +330,6 @@ def process_post_delay(message, bot, chat_id, text, file_path):
     config = load_config()
     pub_config = config.get("publisher", {})
     default_tags = pub_config.get("default_tags", "#СапёрыАутентичности #МихоельАв #2026плита")
-    
     add_publication("telegram", text, delay_seconds, default_tags, file_path)
     user_id = message.from_user.id
     log_admin_action(user_id, f"add_post in {delay_minutes} min, text: {bool(text)}, file: {bool(file_path)}", "success")
@@ -317,7 +337,14 @@ def process_post_delay(message, bot, chat_id, text, file_path):
 
 def handle_admin_command(message, bot):
     user_id = message.from_user.id
+    
+    # Проверка на блокировку
+    if is_blocked(user_id):
+        bot.reply_to(message, "❌ Доступ заблокирован на 1 час из-за слишком частых неудачных попыток.")
+        return
+    
     if user_id != ADMIN_USER_ID:
+        register_failed_attempt(user_id, bot)
         bot.reply_to(message, "❌ Доступ запрещён.")
         return
 
@@ -325,6 +352,8 @@ def handle_admin_command(message, bot):
     if len(parts) == 2 and parts[1] == ADMIN_PASSWORD:
         authorize_admin(user_id, parts[1])
         log_admin_action(user_id, "login", "success")
+        failed_attempts.pop(user_id, None)
         bot.reply_to(message, "✅ Авторизован. Ваше меню:", reply_markup=get_admin_menu())
     else:
+        register_failed_attempt(user_id, bot)
         bot.reply_to(message, "❌ Неверный пароль. Попробуйте: #админ <пароль>")
