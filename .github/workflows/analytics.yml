@@ -1,24 +1,35 @@
-name: Daily Analytics
+name: Analytics Daily
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # Каждый день в 00:00 UTC
-  workflow_dispatch:      # Можно запустить вручную
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 jobs:
   run-analytics:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.14'
+      
       - name: Install dependencies
         run: pip install requests
+      
+      - name: Create analytics directory
+        run: mkdir -p analytics
+      
       - name: Run tag analyzer
-        run: python tag_analyzer.py --export --report
-      - name: Upload results
+        run: python tag_analyzer.py --combined --export --report
+      
+      - name: Upload analytics reports
         uses: actions/upload-artifact@v4
         with:
-          name: analytics
+          name: analytics-reports
           path: analytics/
+          retention-days: 30
