@@ -6,7 +6,6 @@ from dialogue.admin_commands import (
 )
 from dialogue.activity_modes import should_respond_to_talk
 from dialogue.agent import ask_agent
-from alisa_client import ask_alisa
 from ping_utils import ping_self
 
 CONFIG_FILE = "config.json"
@@ -66,28 +65,26 @@ def register_handlers(bot, config):
             handle_admin_command(message, bot)
             return
 
+        # --- Обработчик #говори (через моего агента) ---
         if text.startswith("#говори"):
             if not should_respond_to_talk():
                 bot.reply_to(message, "🌙 Старший брат отдыхает. Спроси в другой раз.")
                 return
+            
             phrase = text.replace("#говори", "", 1).strip()
             if not phrase:
                 bot.reply_to(message, "🗣 *Старший брат:*\nА что ты хотел сказать?")
                 return
+            
             bot.send_chat_action(message.chat.id, 'typing')
-            
-            alisa_enabled = config.get("alisa", {}).get("enabled", True)
-            
-            if alisa_enabled:
-                answer = ask_alisa(phrase)
-            else:
-                answer = ask_agent(phrase)
+            answer = ask_agent(phrase)
             
             if answer:
                 bot.reply_to(message, f"🗣 *Старший брат:*\n{answer}", parse_mode='Markdown')
             else:
                 bot.reply_to(message, "🗣 *Старший брат:*\nНе отвечаю сейчас. Попробуй позже.")
             return
+        # --- Конец обработчика #говори ---
 
         if "#дышим" in text:
             ping_self()
