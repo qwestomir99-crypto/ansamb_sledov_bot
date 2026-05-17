@@ -122,12 +122,10 @@ def start_autoposter(config, vk_token, vk_owner_id):
             message = event.message
             sender = await event.get_sender()
             
-            # Игнорируем ботов
             if sender.bot:
                 print(f"[AUTOPOSTER] Игнор: сообщение от бота {sender.id}")
                 return
             
-            # Проверяем, является ли отправитель администратором группы
             try:
                 chat = await event.get_chat()
                 if not isinstance(chat, (Channel, Chat)):
@@ -157,10 +155,10 @@ def start_autoposter(config, vk_token, vk_owner_id):
             
             post = find_or_create_post(text, sender.id)
             
-            # Telegram канал
+            # Telegram канал (с эмодзи 🔁 для визуального отличия)
             try:
                 tg_tags = build_tg_tags(post)
-                await client.send_message(target_chat_id, f"{text}\n\n{tg_tags}")
+                await client.send_message(target_chat_id, f"🔁 {text}\n\n{tg_tags}")
                 print(f"[AUTOPOSTER] ✅ Telegram")
             except Exception as e:
                 print(f"[AUTOPOSTER] ❌ Telegram: {e}")
