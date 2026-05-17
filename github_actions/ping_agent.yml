@@ -1,0 +1,13 @@
+name: Ping Agent
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping agent
+        run: curl -s https://agent-3kek.onrender.com/health
