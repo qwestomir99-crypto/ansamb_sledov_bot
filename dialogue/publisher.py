@@ -3,20 +3,15 @@ import threading
 import json
 import os
 from datetime import datetime
-from dialogue.activity_modes import should_publish
+from dialogue.activity_modes import should_publish, get_current_mode_config
 from dialogue.publisher_utils import post_to_telegram, post_to_vk
 from dialogue.post_manager import get_post_for_publishing, build_tags, add_post_to_pool
 
 PUBLICATIONS_FILE = "publications.json"
-CONFIG_FILE = "config.json"
 
 def load_config():
-    with open(CONFIG_FILE, "r") as f:
+    with open("config.json", "r") as f:
         return json.load(f)
-
-def save_config(config):
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(config, f, indent=2)
 
 def load_publications():
     if not os.path.exists(PUBLICATIONS_FILE):
@@ -42,9 +37,6 @@ def add_publication(platform, text, delay_seconds, tags, file_path=None):
     save_publications(pubs)
 
 def publish_post(bot, tg_chat_id, vk_token, vk_owner_id, post, platform="both"):
-    """
-    Публикует один пост в Telegram и/или VK
-    """
     text = post.get("text", "")
     tags = build_tags(post)
     full_message = f"{text}\n\n{tags}" if text else tags
@@ -52,7 +44,6 @@ def publish_post(bot, tg_chat_id, vk_token, vk_owner_id, post, platform="both"):
     success_tg = False
     success_vk = False
     
-    # Telegram
     if platform in ["both", "telegram"]:
         try:
             success_tg = post_to_telegram(bot, tg_chat_id, text, None, tags)
@@ -60,7 +51,6 @@ def publish_post(bot, tg_chat_id, vk_token, vk_owner_id, post, platform="both"):
         except Exception as e:
             print(f"[PUBLISHER] Telegram ошибка: {e}")
     
-    # VK
     if platform in ["both", "vk"] and vk_token and vk_owner_id:
         try:
             success_vk = post_to_vk(text, tags, vk_token, vk_owner_id, None)
@@ -71,23 +61,31 @@ def publish_post(bot, tg_chat_id, vk_token, vk_owner_id, post, platform="both"):
     return success_tg or success_vk
 
 def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
-    """
-    Основной цикл публикатора.
-    Проверяет отложенные публикации и публикует посты из post_pool.
-    """
     print("[PUBLISHER] Поток публикатора запущен, проверка каждые 30 секунд")
     
     last_pool_check = 0
-    pool_interval = 3600  # Проверяем пул раз в час (можно настроить)
+    last_interval = None
     
     while True:
         try:
+            # Получаем интервал из текущего режима
+            mode_config = get_current_mode_config()
+            pool_interval = mode_config.get("publisher_interval", 0)
+            
+            # Если интервал изменился или ещё не установлен
+            if pool_interval != last_interval:
+                last_interval = pool_interval
+                if pool_interval > 0:
+                    print(f"[PUBLISHER] Интервал публикаций обновлён: {pool_interval} минут")
+                else:
+                    print("[PUBLISHER] Публикации отключены в текущем режиме")
+            
             # Проверяем, можно ли публиковать по режиму
-            if not should_publish():
+            if not should_publish() or pool_interval <= 0:
                 time.sleep(30)
                 continue
             
-            # 1. Обрабатываем отложенные публикации
+            # Обрабатываем отложенные публикации
             pubs = load_publications()
             now = time.time()
             changed = False
@@ -133,14 +131,16 @@ def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
             if cleaned:
                 save_publications(new_pubs)
             
-            # 2. Публикуем пост из post_pool (раз в час или по расписанию)
+            # Публикуем пост из пула с интервалом из режима
             current_time = time.time()
-            if current_time - last_pool_check >= pool_interval:
+            interval_seconds = pool_interval * 60
+            
+            if current_time - last_pool_check >= interval_seconds:
                 last_pool_check = current_time
                 
                 post, index = get_post_for_publishing()
                 if post:
-                    print(f"[PUBLISHER] Публикуем пост из пула (индекс {index})")
+                    print(f"[PUBLISHER] Публикуем пост из пула (интервал {pool_interval} мин)")
                     publish_post(bot, tg_chat_id, vk_token, vk_owner_id, post)
                 else:
                     print("[PUBLISHER] Нет постов в пуле")
