@@ -2,7 +2,7 @@
 # Модуль: dialogue/admin_commands.py
 # Справка: README.md → Админка
 # Задача: админ-меню, управление режимами, цитатами, постами
-# Комментарий: кнопка "🎬 Пост в VK (с медиа)" использует add_publication
+# Комментарий: кнопка "🎬 Пост в VK" отправляет напрямую (минуя публикатор)
 # ==========================================
 
 import os
@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dialogue.ping_modes import apply_ping_mode
 from dialogue.publisher import add_publication, load_publications
-from dialogue.publisher_utils import get_auto_tags, get_random_quote
+from dialogue.publisher_utils import get_auto_tags, get_random_quote, post_to_vk
 
 CONFIG_FILE = "config.json"
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
@@ -302,7 +302,7 @@ def handle_callback_quotes_set_interval(interval, bot, chat_id, message_id, user
     return_to_admin_menu(bot, chat_id, message_id, user_id)
 
 # ==========================================
-# Блок: мгновенный пост в VK (через публикатор)
+# Блок: мгновенный пост в VK (напрямую, без публикатора)
 # ==========================================
 
 def handle_callback_vk_post(bot, chat_id, message_id, user_id):
@@ -324,7 +324,6 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
         file_path = None
     elif message.photo:
         file_info = bot.get_file(message.photo[-1].file_id)
-        # Сохраняем во временную папку /tmp (Render разрешает запись)
         file_path = os.path.join(tempfile.gettempdir(), f"temp_vk_{message.photo[-1].file_id}.jpg")
         downloaded_file = bot.download_file(file_info.file_path)
         with open(file_path, 'wb') as f:
@@ -360,14 +359,18 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
         return_to_admin_menu(bot, chat_id, user_id=user_id)
         return
     
+    # Автоматически подбираем цитату и теги
     quote = get_random_quote()
     full_text = f"{text}\n\n📜 {quote}"
     auto_tags = get_auto_tags(text, "vk")
     
-    # Добавляем публикацию с задержкой 0
-    add_publication("vk", full_text, 0, auto_tags, file_path)
+    # Отправляем напрямую в VK (минуя публикатор)
+    success = post_to_vk(full_text, auto_tags, vk_token, vk_owner_id, file_path, auto_quote=False, auto_tags=False)
     
-    bot.send_message(chat_id, f"✅ Пост отправлен в VK:\n\n{full_text[:200]}")
+    if success:
+        bot.send_message(chat_id, f"✅ Пост отправлен в VK:\n\n{full_text[:200]}")
+    else:
+        bot.send_message(chat_id, "❌ Ошибка при отправке в VK")
     
     # Удаляем временный файл
     if file_path and os.path.exists(file_path):
