@@ -1,3 +1,12 @@
+# ==========================================
+# Модуль: dialogue/callbacks.py
+# Справка: README.md → Обработчики кнопок
+# Задача: обработка callback_query (нажатий на кнопки)
+# Комментарий: добавлена кнопка "🎬 Пост в VK (с медиа)"
+# Зависит от: admin_commands.py
+# Вызывается из: bot.py
+# ==========================================
+
 from dialogue.admin_commands import (
     is_admin_authorized,
     handle_callback_mode, handle_callback_ping,
@@ -8,6 +17,7 @@ from dialogue.admin_commands import (
     handle_callback_quotes_add_start,
     handle_callback_quotes_interval,
     handle_callback_quotes_set_interval,
+    handle_callback_vk_post,
     ask_for_post_text,
     get_admin_menu
 )
@@ -84,6 +94,13 @@ def register_callback_handlers(bot, config):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
             ask_for_post_text(bot, chat_id, message_id)
+
+        # ---------- ПОСТ В VK (НОВЫЙ) ----------
+        elif data == "vk_post":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            handle_callback_vk_post(bot, chat_id, message_id, user_id)
 
         # ---------- АЛИСА ----------
         elif data == "toggle_alisa":
