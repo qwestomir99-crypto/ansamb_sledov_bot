@@ -2,7 +2,7 @@
 # Модуль: dialogue/callbacks.py
 # Справка: README.md → Обработчики кнопок
 # Задача: обработка callback_query (нажатий на кнопки)
-# Комментарий: добавлена кнопка "🎬 Пост в VK (с медиа)"
+# Комментарий: добавлена диагностика для кнопки "🎬 Пост в VK (с медиа)"
 # Зависит от: admin_commands.py
 # Вызывается из: bot.py
 # ==========================================
@@ -95,11 +95,15 @@ def register_callback_handlers(bot, config):
                 return
             ask_for_post_text(bot, chat_id, message_id)
 
-        # ---------- ПОСТ В VK (НОВЫЙ) ----------
+        # ---------- ПОСТ В VK (НОВЫЙ) С ДИАГНОСТИКОЙ ----------
         elif data == "vk_post":
+            print(f"[DEBUG] Нажата кнопка vk_post, user_id={user_id}")
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
+                print("[DEBUG] Не авторизован")
                 return
+            print("[DEBUG] Авторизован, вызываем handle_callback_vk_post")
+            from dialogue.admin_commands import handle_callback_vk_post
             handle_callback_vk_post(bot, chat_id, message_id, user_id)
 
         # ---------- АЛИСА ----------
