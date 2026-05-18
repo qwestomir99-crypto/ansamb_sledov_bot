@@ -2,9 +2,6 @@
 # Модуль: dialogue/publisher_utils.py
 # Справка: README.md → Публикатор
 # Задача: отправка постов в Telegram и VK с поддержкой медиа
-# Комментарий: автоматически подбирает цитату и теги, если не переданы
-# Зависит от: config.json, quotes.txt, post_pool.json
-# Вызывается из: publisher.py, admin_commands.py
 # ==========================================
 
 import requests
@@ -21,23 +18,19 @@ def load_config():
         return json.load(f)
 
 def load_quotes():
-    """Загружает цитаты для автоматической вставки"""
     if not os.path.exists(QUOTES_FILE):
         return []
     with open(QUOTES_FILE, "r", encoding="utf-8") as f:
         return [line.strip() for line in f if line.strip()]
 
 def get_random_quote():
-    """Возвращает случайную цитату"""
     quotes = load_quotes()
     return random.choice(quotes) if quotes else "Ритм 0,8 Гц стабилен. Сеть тлеет."
 
 def get_auto_tags(text, platform="vk"):
-    """Автоматически подбирает теги из текста и post_pool.json"""
     config = load_config()
     tags = set()
     
-    # Базовые теги платформы
     if platform == "vk":
         vk_tags = config.get("autoposter", {}).get("vk_tags", "#Ансамбль #СледНаКонтаке")
         tags.update(vk_tags.split())
@@ -45,27 +38,27 @@ def get_auto_tags(text, platform="vk"):
         default_tags = config.get("publisher", {}).get("default_tags", "#СапёрыАутентичности #МихоельАв #2026плита")
         tags.update(default_tags.split())
     
-    # Ищем теги в тексте (хештеги)
     words = text.split()
     for w in words:
         if w.startswith('#'):
             tags.add(w)
     
-    # Пытаемся найти похожий пост в пуле и взять его теги
     pool_file = "dialogue/data/post_pool.json"
     if os.path.exists(pool_file):
-        with open(pool_file, "r", encoding="utf-8") as f:
-            pool = json.load(f)
-        for post in pool:
-            if post.get("text") and post["text"].lower() in text.lower():
-                extra_tags = post.get("tags", [])
-                tags.update(extra_tags)
-                break
+        try:
+            with open(pool_file, "r", encoding="utf-8") as f:
+                pool = json.load(f)
+            for post in pool:
+                if post.get("text") and post["text"].lower() in text.lower():
+                    extra_tags = post.get("tags", [])
+                    tags.update(extra_tags)
+                    break
+        except Exception as e:
+            print(f"[VK] Ошибка чтения post_pool.json: {e}")
     
     return " ".join(tags)
 
 def get_vk_upload_url(vk_token, owner_id):
-    """Получает URL для загрузки фото в VK"""
     params = {
         "access_token": vk_token,
         "v": "5.199",
@@ -80,7 +73,6 @@ def get_vk_upload_url(vk_token, owner_id):
         return None
 
 def upload_photo_to_vk(upload_url, file_path, vk_token):
-    """Загружает фото на сервер VK"""
     try:
         with open(file_path, 'rb') as f:
             files = {'photo': f}
@@ -108,19 +100,20 @@ def upload_photo_to_vk(upload_url, file_path, vk_token):
         return None
 
 def post_to_vk(message, tags, access_token, owner_id, file_path=None, auto_quote=True, auto_tags=True):
-    """Отправляет пост в VK с поддержкой медиа и авто-тегов/цитат"""
+    print(f"[VK] post_to_vk вызван: message={message[:50]}..., file_path={file_path}")
+    
     if not access_token or not owner_id:
         print("[VK] Нет токена или owner_id")
         return False
     
-    # Автоматически подбираем цитату
     if auto_quote and message and len(message) < 500:
         quote = get_random_quote()
         message = f"{message}\n\n📜 {quote}"
+        print(f"[VK] Добавлена цитата: {quote[:50]}...")
     
-    # Автоматически подбираем теги
     if auto_tags:
         tags = get_auto_tags(message, "vk")
+        print(f"[VK] Теги: {tags}")
     
     full_message = f"{message}\n\n{tags}" if message else tags
     
@@ -134,6 +127,7 @@ def post_to_vk(message, tags, access_token, owner_id, file_path=None, auto_quote
     
     # Загружаем фото, если есть
     if file_path and os.path.exists(file_path):
+        print(f"[VK] Файл найден: {file_path}, размер: {os.path.getsize(file_path)} байт")
         ext = os.path.splitext(file_path)[1].lower()
         if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
             upload_url = get_vk_upload_url(access_token, owner_id)
@@ -141,8 +135,15 @@ def post_to_vk(message, tags, access_token, owner_id, file_path=None, auto_quote
                 photo_attachment = upload_photo_to_vk(upload_url, file_path, access_token)
                 if photo_attachment:
                     params['attachments'] = photo_attachment
+                    print(f"[VK] Фото прикреплено: {photo_attachment}")
+                else:
+                    print("[VK] Не удалось загрузить фото")
+            else:
+                print("[VK] Не удалось получить upload URL")
         else:
-            print(f"[VK] неподдерживаемый тип файла {ext}")
+            print(f"[VK] Неподдерживаемый тип файла {ext}, отправляю только текст")
+    elif file_path:
+        print(f"[VK] Файл не найден: {file_path}")
     
     try:
         r = requests.get('https://api.vk.com/method/wall.post', params=params, timeout=10)
@@ -158,13 +159,10 @@ def post_to_vk(message, tags, access_token, owner_id, file_path=None, auto_quote
         return False
 
 def post_to_telegram(bot, chat_id, message, file_path=None, tags=None, auto_quote=True, auto_tags=True):
-    """Отправляет пост в Telegram с поддержкой медиа и авто-тегов/цитат"""
-    # Автоматически подбираем цитату
     if auto_quote and message and len(message) < 500:
         quote = get_random_quote()
         message = f"{message}\n\n📜 {quote}"
     
-    # Автоматически подбираем теги
     if auto_tags:
         tags = get_auto_tags(message, "tg")
     
