@@ -3,6 +3,8 @@
 # Задача: основной файл запуска бота
 # ==========================================
 
+print("[DEBUG] 0. Начало загрузки bot.py")
+
 import telebot
 import random
 import os
@@ -16,11 +18,24 @@ from flask import Flask, request
 from datetime import datetime
 
 # Импорт настроек
-from settings import *
+try:
+    from settings import *
+    print("[DEBUG] Настройки загружены из settings.py")
+except ImportError:
+    print("[DEBUG] settings.py не найден, использую значения по умолчанию")
+    # Значения по умолчанию, если settings.py нет
+    ENABLE_VK_READER = True
+    ENABLE_JOURNALIST = True
+    ENABLE_QUOTES = True
+    ENABLE_SCHEDULER = True
+    ENABLE_PUBLISHER = True
+    ENABLE_AUTOPOSTER = False
+    ENABLE_CALLBACKS = True
+    ENABLE_ALISA = False
+    DEBUG_IMPORTS = True
+    DEBUG_THREADS = True
 
-# Если нужна диагностика импортов
 if DEBUG_IMPORTS:
-    print("[DEBUG] 0. Начало загрузки bot.py")
     print(f"[DEBUG] Настройки: VK_READER={ENABLE_VK_READER}, JOURNALIST={ENABLE_JOURNALIST}, QUOTES={ENABLE_QUOTES}")
 
 # Импорт модулей (с проверкой флагов)
@@ -151,6 +166,7 @@ if ENABLE_VK_READER:
             print("[DEBUG] 4a. VK_reader запущен")
     except Exception as e:
         print(f"[DEBUG] 4a. VK_reader ошибка: {e}")
+        traceback.print_exc()
 
 if ENABLE_JOURNALIST:
     try:
@@ -159,6 +175,7 @@ if ENABLE_JOURNALIST:
             print("[DEBUG] 4b. Journalist запущен")
     except Exception as e:
         print(f"[DEBUG] 4b. Journalist ошибка: {e}")
+        traceback.print_exc()
 
 if ENABLE_QUOTES:
     try:
@@ -167,6 +184,7 @@ if ENABLE_QUOTES:
             print("[DEBUG] 4c. Quotes запущен")
     except Exception as e:
         print(f"[DEBUG] 4c. Quotes ошибка: {e}")
+        traceback.print_exc()
 
 if ENABLE_SCHEDULER:
     try:
@@ -175,6 +193,7 @@ if ENABLE_SCHEDULER:
             print("[DEBUG] 4d. Scheduler запущен")
     except Exception as e:
         print(f"[DEBUG] 4d. Scheduler ошибка: {e}")
+        traceback.print_exc()
 
 if ENABLE_PUBLISHER:
     try:
@@ -183,6 +202,7 @@ if ENABLE_PUBLISHER:
             print("[DEBUG] 4e. Publisher запущен")
     except Exception as e:
         print(f"[DEBUG] 4e. Publisher ошибка: {e}")
+        traceback.print_exc()
 
 # ---------- РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ ----------
 if ENABLE_CALLBACKS:
@@ -192,6 +212,7 @@ if ENABLE_CALLBACKS:
             print("[DEBUG] 5. Callback-обработчики зарегистрированы")
     except Exception as e:
         print(f"[DEBUG] 5. Callback-обработчики ошибка: {e}")
+        traceback.print_exc()
 
 # ---------- ВЫЗОВ АГЕНТА (РЕЗЕРВ) ----------
 def ask_agent(phrase):
@@ -295,7 +316,12 @@ if ENABLE_AUTOPOSTER:
 else:
     print("[BOT] Автопостинг отключён (ENABLE_AUTOPOSTER = False)")
 
-if DEBUG_IMPORTS:
-    print("[DEBUG] 7. Запуск поллинга...")
-
-bot.infinity_polling()
+# Запуск поллинга с пропуском старых обновлений (лечит 409)
+print("[DEBUG] 7. Запуск поллинга с skip_pending=True...")
+try:
+    # Небольшая пауза перед запуском, чтобы старый процесс успел завершиться
+    time.sleep(2)
+    bot.infinity_polling(timeout=60, long_polling_timeout=60, skip_pending=True)
+except Exception as e:
+    print(f"[BOT] Ошибка поллинга: {e}")
+    time.sleep(5)
