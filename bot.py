@@ -14,6 +14,7 @@ import time
 import traceback
 import requests
 import json
+import glob
 from flask import Flask, request
 from datetime import datetime
 
@@ -34,6 +35,10 @@ except ImportError:
     ENABLE_ALISA = False
     DEBUG_IMPORTS = True
     DEBUG_THREADS = True
+    SKIP_PENDING_UPDATES = True
+    POLLING_DELAY = 2
+    POLLING_TIMEOUT = 60
+    LONG_POLLING_TIMEOUT = 60
 
 if DEBUG_IMPORTS:
     print(f"[DEBUG] Настройки: VK_READER={ENABLE_VK_READER}, JOURNALIST={ENABLE_JOURNALIST}, QUOTES={ENABLE_QUOTES}")
@@ -85,6 +90,25 @@ def load_config():
 
 if DEBUG_IMPORTS:
     print("[DEBUG] 1. Импорты завершены")
+
+# ==========================================
+# Управление логами (ротация)
+# ==========================================
+def clean_old_logs(days=7):
+    """Удаляет логи старше указанного количества дней"""
+    try:
+        now = time.time()
+        for logfile in ['admin.log', 'error.log']:
+            if os.path.exists(logfile):
+                mtime = os.path.getmtime(logfile)
+                if now - mtime > days * 86400:
+                    os.remove(logfile)
+                    print(f"[LOG] Удалён старый файл: {logfile}")
+                    # Создаём новый пустой
+                    with open(logfile, 'w') as f:
+                        f.write('')
+    except Exception as e:
+        print(f"[LOG] Ошибка при очистке: {e}")
 
 # ---------- ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК ----------
 def global_exception_handler(exc_type, exc_value, exc_traceback):
@@ -157,6 +181,13 @@ threading.Thread(target=keep_alive, daemon=True).start()
 
 if DEBUG_IMPORTS:
     print("[DEBUG] 3. Flask и keep_alive запущены")
+
+# Запуск очистки логов при старте
+clean_old_logs()
+# Запускаем фоновую задачу очистки раз в сутки
+threading.Thread(target=lambda: [time.sleep(86400) or clean_old_logs() for _ in range(999)], daemon=True).start()
+if DEBUG_IMPORTS:
+    print("[DEBUG] 3a. Очистка логов запущена")
 
 # ---------- ПОТОКИ ДИАЛОГА (с проверкой флагов) ----------
 if ENABLE_VK_READER:
@@ -316,12 +347,10 @@ if ENABLE_AUTOPOSTER:
 else:
     print("[BOT] Автопостинг отключён (ENABLE_AUTOPOSTER = False)")
 
-# Запуск поллинга с пропуском старых обновлений (лечит 409)
-print("[DEBUG] 7. Запуск поллинга с skip_pending=True...")
+print("[DEBUG] 7. Запуск поллинга...")
 try:
-    # Небольшая пауза перед запуском, чтобы старый процесс успел завершиться
-    time.sleep(2)
-    bot.infinity_polling(timeout=60, long_polling_timeout=60, skip_pending=True)
+    time.sleep(POLLING_DELAY)
+    bot.infinity_polling(timeout=POLLING_TIMEOUT, long_polling_timeout=LONG_POLLING_TIMEOUT, skip_pending=SKIP_PENDING_UPDATES)
 except Exception as e:
     print(f"[BOT] Ошибка поллинга: {e}")
     time.sleep(5)
