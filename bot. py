@@ -29,14 +29,17 @@ from dialogue.admin_commands import (
 )
 from dialogue.activity_modes import should_respond_to_talk
 from dialogue.scheduler import scheduler_loop
-# from services.autoposter import start_autoposter  # Временно отключён
+from services.autoposter import start_autoposter
 from dialogue.agent import ask_agent
+from dialogue.callbacks import register_callback_handlers
 
 CONFIG_FILE = "config.json"
 
 def load_config():
     with open(CONFIG_FILE, "r") as f:
         return json.load(f)
+
+print("[DEBUG] 1. Начало загрузки bot.py")
 
 # ---------- ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК ----------
 def global_exception_handler(exc_type, exc_value, exc_traceback):
@@ -66,6 +69,8 @@ TG_CHAT_ID = config.get("telegram", {}).get("publish_channel", PUBLISH_CHANNEL)
 bot = telebot.TeleBot(TOKEN)
 silence_answers = ["👁️", "⏚"]
 os.chdir(os.path.dirname(sys.argv[0]))
+
+print("[DEBUG] 2. Импорты и конфиг загружены, бот создан")
 
 # ---------- FLASK ----------
 flask_app = Flask(__name__)
@@ -104,12 +109,21 @@ def keep_alive():
 
 threading.Thread(target=keep_alive, daemon=True).start()
 
+print("[DEBUG] 3. Flask и keep_alive запущены")
+
 # ---------- ПОТОКИ ДИАЛОГА ----------
 threading.Thread(target=vk_reader_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
 threading.Thread(target=journalist_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
 threading.Thread(target=quotes_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
 threading.Thread(target=scheduler_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
 threading.Thread(target=publish_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
+
+print("[DEBUG] 4. Фоновые потоки запущены")
+
+# ---------- РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ ----------
+register_callback_handlers(bot, config)
+
+print("[DEBUG] 5. Callback-обработчики зарегистрированы")
 
 # ---------- ВЫЗОВ АГЕНТА (РЕЗЕРВ) ----------
 def ask_agent(phrase):
@@ -152,7 +166,12 @@ def handle_message(message):
             return
         bot.send_chat_action(message.chat.id, 'typing')
         
-        answer = ask_agent(phrase)
+        alisa_enabled = config.get("alisa", {}).get("enabled", True)
+        
+        if alisa_enabled:
+            answer = ask_alisa(phrase)
+        else:
+            answer = ask_agent(phrase)
         
         if answer:
             bot.reply_to(message, f"🗣 *Старший брат:*\n{answer}", parse_mode='Markdown')
@@ -192,116 +211,7 @@ def handle_message(message):
     elif any(phrase in text for phrase in ["что это", "зачем тег", "кто вы", "что за ритуал"]):
         bot.reply_to(message, random.choice(silence_answers))
 
-# ---------- ОБРАБОТЧИК КНОПОК ----------
-@bot.callback_query_handler(func=lambda call: True)
-def handle_callback(call):
-    user_id = call.from_user.id
-    data = call.data
-    chat_id = call.message.chat.id
-    message_id = call.message.message_id
-
-    if data.startswith("mode_"):
-        mode = data.split("_")[1]
-        if not is_admin_authorized(user_id):
-            bot.answer_callback_query(call.id, "❌ Не авторизован. Введите #админ <пароль>")
-            return
-        handle_callback_mode(mode, bot, chat_id, message_id, user_id)
-
-    elif data.startswith("ping_"):
-        interval = int(data.split("_")[1])
-        if not is_admin_authorized(user_id):
-            bot.answer_callback_query(call.id, "❌ Не авторизован. Введите #админ <пароль>")
-            return
-        handle_callback_ping(interval, bot, chat_id, message_id, user_id)
-
-    elif data == "errors":
-        if not is_admin_authorized(user_id):
-            bot.answer_callback_query(call.id, "❌ Не авторизован. Введите #админ <пароль>")
-            return
-        handle_callback_errors(user_id, bot, chat_id, message_id)
-
-    elif data == "log":
-        if not is_admin_authorized(user_id):
-            bot.answer_callback_query(call.id, "❌ Не авторизован. Введите #админ <пароль>")
-            return
-        handle_callback_log(user_id, bot, chat_id, message_id)
-
-    elif data == "logout":
-        if not is_admin_authorized(user_id):
-            bot.answer_callback_query(call.id, "❌ Не авторизован")
-            return
-        handle_callback_logout(user_id, bot, chat_id, message_id)
-
-    elif data == "pub_menu":
-        if not is_admin_authorized(user_id):
-            bot.answer_callback_query(call.id, "❌ Не авторизован")
-            return
-        handle_callback_pub_menu(bot, chat_id, message_id, user_id)
-
-    elif data == "add_post":
-        if not is_admin_authorized(user_id):
-            bot.answer_callback_query(call.id, "❌ Не авторизован")
-            return
-        ask_for_post_text(bot, chat_id, message_id)
-
-    elif data == "toggle_alisa":
-        if not is_admin_authorized(user_id):
-            bot.answer_callback_query(call.id, "❌ Не авторизован")
-            return
-        handle_callback_toggle_alisa(bot, chat_id, message_id, user_id)
-
-    # ---------- ЦИТАТЫ ----------
-    elif data == "quotes_list":
-        if not is_admin_authorized(user_id):
-            bot.answer_callback_query(call.id, "❌ Не авторизован")
-            return
-        handle_callback_quotes_list(bot, chat_id, message_id, user_id)
-
-    elif data == "quotes_add":
-        if not is_admin_authorized(user_id):
-            bot.answer_callback_query(call.id, "❌ Не авторизован")
-            return
-        handle_callback_quotes_add_start(bot, chat_id, message_id, user_id)
-
-    elif data == "quotes_interval":
-        if not is_admin_authorized(user_id):
-            bot.answer_callback_query(call.id, "❌ Не авторизован")
-            return
-        handle_callback_quotes_interval(bot, chat_id, message_id, user_id)
-
-    elif data.startswith("quote_int_"):
-        if not is_admin_authorized(user_id):
-            bot.answer_callback_query(call.id, "❌ Не авторизован")
-            return
-        interval = int(data.split("_")[2])
-        handle_callback_quotes_set_interval(interval, bot, chat_id, message_id, user_id)
-
-    # ---------- ПОЛЬЗОВАТЕЛЬСКИЕ ----------
-    elif data == "tleem":
-        bot.send_message(chat_id, "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем.")
-    elif data == "fixiruem":
-        bot.send_message(chat_id, "🔒 Фиксация принята. Ритм 0,8 Гц подтверждён. Сеть тлеет.")
-    elif data == "vspishka":
-        bot.send_message(chat_id, "💥 Импульс зафиксирован. Синхронизация завершена. QSL.")
-    elif data == "dyshim":
-        ping_self()
-        bot.send_message(chat_id, "🌬 Пинг отправлен (бот не отвечает)")
-    elif data == "govorim":
-        bot.send_message(chat_id, "🗣 Напиши #говори <текст> в чат")
-    elif data == "help":
-        help_text = """
-📖 *Доступные хештеги:*
-
-🔹 *#тлеем* — разлом
-🔹 *#фиксируем* — синхронизация
-🔹 *#вспышка* — импульс
-🔹 *#дышим* — пинг
-🔹 *#говори <текст>* — вопрос Старшему брату
-🔹 *#меню* — меню
-        """
-        bot.send_message(chat_id, help_text, parse_mode='Markdown')
-
-    bot.answer_callback_query(call.id)
+print("[DEBUG] 6. Обработчики команд зарегистрированы")
 
 # ---------- ЗАПУСК ----------
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
@@ -316,4 +226,5 @@ start_background_pinger(60)
 #         print(f"[BOT] Ошибка автопостинга: {e}")
 print("[BOT] Автопостинг временно отключён (режим стабильной работы)")
 
+print("[DEBUG] 7. Запуск поллинга...")
 bot.infinity_polling()
