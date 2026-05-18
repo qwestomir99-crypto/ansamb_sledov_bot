@@ -2,13 +2,14 @@
 # Модуль: dialogue/admin_commands.py
 # Справка: README.md → Админка
 # Задача: админ-меню, управление режимами, цитатами, постами
-# Комментарий: после любого действия — возврат в меню
+# Комментарий: кнопка "🎬 Пост в VK (с медиа)" использует add_publication
 # ==========================================
 
 import os
 import json
 import time
-from datetime import datetime
+import tempfile
+from datetime import datetime, timedelta
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dialogue.ping_modes import apply_ping_mode
 from dialogue.publisher import add_publication, load_publications
@@ -152,7 +153,6 @@ def get_user_menu():
     return keyboard
 
 def return_to_admin_menu(bot, chat_id, message_id=None, user_id=None):
-    """Возвращает админ-меню (если пользователь авторизован)"""
     if user_id and not is_admin_authorized(user_id):
         return
     if message_id:
@@ -220,7 +220,6 @@ def handle_callback_logout(user_id, bot, chat_id, message_id):
     logout_admin(user_id)
     log_admin_action(user_id, "logout", "success")
     bot.edit_message_text("🔓 Вы вышли из админ-панели", chat_id, message_id)
-    # Не возвращаем в меню, так как вышел
 
 def handle_callback_pub_menu(bot, chat_id, message_id, user_id):
     pubs = load_publications()
@@ -264,7 +263,6 @@ def handle_callback_quotes_list(bot, chat_id, message_id, user_id):
 def handle_callback_quotes_add_start(bot, chat_id, message_id, user_id):
     msg = bot.send_message(chat_id, "✍️ Введите текст новой цитаты:")
     bot.register_next_step_handler(msg, process_quote_add, bot, chat_id, user_id)
-    # Не удаляем исходное сообщение с меню
 
 def process_quote_add(message, bot, chat_id, user_id):
     text = message.text.strip()
@@ -289,7 +287,6 @@ def handle_callback_quotes_interval(bot, chat_id, message_id, user_id):
         f"⏱ *Интервал публикации цитат*\n\nТекущий: {current} минут\n\nВыбери новый:",
         chat_id, message_id, parse_mode='Markdown', reply_markup=keyboard
     )
-    # Здесь не возвращаем в меню, так как это подменю
 
 def handle_callback_quotes_set_interval(interval, bot, chat_id, message_id, user_id):
     from dialogue.quotes import set_quotes_interval_minutes, quotes_loop, load_config as load_cfg
@@ -327,24 +324,28 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
         file_path = None
     elif message.photo:
         file_info = bot.get_file(message.photo[-1].file_id)
-        file_path = f"temp_vk_{message.photo[-1].file_id}.jpg"
+        # Сохраняем во временную папку /tmp (Render разрешает запись)
+        file_path = os.path.join(tempfile.gettempdir(), f"temp_vk_{message.photo[-1].file_id}.jpg")
         downloaded_file = bot.download_file(file_info.file_path)
         with open(file_path, 'wb') as f:
             f.write(downloaded_file)
+        print(f"[DEBUG] Фото сохранено: {file_path}, размер: {os.path.getsize(file_path)} байт")
     elif message.video:
         file_info = bot.get_file(message.video.file_id)
-        file_path = f"temp_vk_{message.video.file_id}.mp4"
+        file_path = os.path.join(tempfile.gettempdir(), f"temp_vk_{message.video.file_id}.mp4")
         downloaded_file = bot.download_file(file_info.file_path)
         with open(file_path, 'wb') as f:
             f.write(downloaded_file)
+        print(f"[DEBUG] Видео сохранено: {file_path}")
     elif message.document:
         ext = os.path.splitext(message.document.file_name)[1].lower()
         if ext in ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.avi']:
             file_info = bot.get_file(message.document.file_id)
-            file_path = f"temp_vk_{message.document.file_id}_{message.document.file_name}"
+            file_path = os.path.join(tempfile.gettempdir(), f"temp_vk_{message.document.file_id}_{message.document.file_name}")
             downloaded_file = bot.download_file(file_info.file_path)
             with open(file_path, 'wb') as f:
                 f.write(downloaded_file)
+            print(f"[DEBUG] Документ сохранён: {file_path}")
         else:
             bot.send_message(chat_id, "❌ Неподдерживаемый тип файла. Пост будет без вложения.")
     else:
@@ -363,12 +364,15 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
     full_text = f"{text}\n\n📜 {quote}"
     auto_tags = get_auto_tags(text, "vk")
     
+    # Добавляем публикацию с задержкой 0
     add_publication("vk", full_text, 0, auto_tags, file_path)
     
     bot.send_message(chat_id, f"✅ Пост отправлен в VK:\n\n{full_text[:200]}")
     
+    # Удаляем временный файл
     if file_path and os.path.exists(file_path):
         os.remove(file_path)
+        print(f"[DEBUG] Временный файл удалён: {file_path}")
     
     return_to_admin_menu(bot, chat_id, user_id=user_id)
 
@@ -396,19 +400,19 @@ def process_post_file(message, bot, chat_id, text):
         file_path = None
     elif message.photo:
         file_info = bot.get_file(message.photo[-1].file_id)
-        file_path = f"temp_{message.photo[-1].file_id}.jpg"
+        file_path = os.path.join(tempfile.gettempdir(), f"temp_{message.photo[-1].file_id}.jpg")
         downloaded_file = bot.download_file(file_info.file_path)
         with open(file_path, 'wb') as f:
             f.write(downloaded_file)
     elif message.document:
         file_info = bot.get_file(message.document.file_id)
-        file_path = f"temp_{message.document.file_id}_{message.document.file_name}"
+        file_path = os.path.join(tempfile.gettempdir(), f"temp_{message.document.file_id}_{message.document.file_name}")
         downloaded_file = bot.download_file(file_info.file_path)
         with open(file_path, 'wb') as f:
             f.write(downloaded_file)
     elif message.video:
         file_info = bot.get_file(message.video.file_id)
-        file_path = f"temp_{message.video.file_id}.mp4"
+        file_path = os.path.join(tempfile.gettempdir(), f"temp_{message.video.file_id}.mp4")
         downloaded_file = bot.download_file(file_info.file_path)
         with open(file_path, 'wb') as f:
             f.write(downloaded_file)
@@ -448,7 +452,6 @@ def handle_admin_command(message, bot):
     user_id = message.from_user.id
     chat_id = message.chat.id
     
-    # Удаляем сообщение с паролем (и ответ бота, если он был)
     try:
         bot.delete_message(chat_id, message.message_id)
     except:
@@ -460,7 +463,6 @@ def handle_admin_command(message, bot):
     
     if user_id != ADMIN_USER_ID:
         register_failed_attempt(user_id, bot)
-        # Отправляем уведомление в личку, а не в группу
         try:
             bot.send_message(
                 user_id,
@@ -470,7 +472,6 @@ def handle_admin_command(message, bot):
             )
         except:
             pass
-        # В группу ничего не пишем
         return
 
     parts = message.text.split()
@@ -481,7 +482,6 @@ def handle_admin_command(message, bot):
         bot.send_message(chat_id, "✅ Авторизован. Ваше меню:", reply_markup=get_admin_menu())
     else:
         register_failed_attempt(user_id, bot)
-        # Отправляем уведомление в личку
         try:
             bot.send_message(
                 user_id,
