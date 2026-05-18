@@ -1,3 +1,8 @@
+# ==========================================
+# Файл: bot.py
+# Задача: основной файл запуска бота
+# ==========================================
+
 import telebot
 import random
 import os
@@ -9,11 +14,27 @@ import requests
 import json
 from flask import Flask, request
 from datetime import datetime
+
+# Импорт настроек
+from settings import *
+
+# Если нужна диагностика импортов
+if DEBUG_IMPORTS:
+    print("[DEBUG] 0. Начало загрузки bot.py")
+    print(f"[DEBUG] Настройки: VK_READER={ENABLE_VK_READER}, JOURNALIST={ENABLE_JOURNALIST}, QUOTES={ENABLE_QUOTES}")
+
+# Импорт модулей (с проверкой флагов)
 from ping_utils import ping_self, start_background_pinger
-from dialogue.journalist import journalist_loop
-from dialogue.vk_reader import vk_reader_loop
-from dialogue.quotes import quotes_loop
-from dialogue.publisher import publish_loop
+
+if ENABLE_JOURNALIST:
+    from dialogue.journalist import journalist_loop
+if ENABLE_VK_READER:
+    from dialogue.vk_reader import vk_reader_loop
+if ENABLE_QUOTES:
+    from dialogue.quotes import quotes_loop
+if ENABLE_PUBLISHER:
+    from dialogue.publisher import publish_loop
+
 from dialogue.admin_commands import (
     handle_admin_command, is_admin_authorized,
     get_admin_menu, get_user_menu,
@@ -27,11 +48,19 @@ from dialogue.admin_commands import (
     handle_callback_quotes_set_interval,
     ask_for_post_text
 )
+
 from dialogue.activity_modes import should_respond_to_talk
-from dialogue.scheduler import scheduler_loop
-from services.autoposter import start_autoposter
+
+if ENABLE_SCHEDULER:
+    from dialogue.scheduler import scheduler_loop
+
+if ENABLE_AUTOPOSTER:
+    from services.autoposter import start_autoposter
+
 from dialogue.agent import ask_agent
-from dialogue.callbacks import register_callback_handlers
+
+if ENABLE_CALLBACKS:
+    from dialogue.callbacks import register_callback_handlers
 
 CONFIG_FILE = "config.json"
 
@@ -39,7 +68,8 @@ def load_config():
     with open(CONFIG_FILE, "r") as f:
         return json.load(f)
 
-print("[DEBUG] 1. Начало загрузки bot.py")
+if DEBUG_IMPORTS:
+    print("[DEBUG] 1. Импорты завершены")
 
 # ---------- ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК ----------
 def global_exception_handler(exc_type, exc_value, exc_traceback):
@@ -70,7 +100,8 @@ bot = telebot.TeleBot(TOKEN)
 silence_answers = ["👁️", "⏚"]
 os.chdir(os.path.dirname(sys.argv[0]))
 
-print("[DEBUG] 2. Импорты и конфиг загружены, бот создан")
+if DEBUG_IMPORTS:
+    print("[DEBUG] 2. Конфиг загружен, бот создан")
 
 # ---------- FLASK ----------
 flask_app = Flask(__name__)
@@ -109,45 +140,58 @@ def keep_alive():
 
 threading.Thread(target=keep_alive, daemon=True).start()
 
-print("[DEBUG] 3. Flask и keep_alive запущены")
+if DEBUG_IMPORTS:
+    print("[DEBUG] 3. Flask и keep_alive запущены")
 
-# ---------- ПОТОКИ ДИАЛОГА (с диагностикой) ----------
-try:
-    threading.Thread(target=vk_reader_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
-    print("[DEBUG] 4a. VK_reader запущен")
-except Exception as e:
-    print(f"[DEBUG] 4a. VK_reader ошибка: {e}")
+# ---------- ПОТОКИ ДИАЛОГА (с проверкой флагов) ----------
+if ENABLE_VK_READER:
+    try:
+        threading.Thread(target=vk_reader_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
+        if DEBUG_THREADS:
+            print("[DEBUG] 4a. VK_reader запущен")
+    except Exception as e:
+        print(f"[DEBUG] 4a. VK_reader ошибка: {e}")
 
-try:
-    threading.Thread(target=journalist_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
-    print("[DEBUG] 4b. Journalist запущен")
-except Exception as e:
-    print(f"[DEBUG] 4b. Journalist ошибка: {e}")
+if ENABLE_JOURNALIST:
+    try:
+        threading.Thread(target=journalist_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
+        if DEBUG_THREADS:
+            print("[DEBUG] 4b. Journalist запущен")
+    except Exception as e:
+        print(f"[DEBUG] 4b. Journalist ошибка: {e}")
 
-try:
-    threading.Thread(target=quotes_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
-    print("[DEBUG] 4c. Quotes запущен")
-except Exception as e:
-    print(f"[DEBUG] 4c. Quotes ошибка: {e}")
+if ENABLE_QUOTES:
+    try:
+        threading.Thread(target=quotes_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
+        if DEBUG_THREADS:
+            print("[DEBUG] 4c. Quotes запущен")
+    except Exception as e:
+        print(f"[DEBUG] 4c. Quotes ошибка: {e}")
 
-try:
-    threading.Thread(target=scheduler_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
-    print("[DEBUG] 4d. Scheduler запущен")
-except Exception as e:
-    print(f"[DEBUG] 4d. Scheduler ошибка: {e}")
+if ENABLE_SCHEDULER:
+    try:
+        threading.Thread(target=scheduler_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
+        if DEBUG_THREADS:
+            print("[DEBUG] 4d. Scheduler запущен")
+    except Exception as e:
+        print(f"[DEBUG] 4d. Scheduler ошибка: {e}")
 
-try:
-    threading.Thread(target=publish_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
-    print("[DEBUG] 4e. Publisher запущен")
-except Exception as e:
-    print(f"[DEBUG] 4e. Publisher ошибка: {e}")
+if ENABLE_PUBLISHER:
+    try:
+        threading.Thread(target=publish_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
+        if DEBUG_THREADS:
+            print("[DEBUG] 4e. Publisher запущен")
+    except Exception as e:
+        print(f"[DEBUG] 4e. Publisher ошибка: {e}")
 
 # ---------- РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ ----------
-try:
-    register_callback_handlers(bot, config)
-    print("[DEBUG] 5. Callback-обработчики зарегистрированы")
-except Exception as e:
-    print(f"[DEBUG] 5. Callback-обработчики ошибка: {e}")
+if ENABLE_CALLBACKS:
+    try:
+        register_callback_handlers(bot, config)
+        if DEBUG_IMPORTS:
+            print("[DEBUG] 5. Callback-обработчики зарегистрированы")
+    except Exception as e:
+        print(f"[DEBUG] 5. Callback-обработчики ошибка: {e}")
 
 # ---------- ВЫЗОВ АГЕНТА (РЕЗЕРВ) ----------
 def ask_agent(phrase):
@@ -190,7 +234,7 @@ def handle_message(message):
             return
         bot.send_chat_action(message.chat.id, 'typing')
         
-        alisa_enabled = config.get("alisa", {}).get("enabled", True)
+        alisa_enabled = ENABLE_ALISA
         
         if alisa_enabled:
             answer = ask_alisa(phrase)
@@ -235,20 +279,23 @@ def handle_message(message):
     elif any(phrase in text for phrase in ["что это", "зачем тег", "кто вы", "что за ритуал"]):
         bot.reply_to(message, random.choice(silence_answers))
 
-print("[DEBUG] 6. Обработчики команд зарегистрированы")
+if DEBUG_IMPORTS:
+    print("[DEBUG] 6. Обработчики команд зарегистрированы")
 
 # ---------- ЗАПУСК ----------
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
 start_background_pinger(60)
 
-# Автопостинг временно отключён
-# if config.get("autoposter", {}).get("enabled", False):
-#     try:
-#         start_autoposter(config, VK_TOKEN, VK_OWNER_ID)
-#         print("[BOT] Автопостинг запущен")
-#     except Exception as e:
-#         print(f"[BOT] Ошибка автопостинга: {e}")
-print("[BOT] Автопостинг временно отключён (режим стабильной работы)")
+if ENABLE_AUTOPOSTER:
+    try:
+        start_autoposter(config, VK_TOKEN, VK_OWNER_ID)
+        print("[BOT] Автопостинг запущен")
+    except Exception as e:
+        print(f"[BOT] Ошибка автопостинга: {e}")
+else:
+    print("[BOT] Автопостинг отключён (ENABLE_AUTOPOSTER = False)")
 
-print("[DEBUG] 7. Запуск поллинга...")
+if DEBUG_IMPORTS:
+    print("[DEBUG] 7. Запуск поллинга...")
+
 bot.infinity_polling()
