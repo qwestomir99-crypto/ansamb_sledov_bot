@@ -1,8 +1,9 @@
+
 # ==========================================
 # Модуль: dialogue/admin_commands.py
 # Справка: README.md → Админка
 # Задача: админ-меню, управление режимами, цитатами, постами
-# Комментарий: добавлена кнопка "🎬 Пост в VK (с медиа)"
+# Комментарий: добавлена кнопка "🎬 Пост в VK (с медиа)" и возврат в меню
 # Зависит от: config.json, publisher_utils.py
 # Вызывается из: bot.py, callbacks.py
 # ==========================================
@@ -294,6 +295,7 @@ def process_vk_post_text(message, bot, chat_id):
     text = message.text.strip()
     if not text:
         bot.send_message(chat_id, "❌ Текст не может быть пустым")
+        bot.send_message(chat_id, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
         return
     msg = bot.send_message(chat_id, "📎 Пришлите фото, видео или нажмите /skip")
     bot.register_next_step_handler(msg, process_vk_post_file, bot, chat_id, text)
@@ -334,6 +336,7 @@ def process_vk_post_file(message, bot, chat_id, text):
     
     if not vk_token or not vk_owner_id:
         bot.send_message(chat_id, "❌ Нет токена VK. Проверь переменные окружения.")
+        bot.send_message(chat_id, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
         return
     
     from dialogue.publisher_utils import post_to_vk
@@ -344,8 +347,12 @@ def process_vk_post_file(message, bot, chat_id, text):
     else:
         bot.send_message(chat_id, "❌ Ошибка при отправке в VK")
     
+    # Удаляем временный файл
     if file_path and os.path.exists(file_path):
         os.remove(file_path)
+    
+    # Возвращаем админ-меню
+    bot.send_message(chat_id, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
 
 # ==========================================
 # Отложенные публикации (старая логика)
