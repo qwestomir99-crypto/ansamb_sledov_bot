@@ -3,18 +3,48 @@
 # Задача: глобальные настройки бота, флаги включения/выключения модулей
 # ==========================================
 
-# Основные модули
-ENABLE_VK_READER = True      # Чтение постов из VK
-ENABLE_JOURNALIST = True     # Журналист (дайджест)
-ENABLE_QUOTES = True         # Цитаты
-ENABLE_SCHEDULER = True      # Планировщик (полуночный ритуал)
-ENABLE_PUBLISHER = True      # Публикатор (посты из пула)
-ENABLE_AUTOPOSTER = False    # Автопостинг (требует Telethon, отключён)
-ENABLE_CALLBACKS = True      # Обработчики кнопок
+# -------------------- ОСНОВНЫЕ МОДУЛИ --------------------
+# Чтение постов из VK (vk_reader_loop)
+ENABLE_VK_READER = True
 
-# Режимы
-ENABLE_ALISA = False         # Алиса (отключена, используем агента)
+# Журналист (дайджест новостей)
+ENABLE_JOURNALIST = True
 
-# Отладка
-DEBUG_IMPORTS = True         # Выводить диагностику импортов
-DEBUG_THREADS = True         # Выводить диагностику потоков
+# Цитаты (quotes_loop)
+ENABLE_QUOTES = True
+
+# Планировщик (полуночный ритуал, scheduler_loop)
+ENABLE_SCHEDULER = True
+
+# Публикатор (посты из пула, publish_loop)
+ENABLE_PUBLISHER = True
+
+# Автопостинг (требует Telethon, отключён по умолчанию)
+ENABLE_AUTOPOSTER = False
+
+# Обработчики кнопок (callback_query)
+ENABLE_CALLBACKS = True
+
+# -------------------- РЕЖИМЫ --------------------
+# Алиса (отключена, используем агента)
+ENABLE_ALISA = False
+
+# -------------------- ОТЛАДКА --------------------
+# Выводить диагностику импортов
+DEBUG_IMPORTS = True
+
+# Выводить диагностику потоков
+DEBUG_THREADS = True
+
+# -------------------- НАСТРОЙКИ ПОЛЛИНГА --------------------
+# Пропускать старые обновления при запуске (лечит ошибку 409)
+SKIP_PENDING_UPDATES = True
+
+# Пауза перед запуском поллинга (секунды)
+POLLING_DELAY = 2
+
+# Таймаут поллинга (секунды)
+POLLING_TIMEOUT = 60
+
+# Длинный таймаут поллинга (секунды)
+LONG_POLLING_TIMEOUT = 60
