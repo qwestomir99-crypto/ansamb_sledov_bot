@@ -9,6 +9,7 @@ admin.log
 
 # Temp files
 temp_*
+*.tmp
 
 # Analytics reports
 analytics/
@@ -20,3 +21,11 @@ analytics/
 
 # Session files
 *.session
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
