@@ -1,6 +1,5 @@
 # ==========================================
 # Модуль: dialogue/publisher_utils.py
-# Справка: README.md → Публикатор
 # Задача: отправка постов в Telegram и VK с поддержкой медиа
 # ==========================================
 
@@ -8,6 +7,7 @@ import requests
 import os
 import random
 import json
+import time
 from datetime import datetime
 
 CONFIG_FILE = "config.json"
@@ -99,6 +99,43 @@ def upload_photo_to_vk(upload_url, file_path, vk_token):
         print(f"[VK] upload photo ошибка: {e}")
         return None
 
+def get_vk_video_upload_url(vk_token, owner_id):
+    """Получает URL для загрузки видео в VK"""
+    params = {
+        "access_token": vk_token,
+        "v": "5.199",
+        "name": "Video from bot",
+        "description": "Загружено через Ансамбль Следов 6",
+        "wallpost": 1
+    }
+    try:
+        r = requests.get("https://api.vk.com/method/video.save", params=params, timeout=10)
+        data = r.json()
+        if 'response' in data:
+            return data['response'].get('upload_url'), data['response'].get('owner_id'), data['response'].get('video_id')
+        else:
+            print(f"[VK] video.save ошибка: {data}")
+            return None, None, None
+    except Exception as e:
+        print(f"[VK] video.save ошибка: {e}")
+        return None, None, None
+
+def upload_video_to_vk(upload_url, file_path):
+    """Загружает видео на сервер VK"""
+    try:
+        with open(file_path, 'rb') as f:
+            files = {'video_file': f}
+            r = requests.post(upload_url, files=files)
+            if r.status_code == 200:
+                print(f"[VK] Видео загружено")
+                return True
+            else:
+                print(f"[VK] Ошибка загрузки видео: {r.status_code}")
+                return False
+    except Exception as e:
+        print(f"[VK] upload video ошибка: {e}")
+        return False
+
 def post_to_vk(message, tags, access_token, owner_id, file_path=None, auto_quote=True, auto_tags=True):
     print(f"[VK] post_to_vk вызван: message={message[:50]}..., file_path={file_path}")
     
@@ -125,11 +162,14 @@ def post_to_vk(message, tags, access_token, owner_id, file_path=None, auto_quote
         "from_group": 1
     }
     
-    # Загружаем фото, если есть
+    # Определяем тип файла
+    is_video = False
     if file_path and os.path.exists(file_path):
         print(f"[VK] Файл найден: {file_path}, размер: {os.path.getsize(file_path)} байт")
         ext = os.path.splitext(file_path)[1].lower()
+        
         if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+            # Фото
             upload_url = get_vk_upload_url(access_token, owner_id)
             if upload_url:
                 photo_attachment = upload_photo_to_vk(upload_url, file_path, access_token)
@@ -138,15 +178,34 @@ def post_to_vk(message, tags, access_token, owner_id, file_path=None, auto_quote
                     print(f"[VK] Фото прикреплено: {photo_attachment}")
                 else:
                     print("[VK] Не удалось загрузить фото")
+                    return False
             else:
-                print("[VK] Не удалось получить upload URL")
+                print("[VK] Не удалось получить upload URL для фото")
+                return False
+        elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
+            # Видео
+            is_video = True
+            upload_url, vk_owner_id, vk_video_id = get_vk_video_upload_url(access_token, owner_id)
+            if upload_url:
+                success = upload_video_to_vk(upload_url, file_path)
+                if success:
+                    params['attachments'] = f"video{vk_owner_id}_{vk_video_id}"
+                    print(f"[VK] Видео прикреплено: video{vk_owner_id}_{vk_video_id}")
+                    # Даём время на обработку видео
+                    time.sleep(3)
+                else:
+                    print("[VK] Не удалось загрузить видео")
+                    return False
+            else:
+                print("[VK] Не удалось получить upload URL для видео")
+                return False
         else:
             print(f"[VK] Неподдерживаемый тип файла {ext}, отправляю только текст")
     elif file_path:
         print(f"[VK] Файл не найден: {file_path}")
     
     try:
-        r = requests.get('https://api.vk.com/method/wall.post', params=params, timeout=10)
+        r = requests.get('https://api.vk.com/method/wall.post', params=params, timeout=30)
         data = r.json()
         if 'response' in data:
             print(f"[VK] ✅ опубликовано: {message[:50]}...")
