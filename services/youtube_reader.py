@@ -113,7 +113,7 @@ def extract_quotes_from_video(video):
             "video_url": f"https://youtu.be/{video['id']}"
         })
     
-    # Первые 200 символов описания как цитата
+    # Первые 300 символов описания как цитата
     if video.get("description"):
         desc = video["description"].strip()
         if len(desc) > 300:
