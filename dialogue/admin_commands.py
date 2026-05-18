@@ -2,7 +2,7 @@
 # Модуль: dialogue/admin_commands.py
 # Справка: README.md → Админка
 # Задача: админ-меню, управление режимами, цитатами, постами
-# Комментарий: кнопка "🎬 Пост в VK" отправляет напрямую (минуя публикатор)
+# Комментарий: команда #админ без пароля запрашивает пароль отдельно
 # ==========================================
 
 import os
@@ -36,6 +36,9 @@ SESSION_TIMEOUT = 1800  # 30 минут
 failed_attempts = {}
 BLOCK_TIME = 3600  # 1 час
 MAX_ATTEMPTS = 3
+
+# Временное хранилище ожидающих ввода пароля
+waiting_for_password = {}
 
 def is_blocked(user_id):
     if user_id in failed_attempts:
@@ -328,7 +331,7 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
         downloaded_file = bot.download_file(file_info.file_path)
         with open(file_path, 'wb') as f:
             f.write(downloaded_file)
-        print(f"[DEBUG] Фото сохранено: {file_path}, размер: {os.path.getsize(file_path)} байт")
+        print(f"[DEBUG] Фото сохранено: {file_path}")
     elif message.video:
         file_info = bot.get_file(message.video.file_id)
         file_path = os.path.join(tempfile.gettempdir(), f"temp_vk_{message.video.file_id}.mp4")
@@ -359,12 +362,10 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
         return_to_admin_menu(bot, chat_id, user_id=user_id)
         return
     
-    # Автоматически подбираем цитату и теги
     quote = get_random_quote()
     full_text = f"{text}\n\n📜 {quote}"
     auto_tags = get_auto_tags(text, "vk")
     
-    # Отправляем напрямую в VK (минуя публикатор)
     success = post_to_vk(full_text, auto_tags, vk_token, vk_owner_id, file_path, auto_quote=False, auto_tags=False)
     
     if success:
@@ -372,7 +373,6 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
     else:
         bot.send_message(chat_id, "❌ Ошибка при отправке в VK")
     
-    # Удаляем временный файл
     if file_path and os.path.exists(file_path):
         os.remove(file_path)
         print(f"[DEBUG] Временный файл удалён: {file_path}")
@@ -448,38 +448,58 @@ def process_post_delay(message, bot, chat_id, text, file_path):
     return_to_admin_menu(bot, chat_id, user_id=user_id)
 
 # ==========================================
-# Обработчик команды #админ
+# Обработчик команды #админ (с запросом пароля)
 # ==========================================
 
 def handle_admin_command(message, bot):
     user_id = message.from_user.id
     chat_id = message.chat.id
     
+    if is_blocked(user_id):
+        bot.send_message(chat_id, "❌ Доступ заблокирован на 1 час из-за слишком частых неудачных попыток.")
+        return
+    
+    if is_admin_authorized(user_id):
+        bot.send_message(chat_id, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
+        return
+    
+    # Если команда пришла с паролем в той же строке
+    parts = message.text.split()
+    if len(parts) == 2 and len(parts[1]) > 3:
+        password = parts[1]
+        if password == ADMIN_PASSWORD:
+            authorize_admin(user_id, password)
+            log_admin_action(user_id, "login", "success")
+            failed_attempts.pop(user_id, None)
+            bot.send_message(chat_id, "✅ Авторизован. Ваше меню:", reply_markup=get_admin_menu())
+        else:
+            register_failed_attempt(user_id, bot)
+            bot.send_message(chat_id, "❌ Неверный пароль.")
+        try:
+            bot.delete_message(chat_id, message.message_id)
+        except:
+            pass
+        return
+    
+    # Запрашиваем пароль
+    msg = bot.send_message(chat_id, "🔐 Введите пароль для входа в админ-панель:")
+    bot.register_next_step_handler(msg, process_admin_password, bot, user_id, chat_id)
+    
+    try:
+        bot.delete_message(chat_id, message.message_id)
+    except:
+        pass
+
+def process_admin_password(message, bot, user_id, chat_id):
+    password = message.text.strip()
+    
     try:
         bot.delete_message(chat_id, message.message_id)
     except:
         pass
     
-    if is_blocked(user_id):
-        bot.send_message(chat_id, "❌ Доступ заблокирован на 1 час из-за слишком частых неудачных попыток.")
-        return
-    
-    if user_id != ADMIN_USER_ID:
-        register_failed_attempt(user_id, bot)
-        try:
-            bot.send_message(
-                user_id,
-                "❌ Неверный пароль. Доступ запрещён.\n\n"
-                "Попробуйте позже или обратитесь к администратору.",
-                parse_mode='Markdown'
-            )
-        except:
-            pass
-        return
-
-    parts = message.text.split()
-    if len(parts) == 2 and parts[1] == ADMIN_PASSWORD:
-        authorize_admin(user_id, parts[1])
+    if password == ADMIN_PASSWORD:
+        authorize_admin(user_id, password)
         log_admin_action(user_id, "login", "success")
         failed_attempts.pop(user_id, None)
         bot.send_message(chat_id, "✅ Авторизован. Ваше меню:", reply_markup=get_admin_menu())
@@ -494,3 +514,4 @@ def handle_admin_command(message, bot):
             )
         except:
             pass
+        bot.send_message(chat_id, "❌ Неверный пароль. Доступ запрещён.")
