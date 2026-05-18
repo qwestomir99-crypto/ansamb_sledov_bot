@@ -111,19 +111,43 @@ threading.Thread(target=keep_alive, daemon=True).start()
 
 print("[DEBUG] 3. Flask и keep_alive запущены")
 
-# ---------- ПОТОКИ ДИАЛОГА ----------
-threading.Thread(target=vk_reader_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
-threading.Thread(target=journalist_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
-threading.Thread(target=quotes_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
-threading.Thread(target=scheduler_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
-threading.Thread(target=publish_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
+# ---------- ПОТОКИ ДИАЛОГА (с диагностикой) ----------
+try:
+    threading.Thread(target=vk_reader_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
+    print("[DEBUG] 4a. VK_reader запущен")
+except Exception as e:
+    print(f"[DEBUG] 4a. VK_reader ошибка: {e}")
 
-print("[DEBUG] 4. Фоновые потоки запущены")
+try:
+    threading.Thread(target=journalist_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
+    print("[DEBUG] 4b. Journalist запущен")
+except Exception as e:
+    print(f"[DEBUG] 4b. Journalist ошибка: {e}")
+
+try:
+    threading.Thread(target=quotes_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
+    print("[DEBUG] 4c. Quotes запущен")
+except Exception as e:
+    print(f"[DEBUG] 4c. Quotes ошибка: {e}")
+
+try:
+    threading.Thread(target=scheduler_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
+    print("[DEBUG] 4d. Scheduler запущен")
+except Exception as e:
+    print(f"[DEBUG] 4d. Scheduler ошибка: {e}")
+
+try:
+    threading.Thread(target=publish_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
+    print("[DEBUG] 4e. Publisher запущен")
+except Exception as e:
+    print(f"[DEBUG] 4e. Publisher ошибка: {e}")
 
 # ---------- РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ ----------
-register_callback_handlers(bot, config)
-
-print("[DEBUG] 5. Callback-обработчики зарегистрированы")
+try:
+    register_callback_handlers(bot, config)
+    print("[DEBUG] 5. Callback-обработчики зарегистрированы")
+except Exception as e:
+    print(f"[DEBUG] 5. Callback-обработчики ошибка: {e}")
 
 # ---------- ВЫЗОВ АГЕНТА (РЕЗЕРВ) ----------
 def ask_agent(phrase):
@@ -217,7 +241,7 @@ print("[DEBUG] 6. Обработчики команд зарегистриров
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
 start_background_pinger(60)
 
-# Автопостинг временно отключён (ошибка 409, Telethon не работает)
+# Автопостинг временно отключён
 # if config.get("autoposter", {}).get("enabled", False):
 #     try:
 #         start_autoposter(config, VK_TOKEN, VK_OWNER_ID)
