@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 import threading
 from dialogue.activity_modes import should_publish_quotes, get_quotes_interval, load_config
+from services.youtube_reader import get_last_video, extract_quotes_from_video
 
 CONFIG_FILE = "config.json"
 
@@ -18,18 +19,22 @@ def load_quotes():
     
     if not os.path.exists(quotes_file):
         os.makedirs(os.path.dirname(quotes_file), exist_ok=True)
-        # Сапёрские цитаты по умолчанию
         default_quotes = [
-            "Ритм 0,8 Гц стабилен. Сеть тлеет.",
-            "Пингвины на базе Туле не спят.",
-            "Разлом. Два полюса. Ожидание.",
-            "Сапёр аутентичности всегда на посту.",
-            "Тлеем. Фиксируем. Вспышка.",
-            "След на контакте. QSL.",
-            "Михоель Ав ведёт.",
-            "2026 плита. Готовность 0,8 Гц.",
-            "Тишина в эфире — знак качества.",
-            "Сапёр не спит. Сапёр ждёт."
+            "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет.",
+            "🐧 Пингвины на базе Туле не спят. Наблюдение продолжается.",
+            "🔒 Фиксация принята. Ритм 0,8 Гц подтверждён.",
+            "📜 Нас нет, но мы дышим. Он есть, и мы помним.",
+            "🎨 Розетка. Разлом. Два полюса. Союз не в целостности, а в разрыве.",
+            "⏳ 2026 плита. Готовность 0,8 Гц.",
+            "🛡 Сапёр аутентичности всегда на посту.",
+            "🕯 Исполнительный лист от Того, Кто не спорит о тональности.",
+            "🌊 Их рты полны воды. Мои холсты — правда.",
+            "🔁 #Тлеем → #Фиксируем → #Вспышка. Цикл замкнут.",
+            "👁 Сапёр аутентичности не объясняет. Он отвечает 👁 или ⏚.",
+            "🐧 След на контакте. QSL.",
+            "🔥 Михоель Ав ведёт.",
+            "⏚ Тишина в эфире — знак качества.",
+            "🌙 Сапёр не спит. Сапёр ждёт."
         ]
         with open(quotes_file, "w", encoding="utf-8") as f:
             for q in default_quotes:
@@ -37,6 +42,24 @@ def load_quotes():
     
     with open(quotes_file, "r", encoding="utf-8") as f:
         return [line.strip() for line in f if line.strip()]
+
+def get_quotes_with_youtube():
+    """Объединяет цитаты из файла и из YouTube"""
+    quotes = load_quotes()
+    
+    # Добавляем цитаты из YouTube (последнее видео)
+    try:
+        last_video = get_last_video()
+        if last_video:
+            youtube_quotes = extract_quotes_from_video(last_video)
+            for q in youtube_quotes:
+                # Форматируем как цитату с указанием источника
+                quote_text = f"📺 {q['text']}\n🔗 {q['video_url']}"
+                quotes.append(quote_text)
+    except Exception as e:
+        print(f"[QUOTES] Ошибка получения YouTube цитаты: {e}")
+    
+    return quotes
 
 def save_quotes(quotes):
     config = load_config()
@@ -79,7 +102,6 @@ quote_thread = None
 def quotes_loop(bot, TG_CHAT_ID):
     global quote_thread_running, quote_thread
     
-    # Останавливаем старый цикл, если был
     quote_thread_running = False
     if quote_thread and quote_thread.is_alive():
         time.sleep(1)
@@ -88,18 +110,13 @@ def quotes_loop(bot, TG_CHAT_ID):
     
     def _run():
         last_interval = None
-        last_mode_check = 0
         
         while quote_thread_running:
-            # Проверяем, можно ли публиковать цитаты
             if not should_publish_quotes():
                 time.sleep(60)
                 continue
             
-            # Получаем интервал из текущего режима
             current_interval = get_quotes_interval()
-            
-            # Если интервал изменился или прошло больше 5 минут — обновляем
             if current_interval != last_interval:
                 last_interval = current_interval
                 print(f"[QUOTES] Интервал обновлён: {current_interval} минут")
@@ -111,16 +128,14 @@ def quotes_loop(bot, TG_CHAT_ID):
             interval_seconds = current_interval * 60
             time.sleep(interval_seconds)
             
-            if not quote_thread_running:
-                break
-            
-            if not should_publish_quotes():
+            if not quote_thread_running or not should_publish_quotes():
                 continue
-                
-            quotes = load_quotes()
+            
+            # Берём цитаты с учётом YouTube
+            quotes = get_quotes_with_youtube()
             if not quotes:
                 continue
-                
+            
             quote = random.choice(quotes)
             message = f"📜 *Цитата дня* • {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n{quote}\n\n#ЦитатаДня #СапёрыАутентичности"
             try:
@@ -131,4 +146,4 @@ def quotes_loop(bot, TG_CHAT_ID):
     
     quote_thread = threading.Thread(target=_run, daemon=True)
     quote_thread.start()
-    print(f"[QUOTES] Цитаты запущены")
+    print(f"[QUOTES] Цитаты запущены (с интеграцией YouTube)")
