@@ -1,10 +1,9 @@
-
 # ==========================================
 # Модуль: dialogue/admin_commands.py
 # Справка: README.md → Админка
 # Задача: админ-меню, управление режимами, цитатами, постами
-# Комментарий: добавлена кнопка "🎬 Пост в VK (с медиа)" и возврат в меню
-# Зависит от: config.json, publisher_utils.py
+# Комментарий: кнопка "🎬 Пост в VK (с медиа)" использует add_publication
+# Зависит от: config.json, publisher.py
 # Вызывается из: bot.py, callbacks.py
 # ==========================================
 
@@ -283,11 +282,11 @@ def handle_callback_quotes_set_interval(interval, bot, chat_id, message_id, user
     bot.edit_message_text(f"✅ Интервал цитат установлен: {interval} минут", chat_id, message_id)
 
 # ==========================================
-# Блок: создание поста в VK с медиа
+# Блок: мгновенный пост в VK (через публикатор)
 # ==========================================
 
 def handle_callback_vk_post(bot, chat_id, message_id, user_id):
-    """Начинает процесс создания поста в VK"""
+    """Начинает процесс создания мгновенного поста в VK"""
     msg = bot.send_message(chat_id, "✍️ Введите текст поста для VK (можно с хештегами):")
     bot.register_next_step_handler(msg, process_vk_post_text, bot, chat_id)
 
@@ -329,7 +328,10 @@ def process_vk_post_file(message, bot, chat_id, text):
     else:
         bot.send_message(chat_id, "❌ Неподдерживаемый тип медиа. Пост будет без вложения.")
     
-    # Получаем токены
+    # Используем механизм отложенных публикаций с задержкой 0 минут
+    from dialogue.publisher import add_publication
+    from dialogue.admin_commands import load_config
+    
     config = load_config()
     vk_token = os.environ.get("VK_TOKEN") or config.get("vk", {}).get("token")
     vk_owner_id = os.environ.get("VK_OWNER_ID") or config.get("vk", {}).get("owner_id")
@@ -339,13 +341,16 @@ def process_vk_post_file(message, bot, chat_id, text):
         bot.send_message(chat_id, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
         return
     
-    from dialogue.publisher_utils import post_to_vk
-    success = post_to_vk(text, "", vk_token, vk_owner_id, file_path, auto_quote=True, auto_tags=True)
+    # Автоматически подбираем теги и цитату
+    from dialogue.publisher_utils import get_auto_tags, get_random_quote
+    quote = get_random_quote()
+    full_text = f"{text}\n\n📜 {quote}"
+    auto_tags = get_auto_tags(text, "vk")
     
-    if success:
-        bot.send_message(chat_id, f"✅ Пост отправлен в VK:\n\n{text[:200]}")
-    else:
-        bot.send_message(chat_id, "❌ Ошибка при отправке в VK")
+    # Добавляем публикацию с задержкой 0
+    add_publication("vk", full_text, 0, auto_tags, file_path)
+    
+    bot.send_message(chat_id, f"✅ Пост отправлен в VK:\n\n{full_text[:200]}")
     
     # Удаляем временный файл
     if file_path and os.path.exists(file_path):
