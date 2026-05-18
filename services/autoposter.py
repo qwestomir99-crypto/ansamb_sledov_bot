@@ -1,3 +1,12 @@
+# ==========================================
+# Модуль: services/autoposter.py
+# Справка: README.md → Автопостинг
+# Задача: пересылка сообщений из группы в канал и VK через Userbot
+# Комментарий: поддерживает файлы до 2 ГБ
+# Зависит от: config.json, publisher_utils.py
+# Вызывается из: bot.py, admin_commands.py (upload_via_userbot)
+# ==========================================
+
 import asyncio
 import os
 import json
@@ -9,6 +18,11 @@ from telethon.tl.types import Channel, Chat, ChannelParticipantsAdmins
 
 POST_POOL_FILE = "dialogue/data/post_pool.json"
 CONFIG_FILE = "config.json"
+
+# Данные для Userbot (берутся из переменных окружения)
+API_ID = int(os.environ.get("TG_API_ID", 0))
+API_HASH = os.environ.get("TG_API_HASH", "")
+PHONE = os.environ.get("TG_PHONE_NUMBER", "")
 
 def load_post_pool():
     if not os.path.exists(POST_POOL_FILE):
@@ -70,7 +84,7 @@ def build_vk_tags(post):
             tags.add(t)
     return " ".join(tags)
 
-def send_to_vk(text, post, vk_token, vk_owner_id):
+def send_to_vk(text, post, vk_token, vk_owner_id, file_path=None):
     if not vk_token or not vk_owner_id:
         return
     tags = build_vk_tags(post)
@@ -82,6 +96,16 @@ def send_to_vk(text, post, vk_token, vk_owner_id):
         "message": full_text,
         "from_group": 1
     }
+    if file_path and os.path.exists(file_path):
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+            upload_url = get_vk_upload_url(vk_token, vk_owner_id)
+            if upload_url:
+                photo_attachment = upload_photo_to_vk(upload_url, file_path, vk_token)
+                if photo_attachment:
+                    params['attachments'] = photo_attachment
+        elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
+            print(f"[VK] Видео пока не поддерживается, публикуем только текст")
     try:
         r = requests.post("https://api.vk.com/method/wall.post", params=params, timeout=10)
         if r.json().get("response"):
@@ -90,6 +114,125 @@ def send_to_vk(text, post, vk_token, vk_owner_id):
             print(f"[VK] ошибка: {r.json()}")
     except Exception as e:
         print(f"[VK] исключение: {e}")
+
+def get_vk_upload_url(vk_token, owner_id):
+    params = {
+        "access_token": vk_token,
+        "v": "5.199",
+        "owner_id": owner_id
+    }
+    try:
+        r = requests.get("https://api.vk.com/method/photos.getWallUploadServer", params=params, timeout=10)
+        data = r.json()
+        return data.get("response", {}).get("upload_url")
+    except Exception as e:
+        print(f"[VK] upload URL ошибка: {e}")
+        return None
+
+def upload_photo_to_vk(upload_url, file_path, vk_token):
+    try:
+        with open(file_path, 'rb') as f:
+            files = {'photo': f}
+            r = requests.post(upload_url, files=files)
+            data = r.json()
+        save_params = {
+            "access_token": vk_token,
+            "v": "5.199",
+            "photo": data['photo'],
+            "server": data['server'],
+            "hash": data['hash']
+        }
+        r = requests.get("https://api.vk.com/method/photos.saveWallPhoto", params=save_params)
+        photo_data = r.json()
+        if 'response' in photo_data and photo_data['response']:
+            photo = photo_data['response'][0]
+            return f"photo{photo['owner_id']}_{photo['id']}"
+        else:
+            print(f"[VK] save photo ошибка: {photo_data}")
+            return None
+    except Exception as e:
+        print(f"[VK] upload photo ошибка: {e}")
+        return None
+
+# ==========================================
+# Функция для загрузки больших файлов через Userbot
+# Вызывается из admin_commands.py
+# ==========================================
+
+async def upload_via_userbot_async(message, caption, tags, vk_token, vk_owner_id):
+    """Загружает файл через Userbot (Telethon) и отправляет в VK"""
+    if not API_ID or not API_HASH or not PHONE:
+        print("[USERBOT] Не настроены TG_API_ID/TG_API_HASH/TG_PHONE_NUMBER")
+        return False
+    
+    client = TelegramClient("autoposter_session", API_ID, API_HASH)
+    await client.start(phone=PHONE)
+    
+    try:
+        # Скачиваем файл из Telegram
+        file_path = await client.download_media(message)
+        if not file_path:
+            print("[USERBOT] Не удалось скачать файл")
+            return False
+        
+        print(f"[USERBOT] Файл скачан: {file_path}, размер: {os.path.getsize(file_path)} байт")
+        
+        # Подготавливаем пост
+        full_text = f"{caption}\n\n{tags}"
+        
+        # Отправляем в VK (здесь нужно добавить логику загрузки видео)
+        # Для видео VK требует отдельного API, пока отправляем только текст
+        params = {
+            "access_token": vk_token,
+            "v": "5.199",
+            "owner_id": vk_owner_id,
+            "message": full_text,
+            "from_group": 1
+        }
+        
+        # Пытаемся прикрепить файл (если это фото)
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+            upload_url = get_vk_upload_url(vk_token, vk_owner_id)
+            if upload_url:
+                photo_attachment = upload_photo_to_vk(upload_url, file_path, vk_token)
+                if photo_attachment:
+                    params['attachments'] = photo_attachment
+        elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
+            # Видео пока не поддерживается через VK API в этом модуле
+            print("[USERBOT] Видео отправляется без прикрепления (VK API не поддерживает видео через Userbot)")
+        
+        r = requests.post("https://api.vk.com/method/wall.post", params=params, timeout=30)
+        data = r.json()
+        
+        if 'response' in data:
+            print(f"[USERBOT] ✅ Пост отправлен в VK")
+            success = True
+        else:
+            print(f"[USERBOT] ❌ Ошибка VK: {data}")
+            success = False
+        
+        # Удаляем временный файл
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        
+        return success
+        
+    except Exception as e:
+        print(f"[USERBOT] Ошибка: {e}")
+        return False
+    finally:
+        await client.disconnect()
+
+def upload_via_userbot(message, caption, tags, vk_token, vk_owner_id):
+    """Синхронная обёртка для вызова из admin_commands.py"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    return loop.run_until_complete(upload_via_userbot_async(message, caption, tags, vk_token, vk_owner_id))
+
+# ==========================================
+# Основной поток автопостинга (отключён)
+# ==========================================
 
 def start_autoposter(config, vk_token, vk_owner_id):
     ap_config = config.get("autoposter", {})
@@ -104,18 +247,12 @@ def start_autoposter(config, vk_token, vk_owner_id):
         print("[AUTOPOSTER] Ошибка: не хватает настроек в конфиге")
         return
 
-    api_id = os.environ.get("TG_API_ID")
-    api_hash = os.environ.get("TG_API_HASH")
-    phone = os.environ.get("TG_PHONE_NUMBER")
-
-    if not api_id or not api_hash or not phone:
+    if not API_ID or not API_HASH or not PHONE:
         print("[AUTOPOSTER] Ошибка: нет TG_API_ID/TG_API_HASH/TG_PHONE_NUMBER")
         return
 
-    api_id = int(api_id)
-
     async def run():
-        client = TelegramClient("autoposter_session", api_id, api_hash)
+        client = TelegramClient("autoposter_session", API_ID, API_HASH)
 
         @client.on(events.NewMessage(chats=source_chat_id))
         async def handler(event):
@@ -147,26 +284,30 @@ def start_autoposter(config, vk_token, vk_owner_id):
                 print(f"[AUTOPOSTER] Ошибка проверки прав: {e}")
                 return
             
-            if not message.text:
+            if not message.text and not message.media:
                 return
             
-            text = message.text.strip()
+            text = message.text or "Медиа-пост"
             print(f"[AUTOPOSTER] Перехвачено: {text[:50]}...")
             
             post = find_or_create_post(text, sender.id)
             
-            # Telegram канал (с эмодзи 🔁 для визуального отличия)
+            # Telegram канал (с эмодзи 🔁)
             try:
                 tg_tags = build_tg_tags(post)
-                await client.send_message(target_chat_id, f"🔁 {text}\n\n{tg_tags}")
+                if message.media:
+                    await client.send_file(target_chat_id, message.media, caption=f"🔁 {text}\n\n{tg_tags}")
+                else:
+                    await client.send_message(target_chat_id, f"🔁 {text}\n\n{tg_tags}")
                 print(f"[AUTOPOSTER] ✅ Telegram")
             except Exception as e:
                 print(f"[AUTOPOSTER] ❌ Telegram: {e}")
             
-            # VK
-            send_to_vk(text, post, vk_token, vk_owner_id)
+            # VK (если есть токен)
+            if vk_token and vk_owner_id:
+                send_to_vk(text, post, vk_token, vk_owner_id)
 
-        await client.start(phone=phone)
+        await client.start(phone=PHONE)
         print(f"[AUTOPOSTER] ✅ Мониторинг запущен. Слушаю чат {source_chat_id} → {target_chat_id}")
         await client.run_until_disconnected()
 
