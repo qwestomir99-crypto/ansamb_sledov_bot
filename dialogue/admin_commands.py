@@ -1,3 +1,12 @@
+# ==========================================
+# Модуль: dialogue/admin_commands.py
+# Справка: README.md → Админка
+# Задача: админ-меню, управление режимами, цитатами, постами
+# Комментарий: добавлена кнопка "🎬 Пост в VK (с медиа)"
+# Зависит от: config.json, publisher_utils.py
+# Вызывается из: bot.py, callbacks.py
+# ==========================================
+
 import os
 import json
 import time
@@ -29,7 +38,6 @@ BLOCK_TIME = 3600  # 1 час
 MAX_ATTEMPTS = 3
 
 def is_blocked(user_id):
-    """Проверяет, заблокирован ли пользователь"""
     if user_id in failed_attempts:
         attempts, block_until = failed_attempts[user_id]
         if time.time() < block_until:
@@ -39,13 +47,11 @@ def is_blocked(user_id):
     return False
 
 def register_failed_attempt(user_id, bot):
-    """Регистрирует неудачную попытку и при необходимости блокирует"""
     attempts, block_until = failed_attempts.get(user_id, (0, 0))
     attempts += 1
     
     if attempts >= MAX_ATTEMPTS:
         block_until = time.time() + BLOCK_TIME
-        # Отправляем уведомление в личку админу
         try:
             bot.send_message(
                 ADMIN_USER_ID,
@@ -113,7 +119,8 @@ def get_admin_menu():
     keyboard.add(InlineKeyboardButton("📝 Управление контентом", callback_data="noop"))
     keyboard.add(
         InlineKeyboardButton("📤 Публикации", callback_data="pub_menu"),
-        InlineKeyboardButton("➕ Добавить пост", callback_data="add_post")
+        InlineKeyboardButton("➕ Добавить пост", callback_data="add_post"),
+        InlineKeyboardButton("🎬 Пост в VK (с медиа)", callback_data="vk_post")
     )
     
     keyboard.add(InlineKeyboardButton("📜 Управление цитатами", callback_data="noop"))
@@ -274,6 +281,76 @@ def handle_callback_quotes_set_interval(interval, bot, chat_id, message_id, user
     log_admin_action(user_id, f"quotes_interval {interval}", "success")
     bot.edit_message_text(f"✅ Интервал цитат установлен: {interval} минут", chat_id, message_id)
 
+# ==========================================
+# Блок: создание поста в VK с медиа
+# ==========================================
+
+def handle_callback_vk_post(bot, chat_id, message_id, user_id):
+    """Начинает процесс создания поста в VK"""
+    msg = bot.send_message(chat_id, "✍️ Введите текст поста для VK (можно с хештегами):")
+    bot.register_next_step_handler(msg, process_vk_post_text, bot, chat_id)
+
+def process_vk_post_text(message, bot, chat_id):
+    text = message.text.strip()
+    if not text:
+        bot.send_message(chat_id, "❌ Текст не может быть пустым")
+        return
+    msg = bot.send_message(chat_id, "📎 Пришлите фото, видео или нажмите /skip")
+    bot.register_next_step_handler(msg, process_vk_post_file, bot, chat_id, text)
+
+def process_vk_post_file(message, bot, chat_id, text):
+    file_path = None
+    if message.text and message.text.lower() == "/skip":
+        file_path = None
+    elif message.photo:
+        file_info = bot.get_file(message.photo[-1].file_id)
+        file_path = f"temp_vk_{message.photo[-1].file_id}.jpg"
+        downloaded_file = bot.download_file(file_info.file_path)
+        with open(file_path, 'wb') as f:
+            f.write(downloaded_file)
+    elif message.video:
+        file_info = bot.get_file(message.video.file_id)
+        file_path = f"temp_vk_{message.video.file_id}.mp4"
+        downloaded_file = bot.download_file(file_info.file_path)
+        with open(file_path, 'wb') as f:
+            f.write(downloaded_file)
+    elif message.document:
+        ext = os.path.splitext(message.document.file_name)[1].lower()
+        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.avi']:
+            file_info = bot.get_file(message.document.file_id)
+            file_path = f"temp_vk_{message.document.file_id}_{message.document.file_name}"
+            downloaded_file = bot.download_file(file_info.file_path)
+            with open(file_path, 'wb') as f:
+                f.write(downloaded_file)
+        else:
+            bot.send_message(chat_id, "❌ Неподдерживаемый тип файла. Пост будет без вложения.")
+    else:
+        bot.send_message(chat_id, "❌ Неподдерживаемый тип медиа. Пост будет без вложения.")
+    
+    # Получаем токены
+    config = load_config()
+    vk_token = os.environ.get("VK_TOKEN") or config.get("vk", {}).get("token")
+    vk_owner_id = os.environ.get("VK_OWNER_ID") or config.get("vk", {}).get("owner_id")
+    
+    if not vk_token or not vk_owner_id:
+        bot.send_message(chat_id, "❌ Нет токена VK. Проверь переменные окружения.")
+        return
+    
+    from dialogue.publisher_utils import post_to_vk
+    success = post_to_vk(text, "", vk_token, vk_owner_id, file_path, auto_quote=True, auto_tags=True)
+    
+    if success:
+        bot.send_message(chat_id, f"✅ Пост отправлен в VK:\n\n{text[:200]}")
+    else:
+        bot.send_message(chat_id, "❌ Ошибка при отправке в VK")
+    
+    if file_path and os.path.exists(file_path):
+        os.remove(file_path)
+
+# ==========================================
+# Отложенные публикации (старая логика)
+# ==========================================
+
 def ask_for_post_text(bot, chat_id, message_id):
     msg = bot.send_message(chat_id, "✍️ Введите текст поста (можно с Markdown) или /skip для поста без текста")
     bot.register_next_step_handler(msg, process_post_text, bot, chat_id)
@@ -312,6 +389,7 @@ def process_post_file(message, bot, chat_id, text):
             f.write(downloaded_file)
     else:
         bot.send_message(chat_id, "❌ Неподдерживаемый тип файла. Пост будет без вложения.")
+    
     ask_for_post_delay(bot, chat_id, text, file_path)
 
 def ask_for_post_delay(bot, chat_id, text, file_path):
@@ -330,15 +408,19 @@ def process_post_delay(message, bot, chat_id, text, file_path):
     config = load_config()
     pub_config = config.get("publisher", {})
     default_tags = pub_config.get("default_tags", "#СапёрыАутентичности #МихоельАв #2026плита")
+    
     add_publication("telegram", text, delay_seconds, default_tags, file_path)
     user_id = message.from_user.id
     log_admin_action(user_id, f"add_post in {delay_minutes} min, text: {bool(text)}, file: {bool(file_path)}", "success")
     bot.send_message(chat_id, f"✅ Пост запланирован через {delay_minutes} минут")
 
+# ==========================================
+# Обработчик команды #админ
+# ==========================================
+
 def handle_admin_command(message, bot):
     user_id = message.from_user.id
     
-    # Проверка на блокировку
     if is_blocked(user_id):
         bot.reply_to(message, "❌ Доступ заблокирован на 1 час из-за слишком частых неудачных попыток.")
         return
