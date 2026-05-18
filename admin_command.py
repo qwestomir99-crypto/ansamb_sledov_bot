@@ -2,18 +2,18 @@
 # Модуль: dialogue/admin_commands.py
 # Справка: README.md → Админка
 # Задача: админ-меню, управление режимами, цитатами, постами
-# Комментарий: добавлена кнопка "🎬 Пост в VK (с медиа)" и возврат в меню
-# Зависит от: config.json, publisher_utils.py
-# Вызывается из: bot.py, callbacks.py
+# Комментарий: кнопка "🎬 Пост в VK (с медиа)" использует add_publication
 # ==========================================
 
 import os
 import json
 import time
+import tempfile
 from datetime import datetime, timedelta
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dialogue.ping_modes import apply_ping_mode
 from dialogue.publisher import add_publication, load_publications
+from dialogue.publisher_utils import get_auto_tags, get_random_quote
 
 CONFIG_FILE = "config.json"
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
@@ -152,6 +152,18 @@ def get_user_menu():
     )
     return keyboard
 
+def return_to_admin_menu(bot, chat_id, message_id=None, user_id=None):
+    if user_id and not is_admin_authorized(user_id):
+        return
+    if message_id:
+        bot.edit_message_text(
+            "🛡️ Админ-меню:",
+            chat_id, message_id,
+            reply_markup=get_admin_menu()
+        )
+    else:
+        bot.send_message(chat_id, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
+
 def handle_callback_mode(mode, bot, chat_id, message_id, user_id):
     config = load_config()
     config["force_mode"] = mode
@@ -163,6 +175,7 @@ def handle_callback_mode(mode, bot, chat_id, message_id, user_id):
         f"✅ Режим «{mode}» установлен сейчас\n\n{GREETINGS.get(mode, '')}",
         chat_id, message_id
     )
+    return_to_admin_menu(bot, chat_id, message_id, user_id)
 
 def handle_callback_ping(interval, bot, chat_id, message_id, user_id):
     config = load_config()
@@ -173,6 +186,7 @@ def handle_callback_ping(interval, bot, chat_id, message_id, user_id):
     apply_ping_mode()
     log_admin_action(user_id, f"ping {interval}", "success")
     bot.edit_message_text(f"✅ Пинг установлен на {interval} секунд", chat_id, message_id)
+    return_to_admin_menu(bot, chat_id, message_id, user_id)
 
 def handle_callback_errors(user_id, bot, chat_id, message_id):
     if os.path.exists("error.log"):
@@ -186,6 +200,7 @@ def handle_callback_errors(user_id, bot, chat_id, message_id):
             bot.edit_message_text("📭 Ошибок нет", chat_id, message_id)
     else:
         bot.edit_message_text("📭 Файл error.log не найден", chat_id, message_id)
+    return_to_admin_menu(bot, chat_id, message_id, user_id)
 
 def handle_callback_log(user_id, bot, chat_id, message_id):
     if os.path.exists("admin.log"):
@@ -199,6 +214,7 @@ def handle_callback_log(user_id, bot, chat_id, message_id):
             bot.edit_message_text("📭 Лог пуст", chat_id, message_id)
     else:
         bot.edit_message_text("📭 Файл admin.log не найден", chat_id, message_id)
+    return_to_admin_menu(bot, chat_id, message_id, user_id)
 
 def handle_callback_logout(user_id, bot, chat_id, message_id):
     logout_admin(user_id)
@@ -209,12 +225,13 @@ def handle_callback_pub_menu(bot, chat_id, message_id, user_id):
     pubs = load_publications()
     if not pubs:
         bot.edit_message_text("📭 Нет отложенных публикаций", chat_id, message_id)
-        return
-    text = "📋 *Отложенные публикации:*\n\n"
-    for p in pubs:
-        status = "✅" if p["status"] == "published" else "⏳"
-        text += f"{status} `{p['text'][:50] if p['text'] else '[Без текста]'}...` ({p['chat_id']})\n"
-    bot.edit_message_text(text, chat_id, message_id, parse_mode='Markdown')
+    else:
+        text = "📋 *Отложенные публикации:*\n\n"
+        for p in pubs:
+            status = "✅" if p["status"] == "published" else "⏳"
+            text += f"{status} `{p['text'][:50] if p['text'] else '[Без текста]'}...` ({p['chat_id']})\n"
+        bot.edit_message_text(text, chat_id, message_id, parse_mode='Markdown')
+    return_to_admin_menu(bot, chat_id, message_id, user_id)
 
 def handle_callback_toggle_alisa(bot, chat_id, message_id, user_id):
     config = load_config()
@@ -225,22 +242,23 @@ def handle_callback_toggle_alisa(bot, chat_id, message_id, user_id):
     status = "включён" if config["alisa"]["enabled"] else "выключен"
     log_admin_action(user_id, "toggle_alisa", status)
     bot.edit_message_text(f"🤖 Старший брат {status}", chat_id, message_id)
-    bot.send_message(chat_id, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
+    return_to_admin_menu(bot, chat_id, message_id, user_id)
 
 def handle_callback_quotes_list(bot, chat_id, message_id, user_id):
     from dialogue.quotes import get_quotes_list
     quotes = get_quotes_list()
     if not quotes:
         bot.edit_message_text("📭 Список цитат пуст", chat_id, message_id)
-        return
-    text = "📜 *Список цитат:*\n\n"
-    for i, q in enumerate(quotes):
-        text += f"`{i+1}.` {q[:60]}{'...' if len(q) > 60 else ''}\n"
-        if len(text) > 3500:
-            bot.send_message(user_id, text, parse_mode='Markdown')
-            text = ""
-    if text:
-        bot.edit_message_text(text, chat_id, message_id, parse_mode='Markdown')
+    else:
+        text = "📜 *Список цитат:*\n\n"
+        for i, q in enumerate(quotes):
+            text += f"`{i+1}.` {q[:60]}{'...' if len(q) > 60 else ''}\n"
+            if len(text) > 3500:
+                bot.send_message(user_id, text, parse_mode='Markdown')
+                text = ""
+        if text:
+            bot.edit_message_text(text, chat_id, message_id, parse_mode='Markdown')
+    return_to_admin_menu(bot, chat_id, message_id, user_id)
 
 def handle_callback_quotes_add_start(bot, chat_id, message_id, user_id):
     msg = bot.send_message(chat_id, "✍️ Введите текст новой цитаты:")
@@ -250,11 +268,12 @@ def process_quote_add(message, bot, chat_id, user_id):
     text = message.text.strip()
     if not text:
         bot.send_message(chat_id, "❌ Цитата не может быть пустой")
-        return
-    from dialogue.quotes import add_quote
-    add_quote(text)
-    log_admin_action(user_id, f"add_quote: {text[:50]}", "success")
-    bot.send_message(chat_id, f"✅ Цитата добавлена:\n\n{text}")
+    else:
+        from dialogue.quotes import add_quote
+        add_quote(text)
+        log_admin_action(user_id, f"add_quote: {text[:50]}", "success")
+        bot.send_message(chat_id, f"✅ Цитата добавлена:\n\n{text}")
+    return_to_admin_menu(bot, chat_id, user_id=user_id)
 
 def handle_callback_quotes_interval(bot, chat_id, message_id, user_id):
     from dialogue.quotes import get_quotes_interval_minutes
@@ -280,78 +299,82 @@ def handle_callback_quotes_set_interval(interval, bot, chat_id, message_id, user
     quotes_module.quotes_loop(bot, TG_CHAT_ID)
     log_admin_action(user_id, f"quotes_interval {interval}", "success")
     bot.edit_message_text(f"✅ Интервал цитат установлен: {interval} минут", chat_id, message_id)
+    return_to_admin_menu(bot, chat_id, message_id, user_id)
 
 # ==========================================
-# Блок: создание поста в VK с медиа
+# Блок: мгновенный пост в VK (через публикатор)
 # ==========================================
 
 def handle_callback_vk_post(bot, chat_id, message_id, user_id):
-    """Начинает процесс создания поста в VK"""
     msg = bot.send_message(chat_id, "✍️ Введите текст поста для VK (можно с хештегами):")
-    bot.register_next_step_handler(msg, process_vk_post_text, bot, chat_id)
+    bot.register_next_step_handler(msg, process_vk_post_text, bot, chat_id, user_id)
 
-def process_vk_post_text(message, bot, chat_id):
+def process_vk_post_text(message, bot, chat_id, user_id):
     text = message.text.strip()
     if not text:
         bot.send_message(chat_id, "❌ Текст не может быть пустым")
-        bot.send_message(chat_id, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
+        return_to_admin_menu(bot, chat_id, user_id=user_id)
         return
     msg = bot.send_message(chat_id, "📎 Пришлите фото, видео или нажмите /skip")
-    bot.register_next_step_handler(msg, process_vk_post_file, bot, chat_id, text)
+    bot.register_next_step_handler(msg, process_vk_post_file, bot, chat_id, text, user_id)
 
-def process_vk_post_file(message, bot, chat_id, text):
+def process_vk_post_file(message, bot, chat_id, text, user_id):
     file_path = None
     if message.text and message.text.lower() == "/skip":
         file_path = None
     elif message.photo:
         file_info = bot.get_file(message.photo[-1].file_id)
-        file_path = f"temp_vk_{message.photo[-1].file_id}.jpg"
+        # Сохраняем во временную папку /tmp (Render разрешает запись)
+        file_path = os.path.join(tempfile.gettempdir(), f"temp_vk_{message.photo[-1].file_id}.jpg")
         downloaded_file = bot.download_file(file_info.file_path)
         with open(file_path, 'wb') as f:
             f.write(downloaded_file)
+        print(f"[DEBUG] Фото сохранено: {file_path}, размер: {os.path.getsize(file_path)} байт")
     elif message.video:
         file_info = bot.get_file(message.video.file_id)
-        file_path = f"temp_vk_{message.video.file_id}.mp4"
+        file_path = os.path.join(tempfile.gettempdir(), f"temp_vk_{message.video.file_id}.mp4")
         downloaded_file = bot.download_file(file_info.file_path)
         with open(file_path, 'wb') as f:
             f.write(downloaded_file)
+        print(f"[DEBUG] Видео сохранено: {file_path}")
     elif message.document:
         ext = os.path.splitext(message.document.file_name)[1].lower()
         if ext in ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.avi']:
             file_info = bot.get_file(message.document.file_id)
-            file_path = f"temp_vk_{message.document.file_id}_{message.document.file_name}"
+            file_path = os.path.join(tempfile.gettempdir(), f"temp_vk_{message.document.file_id}_{message.document.file_name}")
             downloaded_file = bot.download_file(file_info.file_path)
             with open(file_path, 'wb') as f:
                 f.write(downloaded_file)
+            print(f"[DEBUG] Документ сохранён: {file_path}")
         else:
             bot.send_message(chat_id, "❌ Неподдерживаемый тип файла. Пост будет без вложения.")
     else:
         bot.send_message(chat_id, "❌ Неподдерживаемый тип медиа. Пост будет без вложения.")
     
-    # Получаем токены
     config = load_config()
     vk_token = os.environ.get("VK_TOKEN") or config.get("vk", {}).get("token")
     vk_owner_id = os.environ.get("VK_OWNER_ID") or config.get("vk", {}).get("owner_id")
     
     if not vk_token or not vk_owner_id:
         bot.send_message(chat_id, "❌ Нет токена VK. Проверь переменные окружения.")
-        bot.send_message(chat_id, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
+        return_to_admin_menu(bot, chat_id, user_id=user_id)
         return
     
-    from dialogue.publisher_utils import post_to_vk
-    success = post_to_vk(text, "", vk_token, vk_owner_id, file_path, auto_quote=True, auto_tags=True)
+    quote = get_random_quote()
+    full_text = f"{text}\n\n📜 {quote}"
+    auto_tags = get_auto_tags(text, "vk")
     
-    if success:
-        bot.send_message(chat_id, f"✅ Пост отправлен в VK:\n\n{text[:200]}")
-    else:
-        bot.send_message(chat_id, "❌ Ошибка при отправке в VK")
+    # Добавляем публикацию с задержкой 0
+    add_publication("vk", full_text, 0, auto_tags, file_path)
+    
+    bot.send_message(chat_id, f"✅ Пост отправлен в VK:\n\n{full_text[:200]}")
     
     # Удаляем временный файл
     if file_path and os.path.exists(file_path):
         os.remove(file_path)
+        print(f"[DEBUG] Временный файл удалён: {file_path}")
     
-    # Возвращаем админ-меню
-    bot.send_message(chat_id, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
+    return_to_admin_menu(bot, chat_id, user_id=user_id)
 
 # ==========================================
 # Отложенные публикации (старая логика)
@@ -377,19 +400,19 @@ def process_post_file(message, bot, chat_id, text):
         file_path = None
     elif message.photo:
         file_info = bot.get_file(message.photo[-1].file_id)
-        file_path = f"temp_{message.photo[-1].file_id}.jpg"
+        file_path = os.path.join(tempfile.gettempdir(), f"temp_{message.photo[-1].file_id}.jpg")
         downloaded_file = bot.download_file(file_info.file_path)
         with open(file_path, 'wb') as f:
             f.write(downloaded_file)
     elif message.document:
         file_info = bot.get_file(message.document.file_id)
-        file_path = f"temp_{message.document.file_id}_{message.document.file_name}"
+        file_path = os.path.join(tempfile.gettempdir(), f"temp_{message.document.file_id}_{message.document.file_name}")
         downloaded_file = bot.download_file(file_info.file_path)
         with open(file_path, 'wb') as f:
             f.write(downloaded_file)
     elif message.video:
         file_info = bot.get_file(message.video.file_id)
-        file_path = f"temp_{message.video.file_id}.mp4"
+        file_path = os.path.join(tempfile.gettempdir(), f"temp_{message.video.file_id}.mp4")
         downloaded_file = bot.download_file(file_info.file_path)
         with open(file_path, 'wb') as f:
             f.write(downloaded_file)
@@ -419,6 +442,7 @@ def process_post_delay(message, bot, chat_id, text, file_path):
     user_id = message.from_user.id
     log_admin_action(user_id, f"add_post in {delay_minutes} min, text: {bool(text)}, file: {bool(file_path)}", "success")
     bot.send_message(chat_id, f"✅ Пост запланирован через {delay_minutes} минут")
+    return_to_admin_menu(bot, chat_id, user_id=user_id)
 
 # ==========================================
 # Обработчик команды #админ
@@ -426,14 +450,28 @@ def process_post_delay(message, bot, chat_id, text, file_path):
 
 def handle_admin_command(message, bot):
     user_id = message.from_user.id
+    chat_id = message.chat.id
+    
+    try:
+        bot.delete_message(chat_id, message.message_id)
+    except:
+        pass
     
     if is_blocked(user_id):
-        bot.reply_to(message, "❌ Доступ заблокирован на 1 час из-за слишком частых неудачных попыток.")
+        bot.send_message(chat_id, "❌ Доступ заблокирован на 1 час из-за слишком частых неудачных попыток.")
         return
     
     if user_id != ADMIN_USER_ID:
         register_failed_attempt(user_id, bot)
-        bot.reply_to(message, "❌ Доступ запрещён.")
+        try:
+            bot.send_message(
+                user_id,
+                "❌ Неверный пароль. Доступ запрещён.\n\n"
+                "Попробуйте позже или обратитесь к администратору.",
+                parse_mode='Markdown'
+            )
+        except:
+            pass
         return
 
     parts = message.text.split()
@@ -441,7 +479,15 @@ def handle_admin_command(message, bot):
         authorize_admin(user_id, parts[1])
         log_admin_action(user_id, "login", "success")
         failed_attempts.pop(user_id, None)
-        bot.reply_to(message, "✅ Авторизован. Ваше меню:", reply_markup=get_admin_menu())
+        bot.send_message(chat_id, "✅ Авторизован. Ваше меню:", reply_markup=get_admin_menu())
     else:
         register_failed_attempt(user_id, bot)
-        bot.reply_to(message, "❌ Неверный пароль. Попробуйте: #админ <пароль>")
+        try:
+            bot.send_message(
+                user_id,
+                "❌ Неверный пароль. Доступ запрещён.\n\n"
+                "Попробуйте позже или обратитесь к администратору.",
+                parse_mode='Markdown'
+            )
+        except:
+            pass
