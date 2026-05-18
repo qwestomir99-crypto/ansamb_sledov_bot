@@ -2,7 +2,9 @@
 # Модуль: dialogue/admin_commands.py
 # Справка: README.md → Админка
 # Задача: админ-меню, управление режимами, цитатами, постами
-# Комментарий: команда #админ без пароля запрашивает пароль отдельно
+# Комментарий: кнопка "🎬 Пост в VK" отправляет фото/видео через Bot API (до 50 МБ) или Userbot (до 2 ГБ)
+# Зависит от: config.json, publisher.py, publisher_utils.py, services.autoposter
+# Вызывается из: bot.py, callbacks.py
 # ==========================================
 
 import os
@@ -305,7 +307,7 @@ def handle_callback_quotes_set_interval(interval, bot, chat_id, message_id, user
     return_to_admin_menu(bot, chat_id, message_id, user_id)
 
 # ==========================================
-# Блок: мгновенный пост в VK (напрямую, без публикатора)
+# Блок: мгновенный пост в VK (с фото и видео)
 # ==========================================
 
 def handle_callback_vk_post(bot, chat_id, message_id, user_id):
@@ -322,7 +324,67 @@ def process_vk_post_text(message, bot, chat_id, user_id):
     bot.register_next_step_handler(msg, process_vk_post_file, bot, chat_id, text, user_id)
 
 def process_vk_post_file(message, bot, chat_id, text, user_id):
+    # Определяем тип и размер файла ДО скачивания
+    file_size = None
+    file_id = None
+    is_video = False
+    is_photo = False
+    use_userbot = False
+    
+    if message.video:
+        file_size = message.video.file_size
+        file_id = message.video.file_id
+        is_video = True
+        # Видео больше 50 МБ отправляем через Userbot
+        if file_size > 50 * 1024 * 1024:
+            use_userbot = True
+    elif message.document:
+        file_size = message.document.file_size
+        file_id = message.document.file_id
+        ext = os.path.splitext(message.document.file_name)[1].lower()
+        is_video = ext in ['.mp4', '.mov', '.avi', '.mkv']
+        is_photo = ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+        if is_video and file_size > 50 * 1024 * 1024:
+            use_userbot = True
+    elif message.photo:
+        file_size = message.photo[-1].file_size
+        is_photo = True
+        # Фото всегда через Bot API (они маленькие)
+    
+    # Если файл больше 50 МБ и это видео — используем Userbot
+    if use_userbot and is_video:
+        bot.send_message(chat_id, f"📹 Видео ({file_size / 1024 / 1024:.1f} МБ) отправляется через Userbot (до 2 ГБ)...")
+        
+        # Получаем токены для Userbot
+        config = load_config()
+        vk_token = os.environ.get("VK_TOKEN") or config.get("vk", {}).get("token")
+        vk_owner_id = os.environ.get("VK_OWNER_ID") or config.get("vk", {}).get("owner_id")
+        
+        if not vk_token or not vk_owner_id:
+            bot.send_message(chat_id, "❌ Нет токена VK. Проверь переменные окружения.")
+            return_to_admin_menu(bot, chat_id, user_id=user_id)
+            return
+        
+        # Передаём управление Userbot
+        from services.autoposter import upload_via_userbot
+        
+        quote = get_random_quote()
+        full_text = f"{text}\n\n📜 {quote}"
+        auto_tags = get_auto_tags(text, "vk")
+        
+        success = upload_via_userbot(message, full_text, auto_tags, vk_token, vk_owner_id)
+        
+        if success:
+            bot.send_message(chat_id, f"✅ Видео отправлено в VK:\n\n{full_text[:200]}")
+        else:
+            bot.send_message(chat_id, "❌ Ошибка при отправке видео через Userbot")
+        
+        return_to_admin_menu(bot, chat_id, user_id=user_id)
+        return
+    
+    # Для маленьких файлов (до 50 МБ) используем стандартный код
     file_path = None
+    
     if message.text and message.text.lower() == "/skip":
         file_path = None
     elif message.photo:
@@ -341,7 +403,7 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
         print(f"[DEBUG] Видео сохранено: {file_path}")
     elif message.document:
         ext = os.path.splitext(message.document.file_name)[1].lower()
-        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.avi']:
+        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.avi', '.mkv']:
             file_info = bot.get_file(message.document.file_id)
             file_path = os.path.join(tempfile.gettempdir(), f"temp_vk_{message.document.file_id}_{message.document.file_name}")
             downloaded_file = bot.download_file(file_info.file_path)
@@ -366,12 +428,12 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
     full_text = f"{text}\n\n📜 {quote}"
     auto_tags = get_auto_tags(text, "vk")
     
-    success = post_to_vk(full_text, auto_tags, vk_token, vk_owner_id, file_path, auto_quote=False, auto_tags=False)
+    success, error_msg = post_to_vk(full_text, auto_tags, vk_token, vk_owner_id, file_path, auto_quote=False, auto_tags=False)
     
     if success:
         bot.send_message(chat_id, f"✅ Пост отправлен в VK:\n\n{full_text[:200]}")
     else:
-        bot.send_message(chat_id, "❌ Ошибка при отправке в VK")
+        bot.send_message(chat_id, error_msg or "❌ Ошибка при отправке в VK")
     
     if file_path and os.path.exists(file_path):
         os.remove(file_path)
