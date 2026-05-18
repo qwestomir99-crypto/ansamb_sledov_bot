@@ -2,7 +2,7 @@
 # Модуль: dialogue/admin_commands.py
 # Справка: README.md → Админка
 # Задача: админ-меню, управление режимами, цитатами, постами
-# Комментарий: команда #админ без пароля запрашивает пароль отдельно
+# Комментарий: кнопка "🎬 Пост в VK (с медиа)" отправляет фото и видео
 # ==========================================
 
 import os
@@ -305,7 +305,7 @@ def handle_callback_quotes_set_interval(interval, bot, chat_id, message_id, user
     return_to_admin_menu(bot, chat_id, message_id, user_id)
 
 # ==========================================
-# Блок: мгновенный пост в VK (напрямую, без публикатора)
+# Блок: мгновенный пост в VK (с фото и видео)
 # ==========================================
 
 def handle_callback_vk_post(bot, chat_id, message_id, user_id):
@@ -323,6 +323,8 @@ def process_vk_post_text(message, bot, chat_id, user_id):
 
 def process_vk_post_file(message, bot, chat_id, text, user_id):
     file_path = None
+    media_type = None
+    
     if message.text and message.text.lower() == "/skip":
         file_path = None
     elif message.photo:
@@ -331,22 +333,25 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
         downloaded_file = bot.download_file(file_info.file_path)
         with open(file_path, 'wb') as f:
             f.write(downloaded_file)
-        print(f"[DEBUG] Фото сохранено: {file_path}")
+        media_type = "photo"
+        print(f"[DEBUG] Фото сохранено: {file_path}, размер: {os.path.getsize(file_path)} байт")
     elif message.video:
         file_info = bot.get_file(message.video.file_id)
         file_path = os.path.join(tempfile.gettempdir(), f"temp_vk_{message.video.file_id}.mp4")
         downloaded_file = bot.download_file(file_info.file_path)
         with open(file_path, 'wb') as f:
             f.write(downloaded_file)
-        print(f"[DEBUG] Видео сохранено: {file_path}")
+        media_type = "video"
+        print(f"[DEBUG] Видео сохранено: {file_path}, размер: {os.path.getsize(file_path)} байт")
     elif message.document:
         ext = os.path.splitext(message.document.file_name)[1].lower()
-        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.avi']:
+        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.mkv']:
             file_info = bot.get_file(message.document.file_id)
             file_path = os.path.join(tempfile.gettempdir(), f"temp_vk_{message.document.file_id}_{message.document.file_name}")
             downloaded_file = bot.download_file(file_info.file_path)
             with open(file_path, 'wb') as f:
                 f.write(downloaded_file)
+            media_type = "document"
             print(f"[DEBUG] Документ сохранён: {file_path}")
         else:
             bot.send_message(chat_id, "❌ Неподдерживаемый тип файла. Пост будет без вложения.")
@@ -366,12 +371,13 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
     full_text = f"{text}\n\n📜 {quote}"
     auto_tags = get_auto_tags(text, "vk")
     
-    success = post_to_vk(full_text, auto_tags, vk_token, vk_owner_id, file_path, auto_quote=False, auto_tags=False)
+    # Отправляем напрямую в VK
+    success, error_msg = post_to_vk(full_text, auto_tags, vk_token, vk_owner_id, file_path, auto_quote=False, auto_tags=False)
     
     if success:
         bot.send_message(chat_id, f"✅ Пост отправлен в VK:\n\n{full_text[:200]}")
     else:
-        bot.send_message(chat_id, "❌ Ошибка при отправке в VK")
+        bot.send_message(chat_id, error_msg or "❌ Ошибка при отправке в VK")
     
     if file_path and os.path.exists(file_path):
         os.remove(file_path)
