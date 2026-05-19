@@ -1,25 +1,23 @@
 # ==========================================
 # Модуль: dialogue/publisher.py
-# Справка: README.md → Публикатор
 # Задача: публикация отложенных постов и постов из пула
-# Комментарий: интервал публикаций зависит от настроения (базовый, без привязки к пользователю)
-# Зависит от: config.json, publisher_utils.py, post_manager.py, activity_modes.py
-# Вызывается из: bot.py (поток publish_loop)
 # ==========================================
 
 import time
 import threading
 import json
 import os
+import random
 from datetime import datetime
 from dialogue.activity_modes import should_publish, get_current_mode_config
-from dialogue.publisher_utils import post_to_telegram, post_to_vk
+from dialogue.publisher_utils import post_to_telegram, post_to_vk, get_random_own_post_from_vk
 from dialogue.post_manager import get_post_for_publishing, build_tags, add_post_to_pool
 
 PUBLICATIONS_FILE = "publications.json"
+CONFIG_FILE = "config.json"
 
 def load_config():
-    with open("config.json", "r") as f:
+    with open(CONFIG_FILE, "r") as f:
         return json.load(f)
 
 def load_publications():
@@ -53,6 +51,7 @@ def publish_post(bot, tg_chat_id, vk_token, vk_owner_id, post, platform="both"):
     success_tg = False
     success_vk = False
     
+    # Telegram
     if platform in ["both", "telegram"]:
         try:
             success_tg = post_to_telegram(bot, tg_chat_id, text, None, tags)
@@ -60,9 +59,27 @@ def publish_post(bot, tg_chat_id, vk_token, vk_owner_id, post, platform="both"):
         except Exception as e:
             print(f"[PUBLISHER] Telegram ошибка: {e}")
     
+    # VK
     if platform in ["both", "vk"] and vk_token and vk_owner_id:
         try:
-            success_vk = post_to_vk(text, tags, vk_token, vk_owner_id, None)
+            # Проверяем, нужно ли делать репост
+            config = load_config()
+            repost_enabled = config.get("settings", {}).get("REPOST_ENABLED", False)
+            
+            if repost_enabled and random.randint(1, 100) <= config.get("settings", {}).get("REPOST_QUOTE_CHANCE", 50):
+                # Берём случайный свой пост из VK для репоста
+                repost_from = get_random_own_post_from_vk()
+                if repost_from:
+                    print(f"[PUBLISHER] Репост из VK поста {repost_from.get('post_id')} с медиа")
+                    success_vk, error = post_to_vk(
+                        text, tags, vk_token, vk_owner_id, None,
+                        auto_quote=True, auto_tags=True, repost_from=repost_from
+                    )
+                else:
+                    success_vk, error = post_to_vk(text, tags, vk_token, vk_owner_id, None)
+            else:
+                success_vk, error = post_to_vk(text, tags, vk_token, vk_owner_id, None)
+            
             print(f"[PUBLISHER] VK: {'✅' if success_vk else '❌'}")
         except Exception as e:
             print(f"[PUBLISHER] VK ошибка: {e}")
@@ -82,7 +99,6 @@ def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
             mode_config = get_current_mode_config()
             pool_interval = mode_config.get("publisher_interval", 0)
             
-            # Если интервал изменился или ещё не установлен
             if pool_interval != last_interval:
                 last_interval = pool_interval
                 if pool_interval > 0:
@@ -90,7 +106,6 @@ def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
                 else:
                     print("[PUBLISHER] Публикации отключены в текущем режиме")
             
-            # Проверяем, можно ли публиковать по режиму
             if not should_publish() or pool_interval <= 0:
                 time.sleep(30)
                 continue
@@ -115,7 +130,20 @@ def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
                     if platform == "telegram":
                         success = post_to_telegram(bot, tg_chat_id, text, file_path, tags)
                     elif platform == "vk":
-                        success = post_to_vk(text, tags, vk_token, vk_owner_id, file_path)
+                        config = load_config()
+                        repost_enabled = config.get("settings", {}).get("REPOST_ENABLED", False)
+                        
+                        if repost_enabled and random.randint(1, 100) <= config.get("settings", {}).get("REPOST_QUOTE_CHANCE", 50):
+                            repost_from = get_random_own_post_from_vk()
+                            if repost_from:
+                                success, _ = post_to_vk(
+                                    text, tags, vk_token, vk_owner_id, file_path,
+                                    auto_quote=True, auto_tags=True, repost_from=repost_from
+                                )
+                            else:
+                                success, _ = post_to_vk(text, tags, vk_token, vk_owner_id, file_path)
+                        else:
+                            success, _ = post_to_vk(text, tags, vk_token, vk_owner_id, file_path)
                     
                     if success:
                         pub["status"] = "published"
@@ -141,7 +169,7 @@ def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
             if cleaned:
                 save_publications(new_pubs)
             
-            # Публикуем пост из пула с интервалом из режима
+            # Публикуем пост из пула
             current_time = time.time()
             interval_seconds = pool_interval * 60
             
