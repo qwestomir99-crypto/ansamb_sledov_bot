@@ -1,7 +1,6 @@
 # ==========================================
 # Модуль: services/autoposter.py
 # Задача: автоматическая проверка YouTube и публикация новых видео в VK
-# Работает через scheduler.py и activity_modes.py
 # ==========================================
 
 import os
@@ -128,8 +127,17 @@ def post_to_vk(message, access_token, owner_id):
 def check_and_publish():
     """
     Проверяет новые видео и публикует их.
-    Эту функцию будет вызывать scheduler по расписанию.
+    Учитывает адаптивные режимы (тишина при аврале/сне).
     """
+    # ✅ Адаптивные режимы
+    try:
+        from dialogue.adaptive_modes import should_adaptive_publish
+        if not should_adaptive_publish():
+            log("Режим тишины (аврал/сон) — публикация отложена")
+            return False
+    except ImportError:
+        log("adaptive_modes не найден, продолжаем без проверки")
+    
     log("Проверка новых видео на YouTube...")
     
     latest = get_latest_video_from_channel()
@@ -170,10 +178,9 @@ def check_and_publish():
 def start_autoposter(config=None, vk_token=None, vk_owner_id=None):
     """
     Заглушка для обратной совместимости.
-    Реальное расписание управляется через scheduler.py.
+    Реальное расписание управляется через bot.py.
     """
-    log("Автопостинг YouTube настроен. Расписание управляется через scheduler.py")
-    log("Проверка будет выполняться согласно activity_modes.py")
+    log("Автопостинг YouTube настроен. Проверка выполняется отдельным потоком.")
     
     # Для тестирования можно сделать один вызов
     if config and config.get("autoposter", {}).get("test_on_start", False):
