@@ -227,12 +227,29 @@ def handle_callback_pub_menu(bot, chat_id, message_id, user_id):
     pubs = load_publications()
     if not pubs:
         bot.edit_message_text("📭 Нет отложенных публикаций", chat_id, message_id)
-    else:
-        text = "📋 *Отложенные публикации:*\n\n"
-        for p in pubs:
-            status = "✅" if p["status"] == "published" else "⏳"
-            text += f"{status} `{p['text'][:50] if p['text'] else '[Без текста]'}...` ({p['chat_id']})\n"
+        return_to_admin_menu(bot, chat_id, message_id, user_id)
+        return
+    
+    text = "📋 *Отложенные публикации:*\n\n"
+    for i, p in enumerate(pubs):
+        status = "✅" if p.get("status") == "published" else "⏳"
+        # Безопасное получение chat_id и text
+        pub_chat_id = p.get("chat_id", "не указан")
+        pub_text = p.get("text", "[Без текста]")
+        if pub_text and len(pub_text) > 50:
+            pub_text = pub_text[:50] + "..."
+        elif not pub_text:
+            pub_text = "[Без текста]"
+        
+        text += f"{status} `{pub_text}` ({pub_chat_id})\n"
+        
+        if len(text) > 3500:
+            bot.send_message(user_id, text, parse_mode='Markdown')
+            text = ""
+    
+    if text:
         bot.edit_message_text(text, chat_id, message_id, parse_mode='Markdown')
+    
     return_to_admin_menu(bot, chat_id, message_id, user_id)
 
 def handle_callback_toggle_alisa(bot, chat_id, message_id, user_id):
