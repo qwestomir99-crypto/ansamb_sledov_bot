@@ -1,3 +1,12 @@
+# ==========================================
+# Модуль: dialogue/quotes.py
+# Справка: README.md → Цитаты
+# Задача: публикация цитат по расписанию
+# Комментарий: интервал цитат зависит от настроения пользователя (если задано)
+# Зависит от: config.json, activity_modes.py, user_settings.py
+# Вызывается из: bot.py
+# ==========================================
+
 import time
 import random
 import os
@@ -5,7 +14,7 @@ import json
 from datetime import datetime
 import threading
 from dialogue.activity_modes import should_publish_quotes, get_quotes_interval, load_config
-from services.youtube_reader import get_last_video, extract_quotes_from_video
+from dialogue.user_settings import get_user_quotes_interval
 
 CONFIG_FILE = "config.json"
 
@@ -42,24 +51,6 @@ def load_quotes():
     
     with open(quotes_file, "r", encoding="utf-8") as f:
         return [line.strip() for line in f if line.strip()]
-
-def get_quotes_with_youtube():
-    """Объединяет цитаты из файла и из YouTube"""
-    quotes = load_quotes()
-    
-    # Добавляем цитаты из YouTube (последнее видео)
-    try:
-        last_video = get_last_video()
-        if last_video:
-            youtube_quotes = extract_quotes_from_video(last_video)
-            for q in youtube_quotes:
-                # Форматируем как цитату с указанием источника
-                quote_text = f"📺 {q['text']}\n🔗 {q['video_url']}"
-                quotes.append(quote_text)
-    except Exception as e:
-        print(f"[QUOTES] Ошибка получения YouTube цитаты: {e}")
-    
-    return quotes
 
 def save_quotes(quotes):
     config = load_config()
@@ -116,7 +107,13 @@ def quotes_loop(bot, TG_CHAT_ID):
                 time.sleep(60)
                 continue
             
-            current_interval = get_quotes_interval()
+            # Получаем базовый интервал из режима
+            base_interval = get_quotes_interval()
+            
+            # Для общего канала используем базовый интервал (без привязки к пользователю)
+            # Но для отладки можно залогировать
+            current_interval = base_interval
+            
             if current_interval != last_interval:
                 last_interval = current_interval
                 print(f"[QUOTES] Интервал обновлён: {current_interval} минут")
@@ -130,12 +127,11 @@ def quotes_loop(bot, TG_CHAT_ID):
             
             if not quote_thread_running or not should_publish_quotes():
                 continue
-            
-            # Берём цитаты с учётом YouTube
-            quotes = get_quotes_with_youtube()
+                
+            quotes = load_quotes()
             if not quotes:
                 continue
-            
+                
             quote = random.choice(quotes)
             message = f"📜 *Цитата дня* • {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n{quote}\n\n#ЦитатаДня #СапёрыАутентичности"
             try:
@@ -146,4 +142,4 @@ def quotes_loop(bot, TG_CHAT_ID):
     
     quote_thread = threading.Thread(target=_run, daemon=True)
     quote_thread.start()
-    print(f"[QUOTES] Цитаты запущены (с интеграцией YouTube)")
+    print(f"[QUOTES] Цитаты запущены")
