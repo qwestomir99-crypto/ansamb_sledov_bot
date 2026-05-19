@@ -10,6 +10,7 @@
 import os
 import json
 import time
+from datetime import datetime
 
 USER_SETTINGS_FILE = "dialogue/data/user_settings.json"
 
@@ -72,14 +73,21 @@ MOODS = {
 }
 
 def load_user_settings():
-    """Загружает настройки всех пользователей"""
+    """Загружает настройки всех пользователей с защитой от пустого/битого файла"""
     if not os.path.exists(USER_SETTINGS_FILE):
         return {}
     try:
         with open(USER_SETTINGS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, IOError) as e:
-        print(f"[USER_SETTINGS] Ошибка загрузки: {e}")
+            content = f.read().strip()
+            if not content:
+                print("[USER_SETTINGS] Файл настроек пуст, возвращаю пустой словарь")
+                return {}
+            return json.loads(content)
+    except json.JSONDecodeError as e:
+        print(f"[USER_SETTINGS] Ошибка парсинга JSON: {e}, возвращаю пустой словарь")
+        return {}
+    except IOError as e:
+        print(f"[USER_SETTINGS] Ошибка чтения файла: {e}")
         return {}
 
 def save_user_settings(settings):
@@ -206,6 +214,3 @@ def get_all_users_moods():
     for user_id, user_data in settings.items():
         result[user_id] = user_data.get("mood", "сапёр")
     return result
-
-# Для совместимости с datetime
-from datetime import datetime
