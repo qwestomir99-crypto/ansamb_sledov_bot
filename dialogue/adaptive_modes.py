@@ -33,6 +33,7 @@ def save_config(config):
         json.dump(config, f, indent=2)
 
 def load_adaptive_state():
+    """Загружает состояние адаптации с защитой от пустого/битого файла"""
     if not os.path.exists(ADAPTIVE_STATE_FILE):
         return {
             "last_switch": 0,
@@ -40,8 +41,34 @@ def load_adaptive_state():
             "deadend_count": 0,
             "last_return_to_etalon": 0
         }
-    with open(ADAPTIVE_STATE_FILE, "r") as f:
-        return json.load(f)
+    try:
+        with open(ADAPTIVE_STATE_FILE, "r") as f:
+            content = f.read().strip()
+            if not content:
+                print("[ADAPTIVE] Файл состояния пуст, создаём новый")
+                return {
+                    "last_switch": 0,
+                    "current_adaptive_mode": None,
+                    "deadend_count": 0,
+                    "last_return_to_etalon": 0
+                }
+            return json.loads(content)
+    except json.JSONDecodeError as e:
+        print(f"[ADAPTIVE] Ошибка парсинга состояния: {e}, создаём новый файл")
+        return {
+            "last_switch": 0,
+            "current_adaptive_mode": None,
+            "deadend_count": 0,
+            "last_return_to_etalon": 0
+        }
+    except Exception as e:
+        print(f"[ADAPTIVE] Ошибка чтения состояния: {e}")
+        return {
+            "last_switch": 0,
+            "current_adaptive_mode": None,
+            "deadend_count": 0,
+            "last_return_to_etalon": 0
+        }
 
 def save_adaptive_state(state):
     os.makedirs(os.path.dirname(ADAPTIVE_STATE_FILE), exist_ok=True)
@@ -69,7 +96,6 @@ def count_errors_last_hour():
         one_hour_ago = time.time() - 3600
         with open("error.log", "r") as f:
             lines = f.readlines()
-        # Простой подсчёт (можно улучшить)
         return len(lines)
     except:
         return 0
@@ -79,7 +105,6 @@ def count_commands_last_hour():
     if not os.path.exists("admin.log"):
         return 0
     try:
-        one_hour_ago = time.time() - 3600
         with open("admin.log", "r") as f:
             lines = f.readlines()
         commands = 0
@@ -91,8 +116,7 @@ def count_commands_last_hour():
         return 0
 
 def get_vk_views_last_hour():
-    """Получает просмотры из VK (требует интеграции с vk_reader)"""
-    # TODO: интегрировать с сохранёнными постами
+    """Получает просмотры из VK"""
     return 0
 
 def get_last_publication_age():
@@ -122,24 +146,19 @@ def get_adaptive_mode(metrics):
     hour = metrics.get("hour", 0)
     last_pub_age = metrics.get("last_publication_age", 999)
     
-    # Авральный режим (много ошибок)
     if errors > 10:
         return "авральный"
     
-    # Ночной режим (по времени, но можно перебить активностью)
     if hour < 6 or hour > 23:
         if commands < 3 and last_pub_age > 120:
             return "ночной"
     
-    # Ускоренный режим (высокая активность)
     if commands > 20 or (is_weekend and commands > 10):
         return "ускоренный"
     
-    # Замедленный режим (мало активности, давно не публиковали)
     if commands < 3 and last_pub_age > 60:
         return "замедленный"
     
-    # Сон (полное затишье)
     if commands == 0 and last_pub_age > 180:
         return "сон"
     
@@ -151,22 +170,19 @@ def is_dead_end(adaptive_mode, metrics):
     commands = metrics.get("commands_last_hour", 0)
     last_pub_age = metrics.get("last_publication_age", 999)
     
-    # Если в адаптивном режиме ошибки растут — тупик
     if errors > 15:
         return True
     
-    # Если в адаптивном режиме активность нулевая больше 3 часов
     if commands == 0 and last_pub_age > 180:
         return True
     
-    # Если адаптивный режим активен давно, а публикаций нет
     if last_pub_age > 240:
         return True
     
     return False
 
 def get_etalon_mode_by_time():
-    """Возвращает эталонный режим по времени (как в activity_modes.py)"""
+    """Возвращает эталонный режим по времени"""
     config = load_config()
     current_hour = datetime.now().hour
     modes = config.get("modes", {})
@@ -189,7 +205,7 @@ def get_adaptive_interval(base_interval, adaptive_mode):
     elif adaptive_mode == "замедленный":
         return min(480, base_interval * 2)
     elif adaptive_mode == "авральный":
-        return 0  # отключить публикации
+        return 0
     elif adaptive_mode == "сон":
         return 0
     else:
@@ -199,6 +215,13 @@ def get_current_adaptive_mode():
     """
     Главная функция: возвращает текущий режим (адаптивный или эталонный)
     """
+    global ADAPTIVE_ENABLED
+    try:
+        from settings import ADAPTIVE_ENABLED as SETTINGS_ADAPTIVE
+        ADAPTIVE_ENABLED = SETTINGS_ADAPTIVE
+    except:
+        pass
+    
     if not ADAPTIVE_ENABLED:
         return get_etalon_mode_by_time()
     
@@ -206,7 +229,6 @@ def get_current_adaptive_mode():
     metrics = collect_metrics()
     adaptive_mode = get_adaptive_mode(metrics)
     
-    # Проверка на тупик
     if is_dead_end(adaptive_mode, metrics):
         print(f"[ADAPTIVE] Тупик в режиме {adaptive_mode}, возврат к эталону")
         state["last_return_to_etalon"] = time.time()
@@ -214,7 +236,6 @@ def get_current_adaptive_mode():
         save_adaptive_state(state)
         return get_etalon_mode_by_time()
     
-    # Ограничение на частоту смены режимов
     now = time.time()
     if adaptive_mode != state.get("current_adaptive_mode"):
         if now - state.get("last_switch", 0) > ADAPTIVE_COOLDOWN:
@@ -223,7 +244,6 @@ def get_current_adaptive_mode():
             state["current_adaptive_mode"] = adaptive_mode
             save_adaptive_state(state)
         else:
-            # Используем предыдущий режим, если кулдаун не прошёл
             adaptive_mode = state.get("current_adaptive_mode", "обычный")
     
     return adaptive_mode
