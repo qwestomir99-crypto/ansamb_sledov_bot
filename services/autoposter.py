@@ -18,15 +18,33 @@ def log(msg, level="INFO"):
 def get_last_published_video():
     """Возвращает ID последнего опубликованного видео"""
     if os.path.exists(LAST_VIDEO_FILE):
-        with open(LAST_VIDEO_FILE, "r") as f:
-            return f.read().strip()
-    return None
+        try:
+            with open(LAST_VIDEO_FILE, "r") as f:
+                video_id = f.read().strip()
+                if video_id:
+                    log(f"Прочитан сохранённый ID: {video_id}")
+                    return video_id
+                else:
+                    log("Файл с ID пуст")
+                    return None
+        except Exception as e:
+            log(f"Ошибка чтения файла: {e}", "ERROR")
+            return None
+    else:
+        log("Файл с ID не найден, это нормально для первого запуска")
+        return None
 
 def save_last_published_video(video_id):
     """Сохраняет ID последнего опубликованного видео"""
-    os.makedirs(os.path.dirname(LAST_VIDEO_FILE), exist_ok=True)
-    with open(LAST_VIDEO_FILE, "w") as f:
-        f.write(video_id)
+    try:
+        os.makedirs(os.path.dirname(LAST_VIDEO_FILE), exist_ok=True)
+        with open(LAST_VIDEO_FILE, "w") as f:
+            f.write(video_id)
+        log(f"✅ Сохранён ID видео: {video_id}")
+        return True
+    except Exception as e:
+        log(f"Ошибка сохранения ID: {e}", "ERROR")
+        return False
 
 def get_latest_video_from_channel():
     """Получает последнее видео с канала через YouTube API"""
@@ -61,11 +79,13 @@ def get_latest_video_from_channel():
         
         if "items" in data and data["items"]:
             item = data["items"][0]
-            return {
+            video = {
                 "id": item["id"]["videoId"],
                 "title": item["snippet"]["title"],
                 "published_at": item["snippet"]["publishedAt"]
             }
+            log(f"Найдено видео: {video['title']} (ID: {video['id']})")
+            return video
         
         log("Видео не найдены", "WARNING")
         return None
@@ -77,13 +97,16 @@ def get_random_quote():
     """Берёт случайную цитату из файла"""
     quotes_file = "dialogue/data/quotes.txt"
     if not os.path.exists(quotes_file):
+        log("Файл цитат не найден", "WARNING")
         return "Ритм 0,8 Гц стабилен. Сеть тлеет."
     
     with open(quotes_file, "r", encoding="utf-8") as f:
         quotes = [line.strip() for line in f if line.strip()]
     
     import random
-    return random.choice(quotes) if quotes else "Сеть тлеет. Ритм 0,8 Гц."
+    quote = random.choice(quotes) if quotes else "Сеть тлеет. Ритм 0,8 Гц."
+    log(f"Выбрана цитата: {quote[:50]}...")
+    return quote
 
 def post_to_vk(message, access_token, owner_id):
     """Отправляет пост в VK"""
@@ -129,7 +152,9 @@ def check_and_publish():
     Проверяет новые видео и публикует их.
     Учитывает адаптивные режимы (тишина при аврале/сне).
     """
-    # ✅ Адаптивные режимы
+    log("=== НАЧАЛО ПРОВЕРКИ ===")
+    
+    # Адаптивные режимы
     try:
         from dialogue.adaptive_modes import should_adaptive_publish
         if not should_adaptive_publish():
@@ -138,17 +163,17 @@ def check_and_publish():
     except ImportError:
         log("adaptive_modes не найден, продолжаем без проверки")
     
-    log("Проверка новых видео на YouTube...")
-    
+    # Получаем последнее видео
     latest = get_latest_video_from_channel()
     if not latest:
         log("Не удалось получить видео с канала", "WARNING")
         return False
     
+    # Проверяем, публиковали ли уже это видео
     last_published = get_last_published_video()
     
-    if last_published == latest["id"]:
-        log(f"Новых видео нет. Последнее: {latest['id']}")
+    if last_published and last_published == latest["id"]:
+        log(f"Видео уже было опубликовано ранее (ID: {latest['id']})")
         return False
     
     # Новое видео найдено!
@@ -168,9 +193,13 @@ def check_and_publish():
     success, error = post_to_vk(post_text, vk_token, vk_owner_id)
     
     if success:
-        save_last_published_video(latest["id"])
-        log("✅ Видео успешно опубликовано в VK!")
-        return True
+        # Сохраняем ID опубликованного видео
+        if save_last_published_video(latest["id"]):
+            log("✅ Видео успешно опубликовано и сохранено!")
+            return True
+        else:
+            log("⚠️ Видео опубликовано, но НЕ СОХРАНЕНО! Возможны повторы.")
+            return True
     else:
         log(f"❌ Ошибка публикации: {error}", "ERROR")
         return False
