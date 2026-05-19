@@ -9,7 +9,7 @@ ENABLE_JOURNALIST = True     # Журналист (дайджест)
 ENABLE_QUOTES = True         # Цитаты
 ENABLE_SCHEDULER = True      # Планировщик (полуночный ритуал)
 ENABLE_PUBLISHER = True      # Публикатор (посты из пула)
-ENABLE_AUTOPOSTER = False    # Автопостинг (требует Telethon, отключён)
+ENABLE_AUTOPOSTER = True     # Автопостинг YouTube → VK (ВКЛЮЧЁН!)
 ENABLE_CALLBACKS = True      # Обработчики кнопок
 
 # -------------------- РЕЖИМЫ --------------------
@@ -24,6 +24,9 @@ DEADEND_TIMEOUT = 7200       # Таймаут тупика (секунды)
 REPOST_ENABLED = True        # Включить репосты своих постов из VK с новыми цитатами
 REPOST_DAILY_LIMIT = 3       # Максимум репостов в сутки
 REPOST_QUOTE_CHANCE = 50     # Шанс добавить новую цитату к репосту (%)
+
+# -------------------- YOUTUBE АВТОПОСТИНГ (НОВЫЙ МОДУЛЬ) --------------------
+YOUTUBE_CHECK_INTERVAL = 60  # Интервал проверки YouTube в минутах (будет гибко по режимам)
 
 # -------------------- ОТЛАДКА --------------------
 DEBUG_IMPORTS = True         # Выводить диагностику импортов
