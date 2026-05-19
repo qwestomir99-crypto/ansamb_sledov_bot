@@ -30,7 +30,7 @@ except ImportError:
     ENABLE_QUOTES = True
     ENABLE_SCHEDULER = True
     ENABLE_PUBLISHER = True
-    ENABLE_AUTOPOSTER = False
+    ENABLE_AUTOPOSTER = True
     ENABLE_CALLBACKS = True
     ENABLE_ALISA = False
     DEBUG_IMPORTS = True
@@ -39,6 +39,7 @@ except ImportError:
     POLLING_DELAY = 2
     POLLING_TIMEOUT = 60
     LONG_POLLING_TIMEOUT = 60
+    YOUTUBE_CHECK_INTERVAL = 60
 
 if DEBUG_IMPORTS:
     print(f"[DEBUG] Настройки: VK_READER={ENABLE_VK_READER}, JOURNALIST={ENABLE_JOURNALIST}, QUOTES={ENABLE_QUOTES}")
@@ -96,10 +97,10 @@ if ENABLE_SCHEDULER:
 
 if ENABLE_AUTOPOSTER:
     try:
-        from services.autoposter import start_autoposter
-        print("[DEBUG] start_autoposter импортирован")
+        from services.autoposter import start_autoposter, check_and_publish
+        print("[DEBUG] start_autoposter и check_and_publish импортированы")
     except Exception as e:
-        print(f"[DEBUG] start_autoposter ОШИБКА: {e}")
+        print(f"[DEBUG] autoposter ОШИБКА: {e}")
 
 from dialogue.agent import ask_agent
 
@@ -254,6 +255,34 @@ if ENABLE_PUBLISHER:
         print("[DEBUG] 4e. Publisher запущен")
     except Exception as e:
         print(f"[DEBUG] 4e. Publisher ошибка: {e}")
+        traceback.print_exc()
+
+# ---------- ПОТОК YOUTUBE АВТОПОСТИНГА (НОВЫЙ) ----------
+if ENABLE_AUTOPOSTER:
+    try:
+        from services.autoposter import check_and_publish
+        import time
+        
+        def youtube_autoposter_loop():
+            """Отдельный поток для периодической проверки YouTube"""
+            interval_minutes = YOUTUBE_CHECK_INTERVAL
+            interval_seconds = interval_minutes * 60
+            print(f"[AUTOPOSTER] Поток YouTube запущен, проверка каждые {interval_minutes} минут")
+            
+            # Первая проверка через 30 секунд
+            time.sleep(30)
+            
+            while True:
+                try:
+                    check_and_publish()
+                except Exception as e:
+                    print(f"[AUTOPOSTER] Ошибка в цикле: {e}")
+                time.sleep(interval_seconds)
+        
+        threading.Thread(target=youtube_autoposter_loop, daemon=True).start()
+        print("[DEBUG] 4f. YouTube Autoposter (новый поток) запущен")
+    except Exception as e:
+        print(f"[DEBUG] 4f. YouTube Autoposter ошибка: {e}")
         traceback.print_exc()
 
 # ---------- РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ ----------
@@ -459,7 +488,7 @@ start_background_pinger(60)
 if ENABLE_AUTOPOSTER:
     try:
         start_autoposter(config, VK_TOKEN, VK_OWNER_ID)
-        print("[BOT] Автопостинг запущен")
+        print("[BOT] Автопостинг (старая версия) запущен")
     except Exception as e:
         print(f"[BOT] Ошибка автопостинга: {e}")
 else:
