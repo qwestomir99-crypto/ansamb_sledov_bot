@@ -47,15 +47,31 @@ if DEBUG_IMPORTS:
 from ping_utils import ping_self, start_background_pinger
 
 if ENABLE_JOURNALIST:
-    from dialogue.journalist import journalist_loop
+    try:
+        from dialogue.journalist import journalist_loop
+        print("[DEBUG] journalist_loop импортирован")
+    except Exception as e:
+        print(f"[DEBUG] journalist_loop ОШИБКА: {e}")
 if ENABLE_VK_READER:
-    from dialogue.vk_reader import vk_reader_loop
+    try:
+        from dialogue.vk_reader import vk_reader_loop
+        print("[DEBUG] vk_reader_loop импортирован")
+    except Exception as e:
+        print(f"[DEBUG] vk_reader_loop ОШИБКА: {e}")
 if ENABLE_QUOTES:
-    from dialogue.quotes import quotes_loop
+    try:
+        from dialogue.quotes import quotes_loop
+        print("[DEBUG] quotes_loop импортирован")
+    except Exception as e:
+        print(f"[DEBUG] quotes_loop ОШИБКА: {e}")
 if ENABLE_PUBLISHER:
-    from dialogue.publisher import publish_loop
+    try:
+        from dialogue.dramchik import publish_loop
+        print("[DEBUG] dramchik (publisher) импортирован")
+    except Exception as e:
+        print(f"[DEBUG] dramchik ОШИБКА: {e}")
 
-from dialogue.admin_commands import (
+from dialogue.kritik import (
     handle_admin_command, is_admin_authorized,
     get_admin_menu, get_user_menu,
     handle_callback_mode, handle_callback_ping,
@@ -69,18 +85,30 @@ from dialogue.admin_commands import (
     ask_for_post_text
 )
 
-from dialogue.activity_modes import should_respond_to_talk
+from dialogue.saper import should_respond_to_talk
 
 if ENABLE_SCHEDULER:
-    from dialogue.scheduler import scheduler_loop
+    try:
+        from dialogue.scheduler import scheduler_loop
+        print("[DEBUG] scheduler_loop импортирован")
+    except Exception as e:
+        print(f"[DEBUG] scheduler_loop ОШИБКА: {e}")
 
 if ENABLE_AUTOPOSTER:
-    from services.autoposter import start_autoposter
+    try:
+        from services.tzar import start_autoposter
+        print("[DEBUG] tzar (autoposter) импортирован")
+    except Exception as e:
+        print(f"[DEBUG] tzar ОШИБКА: {e}")
 
-from dialogue.agent import ask_agent
+from dialogue.star_brat import ask_agent
 
 if ENABLE_CALLBACKS:
-    from dialogue.callbacks import register_callback_handlers
+    try:
+        from dialogue.shturman import register_callback_handlers
+        print("[DEBUG] shturman (callbacks) импортирован")
+    except Exception as e:
+        print(f"[DEBUG] shturman ОШИБКА: {e}")
 
 CONFIG_FILE = "config.json"
 
@@ -104,7 +132,6 @@ def clean_old_logs(days=7):
                 if now - mtime > days * 86400:
                     os.remove(logfile)
                     print(f"[LOG] Удалён старый файл: {logfile}")
-                    # Создаём новый пустой
                     with open(logfile, 'w') as f:
                         f.write('')
     except Exception as e:
@@ -184,7 +211,6 @@ if DEBUG_IMPORTS:
 
 # Запуск очистки логов при старте
 clean_old_logs()
-# Запускаем фоновую задачу очистки раз в сутки
 threading.Thread(target=lambda: [time.sleep(86400) or clean_old_logs() for _ in range(999)], daemon=True).start()
 if DEBUG_IMPORTS:
     print("[DEBUG] 3a. Очистка логов запущена")
@@ -193,8 +219,7 @@ if DEBUG_IMPORTS:
 if ENABLE_VK_READER:
     try:
         threading.Thread(target=vk_reader_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
-        if DEBUG_THREADS:
-            print("[DEBUG] 4a. VK_reader запущен")
+        print("[DEBUG] 4a. VK_reader запущен")
     except Exception as e:
         print(f"[DEBUG] 4a. VK_reader ошибка: {e}")
         traceback.print_exc()
@@ -202,8 +227,7 @@ if ENABLE_VK_READER:
 if ENABLE_JOURNALIST:
     try:
         threading.Thread(target=journalist_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
-        if DEBUG_THREADS:
-            print("[DEBUG] 4b. Journalist запущен")
+        print("[DEBUG] 4b. Journalist запущен")
     except Exception as e:
         print(f"[DEBUG] 4b. Journalist ошибка: {e}")
         traceback.print_exc()
@@ -211,8 +235,7 @@ if ENABLE_JOURNALIST:
 if ENABLE_QUOTES:
     try:
         threading.Thread(target=quotes_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
-        if DEBUG_THREADS:
-            print("[DEBUG] 4c. Quotes запущен")
+        print("[DEBUG] 4c. Quotes запущен")
     except Exception as e:
         print(f"[DEBUG] 4c. Quotes ошибка: {e}")
         traceback.print_exc()
@@ -220,8 +243,7 @@ if ENABLE_QUOTES:
 if ENABLE_SCHEDULER:
     try:
         threading.Thread(target=scheduler_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
-        if DEBUG_THREADS:
-            print("[DEBUG] 4d. Scheduler запущен")
+        print("[DEBUG] 4d. Scheduler запущен")
     except Exception as e:
         print(f"[DEBUG] 4d. Scheduler ошибка: {e}")
         traceback.print_exc()
@@ -229,20 +251,18 @@ if ENABLE_SCHEDULER:
 if ENABLE_PUBLISHER:
     try:
         threading.Thread(target=publish_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
-        if DEBUG_THREADS:
-            print("[DEBUG] 4e. Publisher запущен")
+        print("[DEBUG] 4e. Dramchik (publisher) запущен")
     except Exception as e:
-        print(f"[DEBUG] 4e. Publisher ошибка: {e}")
+        print(f"[DEBUG] 4e. Dramchik ошибка: {e}")
         traceback.print_exc()
 
 # ---------- РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ ----------
 if ENABLE_CALLBACKS:
     try:
         register_callback_handlers(bot, config)
-        if DEBUG_IMPORTS:
-            print("[DEBUG] 5. Callback-обработчики зарегистрированы")
+        print("[DEBUG] 5. Shturman (callbacks) зарегистрированы")
     except Exception as e:
-        print(f"[DEBUG] 5. Callback-обработчики ошибка: {e}")
+        print(f"[DEBUG] 5. Shturman ошибка: {e}")
         traceback.print_exc()
 
 # ---------- ВЫЗОВ АГЕНТА (РЕЗЕРВ) ----------
@@ -265,6 +285,21 @@ def send_start(message):
 def handle_message(message):
     text = message.text.lower()
 
+    # --- ИНТЕРАКТИВНАЯ СПРАВКА # ---
+    if text == "#":
+        try:
+            from dialogue.botsman import get_help_keyboard
+            bot.reply_to(
+                message,
+                "📖 *Справка по командам*\n\nВыберите команду для подробного описания:",
+                reply_markup=get_help_keyboard(),
+                parse_mode='Markdown'
+            )
+        except ImportError:
+            bot.reply_to(message, "❌ Модуль справки не загружен")
+        return
+    # --- КОНЕЦ СПРАВКИ # ---
+
     if text == "#меню" or text == "#помощь":
         if is_admin_authorized(message.from_user.id):
             bot.reply_to(message, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
@@ -276,28 +311,115 @@ def handle_message(message):
         handle_admin_command(message, bot)
         return
 
+    # --- ОБРАБОТЧИК #говори (через агента) ---
     if text.startswith("#говори"):
         if not should_respond_to_talk():
             bot.reply_to(message, "🌙 Старший брат отдыхает. Спроси в другой раз.")
             return
+        
         phrase = text.replace("#говори", "", 1).strip()
         if not phrase:
             bot.reply_to(message, "🗣 *Старший брат:*\nА что ты хотел сказать?")
             return
+        
         bot.send_chat_action(message.chat.id, 'typing')
-        
-        alisa_enabled = ENABLE_ALISA
-        
-        if alisa_enabled:
-            answer = ask_alisa(phrase)
-        else:
-            answer = ask_agent(phrase)
+        answer = ask_agent(phrase)
         
         if answer:
             bot.reply_to(message, f"🗣 *Старший брат:*\n{answer}", parse_mode='Markdown')
         else:
             bot.reply_to(message, "🗣 *Старший брат:*\nНе отвечаю сейчас. Попробуй позже.")
         return
+    # --- КОНЕЦ ОБРАБОТЧИКА #говори ---
+
+    # --- РИТУАЛЬНЫЕ КОМАНДЫ (#тлеем, #фиксируем) ---
+    if text in ["#тлеем", "#фиксируем", "#tleem", "#fixiruem"]:
+        try:
+            from dialogue.quotes import get_quotes_list
+            quotes = get_quotes_list()
+            if quotes:
+                import random
+                random_quote = random.choice(quotes)
+                bot.reply_to(message, f"👁️ {random_quote}")
+            else:
+                bot.reply_to(message, "📭 База цитат пуста. Добавьте цитаты через админку.")
+        except Exception as e:
+            bot.reply_to(message, "❌ Ошибка при выборе цитаты.")
+            print(f"[RITUAL] Ошибка: {e}")
+        return
+    # --- КОНЕЦ РИТУАЛЬНЫХ КОМАНД ---
+
+    # --- КОМАНДА #вспышка ---
+    if text in ["#вспышка", "#vspishka"]:
+        bot.reply_to(message, "⚡ Ты снаружи картины. До погружения. Аутентичность — не маска. Это способ не сдаться.")
+        return
+    # --- КОНЕЦ #вспышка ---
+
+    # --- КОМАНДА #сброс (сброс адаптивных режимов к эталону) ---
+    if text == "#сброс":
+        if not is_admin_authorized(message.from_user.id):
+            bot.reply_to(message, "❌ Только для админа")
+            return
+        try:
+            from dialogue.kraken import reset_to_etalon
+            reset_to_etalon()
+            bot.reply_to(message, "✅ Адаптивные режимы сброшены к эталону")
+            print("[HANDLERS] Выполнен сброс адаптивных режимов")
+        except ImportError:
+            bot.reply_to(message, "❌ Модуль адаптивных режимов не загружен")
+        except Exception as e:
+            bot.reply_to(message, f"❌ Ошибка сброса: {e}")
+        return
+    # --- КОНЕЦ #сброс ---
+
+    # --- КОМАНДА #настроение (персональное настроение) ---
+    if text.startswith("#настроение"):
+        mood = text.replace("#настроение", "", 1).strip()
+        
+        try:
+            from dialogue.sema import (
+                get_available_moods, get_user_mood, get_user_style,
+                get_user_emoji, set_user_mood, MOODS
+            )
+        except ImportError:
+            bot.reply_to(message, "❌ Модуль настроений не загружен")
+            return
+        
+        if not mood:
+            current_mood = get_user_mood(message.from_user.id)
+            moods_list = get_available_moods()
+            text_moods = "\n".join([f"  • {m['emoji']} *{m['name']}* — `{m['id']}` — {m['style']}" for m in moods_list])
+            bot.reply_to(
+                message,
+                f"🎭 *Текущее настроение:* {get_user_emoji(message.from_user.id)} *{get_user_mood(message.from_user.id).capitalize()}*\n\n"
+                f"*Доступные настроения:*\n{text_moods}\n\n"
+                f"✨ *Изменить:* `#настроение <id>`\n"
+                f"Пример: `#настроение художник`",
+                parse_mode='Markdown'
+            )
+            return
+        
+        if mood in MOODS:
+            set_user_mood(message.from_user.id, mood)
+            bot.reply_to(
+                message,
+                f"{MOODS[mood]['emoji']} *Настроение «{MOODS[mood]['name']}» установлено!*\n\n"
+                f"🎨 *Стиль:* {MOODS[mood]['style']}\n"
+                f"⏱️ *Интервал цитат:* {MOODS[mood]['quotes_interval']} мин\n"
+                f"📤 *Интервал публикаций:* {MOODS[mood]['publisher_interval']} мин\n\n"
+                f"🌟 *Ритм 0,8 Гц остаётся неизменным.*",
+                parse_mode='Markdown'
+            )
+            print(f"[HANDLERS] Пользователь {message.from_user.id} сменил настроение на {mood}")
+        else:
+            bot.reply_to(
+                message,
+                f"❌ Настроение `{mood}` не найдено.\n"
+                f"Доступные: `сапёр`, `художник`, `поэт`, `админ`, `наблюдатель`, `философ`",
+                parse_mode='Markdown'
+            )
+        return
+    # --- КОНЕЦ #настроение ---
 
     if "#дышим" in text:
         ping_self()
@@ -307,17 +429,13 @@ def handle_message(message):
         help_text = """
 📖 *Доступные хештеги:*
 
-🔹 *#тлеем* / *#tleem* — зафиксировать разлом
-🔹 *#фиксируем* / *#fixiruem* — подтвердить синхронизацию
-🔹 *#вспышка* / *#vspishka* — импульс
-🔹 *#дышим* — пинг бота
-🔹 *#говори <текст>* — спросить у Старшего брата
-🔹 *#меню* / *#помощь* — открыть меню
-
-🛡️ *Админ-команды:*
-🔹 *#админ <пароль>* — вход в админ-панель
-
-📌 *Режимы:* утро, день, вечер, ночь
+🔹 *#тлеем* — разлом
+🔹 *#фиксируем* — синхронизация
+🔹 *#вспышка* — импульс
+🔹 *#дышим* — пинг
+🔹 *#говори <текст>* — вопрос Старшему брату
+🔹 *#меню* — меню
+🔹 *#* — интерактивная справка
         """
         bot.reply_to(message, help_text, parse_mode='Markdown')
         return
