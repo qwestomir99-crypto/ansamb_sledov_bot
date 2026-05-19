@@ -2,9 +2,7 @@
 # Модуль: dialogue/handlers.py
 # Справка: README.md → Обработчики команд
 # Задача: обработка команд пользователей и админов
-# Комментарий: добавлена команда # (хештег без текста) для вызова интерактивной справки
-# Зависит от: admin_commands.py, activity_modes.py, agent.py, adaptive_modes.py, user_settings.py, help_menu.py
-# Вызывается из: bot.py
+# Комментарий: добавлена команда #ютуб_тест для проверки YouTube API
 # ==========================================
 
 import random
@@ -24,7 +22,6 @@ def load_config():
         return json.load(f)
 
 def get_help_text():
-    """Динамически генерирует справку из config.json"""
     config = load_config()
     default_tags = config.get("publisher", {}).get("default_tags", "#СапёрыАутентичности #МихоельАв #2026плита")
     vk_tags = config.get("autoposter", {}).get("vk_tags", "#Ансамбль #СледНаКонтаке")
@@ -40,6 +37,7 @@ def get_help_text():
 🔹 *#меню* / *#помощь* — открыть меню
 🔹 *#сброс* — сбросить адаптивные режимы к эталону (только админ)
 🔹 *#настроение* — показать/сменить персональное настроение
+🔹 *#ютуб_тест* — проверить работу YouTube API
 🔹 *#* — интерактивная справка с кнопками
 
 🏷 *Основные теги:*
@@ -82,6 +80,23 @@ def register_handlers(bot, config):
             return
         # --- КОНЕЦ СПРАВКИ # ---
 
+        # --- ТЕСТ YOUTUBE API ---
+        if text == "#ютуб_тест":
+            try:
+                from services.youtube_reader import test_youtube
+                bot.send_chat_action(message.chat.id, 'typing')
+                success = test_youtube()
+                if success:
+                    bot.reply_to(message, "✅ YouTube API работает! Последнее видео получено.")
+                else:
+                    bot.reply_to(message, "❌ YouTube API не отвечает. Проверь ключи и ID канала.")
+            except ImportError:
+                bot.reply_to(message, "❌ Модуль youtube_reader не загружен")
+            except Exception as e:
+                bot.reply_to(message, f"❌ Ошибка: {e}")
+            return
+        # --- КОНЕЦ ТЕСТА YOUTUBE ---
+
         if text == "#меню" or text == "#помощь":
             if is_admin_authorized(message.from_user.id):
                 bot.reply_to(message, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
@@ -120,7 +135,6 @@ def register_handlers(bot, config):
                 from dialogue.quotes import get_quotes_list
                 quotes = get_quotes_list()
                 if quotes:
-                    import random
                     random_quote = random.choice(quotes)
                     bot.reply_to(message, f"👁️ {random_quote}")
                 else:
