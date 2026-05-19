@@ -1,3 +1,12 @@
+# ==========================================
+# Модуль: dialogue/handlers.py
+# Справка: README.md → Обработчики команд
+# Задача: обработка команд пользователей и админов
+# Комментарий: добавлена команда #сброс для сброса адаптивных режимов
+# Зависит от: admin_commands.py, activity_modes.py, agent.py, adaptive_modes.py
+# Вызывается из: bot.py
+# ==========================================
+
 import random
 import json
 from dialogue.admin_commands import (
@@ -29,6 +38,7 @@ def get_help_text():
 🔹 *#дышим* — пинг бота
 🔹 *#говори <текст>* — спросить у Старшего брата
 🔹 *#меню* / *#помощь* — открыть меню
+🔹 *#сброс* — сбросить адаптивные режимы к эталону (только админ)
 
 🏷 *Основные теги:*
 📝 Telegram: `{default_tags}`
@@ -37,7 +47,7 @@ def get_help_text():
 🛡️ *Админ-команды:*
 🔹 *#админ <пароль>* — вход в админ-панель
 
-📌 *Режимы:* утро, день, вечер, ночь
+📌 *Режимы:* утро, день, вечер, ночь + адаптивные
 """
     return help_text
 
@@ -65,7 +75,7 @@ def register_handlers(bot, config):
             handle_admin_command(message, bot)
             return
 
-        # --- Обработчик #говори (через моего агента) ---
+        # --- ОБРАБОТЧИК #говори (через агента) ---
         if text.startswith("#говори"):
             if not should_respond_to_talk():
                 bot.reply_to(message, "🌙 Старший брат отдыхает. Спроси в другой раз.")
@@ -84,7 +94,47 @@ def register_handlers(bot, config):
             else:
                 bot.reply_to(message, "🗣 *Старший брат:*\nНе отвечаю сейчас. Попробуй позже.")
             return
-        # --- Конец обработчика #говори ---
+        # --- КОНЕЦ ОБРАБОТЧИКА #говори ---
+
+        # --- РИТУАЛЬНЫЕ КОМАНДЫ (#тлеем, #фиксируем) ---
+        if text in ["#тлеем", "#фиксируем", "#tleem", "#fixiruem"]:
+            try:
+                from dialogue.quotes import get_quotes_list
+                quotes = get_quotes_list()
+                if quotes:
+                    import random
+                    random_quote = random.choice(quotes)
+                    bot.reply_to(message, f"👁️ {random_quote}")
+                else:
+                    bot.reply_to(message, "📭 База цитат пуста. Добавьте цитаты через админку.")
+            except Exception as e:
+                bot.reply_to(message, "❌ Ошибка при выборе цитаты.")
+                print(f"[RITUAL] Ошибка: {e}")
+            return
+        # --- КОНЕЦ РИТУАЛЬНЫХ КОМАНД ---
+
+        # --- КОМАНДА #вспышка ---
+        if text in ["#вспышка", "#vspishka"]:
+            bot.reply_to(message, "⚡ Ты снаружи картины. До погружения. Аутентичность — не маска. Это способ не сдаться.")
+            return
+        # --- КОНЕЦ #вспышка ---
+
+        # --- КОМАНДА #сброс (сброс адаптивных режимов к эталону) ---
+        if text == "#сброс":
+            if not is_admin_authorized(message.from_user.id):
+                bot.reply_to(message, "❌ Только для админа")
+                return
+            try:
+                from dialogue.adaptive_modes import reset_to_etalon
+                reset_to_etalon()
+                bot.reply_to(message, "✅ Адаптивные режимы сброшены к эталону")
+                print("[HANDLERS] Выполнен сброс адаптивных режимов")
+            except ImportError:
+                bot.reply_to(message, "❌ Модуль адаптивных режимов не загружен")
+            except Exception as e:
+                bot.reply_to(message, f"❌ Ошибка сброса: {e}")
+            return
+        # --- КОНЕЦ #сброс ---
 
         if "#дышим" in text:
             ping_self()
