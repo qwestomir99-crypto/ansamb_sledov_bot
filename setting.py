@@ -9,7 +9,7 @@ ENABLE_JOURNALIST = True     # Журналист (дайджест)
 ENABLE_QUOTES = True         # Цитаты
 ENABLE_SCHEDULER = True      # Планировщик (полуночный ритуал)
 ENABLE_PUBLISHER = True      # Публикатор (посты из пула)
-ENABLE_AUTOPOSTER = True     # Автопостинг YouTube → VK (ВКЛЮЧЁН!)
+ENABLE_AUTOPOSTER = False     # Автопостинг YouTube → VK (ВКЛЮЧЁН!)
 ENABLE_CALLBACKS = True      # Обработчики кнопок
 
 # -------------------- РЕЖИМЫ --------------------
