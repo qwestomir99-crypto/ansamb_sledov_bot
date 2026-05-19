@@ -17,7 +17,9 @@ try:
     from dialogue.adaptive_modes import (
         get_current_adaptive_mode,
         get_adaptive_quotes_interval,
-        should_adaptive_publish
+        get_adaptive_publisher_interval,
+        should_adaptive_publish,
+        ADAPTIVE_ENABLED
     )
     ADAPTIVE_AVAILABLE = True
     print("[ACTIVITY_MODES] Адаптивные режимы загружены")
@@ -31,13 +33,11 @@ def load_config():
 
 def get_current_mode():
     """Возвращает текущий режим (адаптивный или эталонный)"""
-    if ADAPTIVE_AVAILABLE:
-        from dialogue.adaptive_modes import ADAPTIVE_ENABLED
-        if ADAPTIVE_ENABLED:
-            adaptive_mode = get_current_adaptive_mode()
-            # Если адаптивный режим вернул название, отличное от эталонного, используем его
-            if adaptive_mode != "обычный":
-                return adaptive_mode
+    if ADAPTIVE_AVAILABLE and ADAPTIVE_ENABLED:
+        adaptive_mode = get_current_adaptive_mode()
+        # Если адаптивный режим не "обычный", используем его
+        if adaptive_mode and adaptive_mode != "обычный":
+            return adaptive_mode
     
     # Иначе — эталонный режим по времени
     config = load_config()
@@ -72,25 +72,25 @@ def get_current_activity_mode():
     return get_current_mode()
 
 def get_current_mode_config():
-    """Возвращает конфиг текущего режима"""
+    """Возвращает конфиг текущего режима (с учётом адаптации)"""
     mode = get_current_mode()
     config = load_config()
     modes = config.get("modes", {})
-    mode_config = modes.get(mode, {})
+    
+    # Получаем базовый конфиг режима
+    if mode in modes:
+        mode_config = modes[mode].copy()
+    else:
+        mode_config = {}
     
     # Если адаптивные режимы включены, корректируем интервалы
-    if ADAPTIVE_AVAILABLE:
-        from dialogue.adaptive_modes import ADAPTIVE_ENABLED
-        if ADAPTIVE_ENABLED:
-            # Получаем скорректированные интервалы
-            base_quotes_interval = mode_config.get("quotes_interval", 60)
-            base_publisher_interval = mode_config.get("publisher_interval", 0)
-            
-            corrected_config = mode_config.copy()
-            corrected_config["quotes_interval"] = get_adaptive_quotes_interval(base_quotes_interval)
-            corrected_config["publisher_interval"] = get_adaptive_publisher_interval(base_publisher_interval)
-            corrected_config["publisher"] = should_adaptive_publish()
-            return corrected_config
+    if ADAPTIVE_AVAILABLE and ADAPTIVE_ENABLED:
+        base_quotes_interval = mode_config.get("quotes_interval", 60)
+        base_publisher_interval = mode_config.get("publisher_interval", 0)
+        
+        mode_config["quotes_interval"] = get_adaptive_quotes_interval(base_quotes_interval)
+        mode_config["publisher_interval"] = get_adaptive_publisher_interval(base_publisher_interval)
+        mode_config["publisher"] = should_adaptive_publish()
     
     return mode_config
 
