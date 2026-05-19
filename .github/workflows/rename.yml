@@ -1,0 +1,32 @@
+name: Rename modules to ensemble roles
+
+on:
+  workflow_dispatch:  # запускается вручную
+
+jobs:
+  rename:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Rename files
+        run: |
+          # Переименовываем файлы
+          git mv dialogue/admin_commands.py dialogue/kritik.py || true
+          git mv dialogue/activity_modes.py dialogue/saper.py || true
+          git mv dialogue/adaptive_modes.py dialogue/kraken.py || true
+          git mv dialogue/user_settings.py dialogue/sema.py || true
+          git mv dialogue/publisher.py dialogue/dramchik.py || true
+          git mv dialogue/help_menu.py dialogue/botsman.py || true
+          git mv dialogue/callbacks.py dialogue/shturman.py || true
+          git mv dialogue/agent.py dialogue/star_brat.py || true
+          git mv services/autoposter.py services/tzar.py || true
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "refactor: переименование модулей в роли ансамбля" || echo "No changes to commit"
+          git push origin main
