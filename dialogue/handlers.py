@@ -2,8 +2,8 @@
 # Модуль: dialogue/handlers.py
 # Справка: README.md → Обработчики команд
 # Задача: обработка команд пользователей и админов
-# Комментарий: добавлены команды #сброс и #настроение
-# Зависит от: admin_commands.py, activity_modes.py, agent.py, adaptive_modes.py, user_settings.py
+# Комментарий: добавлена команда # (хештег без текста) для вызова интерактивной справки
+# Зависит от: admin_commands.py, activity_modes.py, agent.py, adaptive_modes.py, user_settings.py, help_menu.py
 # Вызывается из: bot.py
 # ==========================================
 
@@ -40,6 +40,7 @@ def get_help_text():
 🔹 *#меню* / *#помощь* — открыть меню
 🔹 *#сброс* — сбросить адаптивные режимы к эталону (только админ)
 🔹 *#настроение* — показать/сменить персональное настроение
+🔹 *#* — интерактивная справка с кнопками
 
 🏷 *Основные теги:*
 📝 Telegram: `{default_tags}`
@@ -65,6 +66,21 @@ def register_handlers(bot, config):
     @bot.message_handler(func=lambda message: True)
     def handle_message(message):
         text = message.text.lower()
+
+        # --- ИНТЕРАКТИВНАЯ СПРАВКА # ---
+        if text == "#":
+            try:
+                from dialogue.help_menu import get_help_keyboard
+                bot.reply_to(
+                    message,
+                    "📖 *Справка по командам*\n\nВыберите команду для подробного описания:",
+                    reply_markup=get_help_keyboard(),
+                    parse_mode='Markdown'
+                )
+            except ImportError:
+                bot.reply_to(message, "❌ Модуль справки не загружен")
+            return
+        # --- КОНЕЦ СПРАВКИ # ---
 
         if text == "#меню" or text == "#помощь":
             if is_admin_authorized(message.from_user.id):
@@ -142,10 +158,14 @@ def register_handlers(bot, config):
         if text.startswith("#настроение"):
             mood = text.replace("#настроение", "", 1).strip()
             
-            from dialogue.user_settings import (
-                get_available_moods, get_user_mood, get_user_style,
-                get_user_emoji, set_user_mood, MOODS
-            )
+            try:
+                from dialogue.user_settings import (
+                    get_available_moods, get_user_mood, get_user_style,
+                    get_user_emoji, set_user_mood, MOODS
+                )
+            except ImportError:
+                bot.reply_to(message, "❌ Модуль настроений не загружен")
+                return
             
             if not mood:
                 current_mood = get_user_mood(message.from_user.id)
