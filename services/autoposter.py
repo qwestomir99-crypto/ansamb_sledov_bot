@@ -1,53 +1,22 @@
 # ==========================================
 # Модуль: services/autoposter.py
-# Задача: автоматическая проверка YouTube и публикация новых видео в VK
+# Задача: публикация случайных видео с YouTube в VK
 # ==========================================
 
 import os
-import time
+import random
 import json
 import requests
 from datetime import datetime
 
-# Файл для хранения ID последнего опубликованного видео
+# Файл для хранения ID последнего опубликованного видео (опционально)
 LAST_VIDEO_FILE = "dialogue/data/last_youtube_video.txt"
 
 def log(msg, level="INFO"):
     print(f"[AUTOPOSTER] {level}: {msg}")
 
-def get_last_published_video():
-    """Возвращает ID последнего опубликованного видео"""
-    if os.path.exists(LAST_VIDEO_FILE):
-        try:
-            with open(LAST_VIDEO_FILE, "r") as f:
-                video_id = f.read().strip()
-                if video_id:
-                    log(f"Прочитан сохранённый ID: {video_id}")
-                    return video_id
-                else:
-                    log("Файл с ID пуст")
-                    return None
-        except Exception as e:
-            log(f"Ошибка чтения файла: {e}", "ERROR")
-            return None
-    else:
-        log("Файл с ID не найден, это нормально для первого запуска")
-        return None
-
-def save_last_published_video(video_id):
-    """Сохраняет ID последнего опубликованного видео"""
-    try:
-        os.makedirs(os.path.dirname(LAST_VIDEO_FILE), exist_ok=True)
-        with open(LAST_VIDEO_FILE, "w") as f:
-            f.write(video_id)
-        log(f"✅ Сохранён ID видео: {video_id}")
-        return True
-    except Exception as e:
-        log(f"Ошибка сохранения ID: {e}", "ERROR")
-        return False
-
-def get_latest_video_from_channel():
-    """Получает последнее видео с канала через YouTube API"""
+def get_random_video_from_channel():
+    """Получает случайное видео с канала через YouTube API"""
     api_key = os.environ.get("YOUTUBE_API_KEY")
     channel_id = os.environ.get("YOUTUBE_CHANNEL_ID")
     
@@ -63,8 +32,8 @@ def get_latest_video_from_channel():
     params = {
         "part": "snippet",
         "channelId": channel_id,
-        "maxResults": 1,
-        "order": "date",
+        "maxResults": 50,           # максимум видео за раз
+        "order": "date",            # сортировка по дате
         "type": "video",
         "key": api_key
     }
@@ -77,18 +46,23 @@ def get_latest_video_from_channel():
             log(f"API ошибка: {data['error']['message']}", "ERROR")
             return None
         
-        if "items" in data and data["items"]:
-            item = data["items"][0]
-            video = {
-                "id": item["id"]["videoId"],
-                "title": item["snippet"]["title"],
-                "published_at": item["snippet"]["publishedAt"]
-            }
-            log(f"Найдено видео: {video['title']} (ID: {video['id']})")
-            return video
+        items = data.get("items", [])
+        if not items:
+            log("Видео не найдены", "WARNING")
+            return None
         
-        log("Видео не найдены", "WARNING")
-        return None
+        # Выбираем случайное видео из списка
+        item = random.choice(items)
+        
+        video = {
+            "id": item["id"]["videoId"],
+            "title": item["snippet"]["title"],
+            "published_at": item["snippet"]["publishedAt"],
+            "url": f"https://youtu.be/{item['id']['videoId']}"
+        }
+        log(f"🎲 Выбрано случайное видео: {video['title']} (ID: {video['id']})")
+        return video
+        
     except Exception as e:
         log(f"Ошибка запроса: {e}", "ERROR")
         return None
@@ -103,9 +77,8 @@ def get_random_quote():
     with open(quotes_file, "r", encoding="utf-8") as f:
         quotes = [line.strip() for line in f if line.strip()]
     
-    import random
     quote = random.choice(quotes) if quotes else "Сеть тлеет. Ритм 0,8 Гц."
-    log(f"Выбрана цитата: {quote[:50]}...")
+    log(f"📜 Выбрана цитата: {quote[:50]}...")
     return quote
 
 def post_to_vk(message, access_token, owner_id):
@@ -149,12 +122,11 @@ def post_to_vk(message, access_token, owner_id):
 
 def check_and_publish():
     """
-    Проверяет новые видео и публикует их.
-    Учитывает адаптивные режимы (тишина при аврале/сне).
+    Публикует случайное видео с YouTube в VK.
     """
-    log("=== НАЧАЛО ПРОВЕРКИ ===")
+    log("=== НАЧАЛО ПУБЛИКАЦИИ СЛУЧАЙНОГО ВИДЕО ===")
     
-    # Адаптивные режимы
+    # Проверка адаптивных режимов (если они есть)
     try:
         from dialogue.adaptive_modes import should_adaptive_publish
         if not should_adaptive_publish():
@@ -163,28 +135,17 @@ def check_and_publish():
     except ImportError:
         log("adaptive_modes не найден, продолжаем без проверки")
     
-    # Получаем последнее видео
-    latest = get_latest_video_from_channel()
-    if not latest:
+    # Получаем случайное видео
+    video = get_random_video_from_channel()
+    if not video:
         log("Не удалось получить видео с канала", "WARNING")
         return False
-    
-    # Проверяем, публиковали ли уже это видео
-    last_published = get_last_published_video()
-    
-    if last_published and last_published == latest["id"]:
-        log(f"Видео уже было опубликовано ранее (ID: {latest['id']})")
-        return False
-    
-    # Новое видео найдено!
-    log(f"🔥 НОВОЕ ВИДЕО: {latest['title']} (ID: {latest['id']})")
     
     # Берём случайную цитату
     quote = get_random_quote()
     
     # Формируем пост
-    video_url = f"https://youtu.be/{latest['id']}"
-    post_text = f"📜 *{quote}*\n\n🎬 *НОВОЕ ВИДЕО НА КАНАЛЕ*\n{latest['title']}\n\n{video_url}"
+    post_text = f"📜 *{quote}*\n\n🎬 *СЛУЧАЙНОЕ ВИДЕО С КАНАЛА*\n{video['title']}\n\n{video['url']}"
     
     # Публикуем в VK
     vk_token = os.environ.get("VK_TOKEN")
@@ -193,13 +154,8 @@ def check_and_publish():
     success, error = post_to_vk(post_text, vk_token, vk_owner_id)
     
     if success:
-        # Сохраняем ID опубликованного видео
-        if save_last_published_video(latest["id"]):
-            log("✅ Видео успешно опубликовано и сохранено!")
-            return True
-        else:
-            log("⚠️ Видео опубликовано, но НЕ СОХРАНЕНО! Возможны повторы.")
-            return True
+        log("✅ Случайное видео успешно опубликовано в VK!")
+        return True
     else:
         log(f"❌ Ошибка публикации: {error}", "ERROR")
         return False
@@ -209,7 +165,7 @@ def start_autoposter(config=None, vk_token=None, vk_owner_id=None):
     Заглушка для обратной совместимости.
     Реальное расписание управляется через bot.py.
     """
-    log("Автопостинг YouTube настроен. Проверка выполняется отдельным потоком.")
+    log("Автопостинг YouTube (случайные видео) настроен. Проверка выполняется отдельным потоком.")
     
     # Для тестирования можно сделать один вызов
     if config and config.get("autoposter", {}).get("test_on_start", False):
