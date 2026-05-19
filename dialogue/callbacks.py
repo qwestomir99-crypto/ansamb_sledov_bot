@@ -2,8 +2,8 @@
 # Модуль: dialogue/callbacks.py
 # Справка: README.md → Обработчики кнопок
 # Задача: обработка callback_query (нажатий на кнопки)
-# Комментарий: добавлена диагностика для кнопки "🎬 Пост в VK (с медиа)"
-# Зависит от: admin_commands.py
+# Комментарий: добавлена обработка кнопок справки
+# Зависит от: admin_commands.py, help_menu.py
 # Вызывается из: bot.py
 # ==========================================
 
@@ -25,6 +25,14 @@ from ping_utils import ping_self
 
 def register_callback_handlers(bot, config):
     """Регистрирует обработчики кнопок (callback_query)"""
+
+    # --- РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ СПРАВКИ ---
+    try:
+        from dialogue.help_menu import register_help_handlers
+        register_help_handlers(bot)
+        print("[CALLBACKS] Обработчики справки зарегистрированы")
+    except ImportError as e:
+        print(f"[CALLBACKS] Модуль help_menu не найден: {e}")
 
     @bot.callback_query_handler(func=lambda call: True)
     def handle_callback(call):
@@ -95,15 +103,11 @@ def register_callback_handlers(bot, config):
                 return
             ask_for_post_text(bot, chat_id, message_id)
 
-        # ---------- ПОСТ В VK (НОВЫЙ) С ДИАГНОСТИКОЙ ----------
+        # ---------- ПОСТ В VK ----------
         elif data == "vk_post":
-            print(f"[DEBUG] Нажата кнопка vk_post, user_id={user_id}")
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
-                print("[DEBUG] Не авторизован")
                 return
-            print("[DEBUG] Авторизован, вызываем handle_callback_vk_post")
-            from dialogue.admin_commands import handle_callback_vk_post
             handle_callback_vk_post(bot, chat_id, message_id, user_id)
 
         # ---------- АЛИСА ----------
@@ -161,6 +165,7 @@ def register_callback_handlers(bot, config):
 🔹 *#дышим* — пинг
 🔹 *#говори <текст>* — вопрос Старшему брату
 🔹 *#меню* — меню
+🔹 *#* — интерактивная справка
             """
             bot.send_message(chat_id, help_text, parse_mode='Markdown')
 
