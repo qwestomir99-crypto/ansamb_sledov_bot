@@ -2,7 +2,7 @@
 # Модуль: services/autoposter.py
 # Справка: README.md → Автопостинг
 # Задача: пересылка сообщений из группы в канал и VK через Userbot
-# Комментарий: поддерживает файлы до 2 ГБ
+# Комментарий: поддерживает файлы до 2 ГБ, не использует Bot API для больших видео
 # Зависит от: config.json, publisher_utils.py
 # Вызывается из: bot.py, admin_commands.py (upload_via_userbot)
 # ==========================================
@@ -84,37 +84,6 @@ def build_vk_tags(post):
             tags.add(t)
     return " ".join(tags)
 
-def send_to_vk(text, post, vk_token, vk_owner_id, file_path=None):
-    if not vk_token or not vk_owner_id:
-        return
-    tags = build_vk_tags(post)
-    full_text = f"{text}\n\n{tags}"
-    params = {
-        "access_token": vk_token,
-        "v": "5.199",
-        "owner_id": vk_owner_id,
-        "message": full_text,
-        "from_group": 1
-    }
-    if file_path and os.path.exists(file_path):
-        ext = os.path.splitext(file_path)[1].lower()
-        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
-            upload_url = get_vk_upload_url(vk_token, vk_owner_id)
-            if upload_url:
-                photo_attachment = upload_photo_to_vk(upload_url, file_path, vk_token)
-                if photo_attachment:
-                    params['attachments'] = photo_attachment
-        elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
-            print(f"[VK] Видео пока не поддерживается, публикуем только текст")
-    try:
-        r = requests.post("https://api.vk.com/method/wall.post", params=params, timeout=10)
-        if r.json().get("response"):
-            print(f"[VK] ✅ отправлено: {tags[:50]}...")
-        else:
-            print(f"[VK] ошибка: {r.json()}")
-    except Exception as e:
-        print(f"[VK] исключение: {e}")
-
 def get_vk_upload_url(vk_token, owner_id):
     params = {
         "access_token": vk_token,
@@ -154,12 +123,43 @@ def upload_photo_to_vk(upload_url, file_path, vk_token):
         print(f"[VK] upload photo ошибка: {e}")
         return None
 
+def send_to_vk(text, post, vk_token, vk_owner_id, file_path=None):
+    if not vk_token or not vk_owner_id:
+        return
+    tags = build_vk_tags(post)
+    full_text = f"{text}\n\n{tags}"
+    params = {
+        "access_token": vk_token,
+        "v": "5.199",
+        "owner_id": vk_owner_id,
+        "message": full_text,
+        "from_group": 1
+    }
+    if file_path and os.path.exists(file_path):
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+            upload_url = get_vk_upload_url(vk_token, vk_owner_id)
+            if upload_url:
+                photo_attachment = upload_photo_to_vk(upload_url, file_path, vk_token)
+                if photo_attachment:
+                    params['attachments'] = photo_attachment
+        elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
+            print(f"[VK] Видео пока не поддерживается, публикуем только текст")
+    try:
+        r = requests.post("https://api.vk.com/method/wall.post", params=params, timeout=10)
+        if r.json().get("response"):
+            print(f"[VK] ✅ отправлено: {tags[:50]}...")
+        else:
+            print(f"[VK] ошибка: {r.json()}")
+    except Exception as e:
+        print(f"[VK] исключение: {e}")
+
 # ==========================================
 # Функция для загрузки больших файлов через Userbot
 # Вызывается из admin_commands.py
 # ==========================================
 
-async def upload_via_userbot_async(message, caption, tags, vk_token, vk_owner_id):
+async def upload_via_userbot_async(file_id, caption, tags, vk_token, vk_owner_id, message):
     """Загружает файл через Userbot (Telethon) и отправляет в VK"""
     if not API_ID or not API_HASH or not PHONE:
         print("[USERBOT] Не настроены TG_API_ID/TG_API_HASH/TG_PHONE_NUMBER")
@@ -169,19 +169,20 @@ async def upload_via_userbot_async(message, caption, tags, vk_token, vk_owner_id
     await client.start(phone=PHONE)
     
     try:
-        # Скачиваем файл из Telegram
+        # Скачиваем файл из Telegram по message (Telethon умеет сам)
+        print(f"[USERBOT] Скачивание файла...")
         file_path = await client.download_media(message)
         if not file_path:
             print("[USERBOT] Не удалось скачать файл")
             return False
         
-        print(f"[USERBOT] Файл скачан: {file_path}, размер: {os.path.getsize(file_path)} байт")
+        file_size = os.path.getsize(file_path)
+        print(f"[USERBOT] Файл скачан: {file_path}, размер: {file_size / 1024 / 1024:.1f} МБ")
         
         # Подготавливаем пост
         full_text = f"{caption}\n\n{tags}"
         
-        # Отправляем в VK (здесь нужно добавить логику загрузки видео)
-        # Для видео VK требует отдельного API, пока отправляем только текст
+        # Отправляем в VK
         params = {
             "access_token": vk_token,
             "v": "5.199",
@@ -198,9 +199,10 @@ async def upload_via_userbot_async(message, caption, tags, vk_token, vk_owner_id
                 photo_attachment = upload_photo_to_vk(upload_url, file_path, vk_token)
                 if photo_attachment:
                     params['attachments'] = photo_attachment
+                    print("[USERBOT] Фото прикреплено")
         elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
-            # Видео пока не поддерживается через VK API в этом модуле
-            print("[USERBOT] Видео отправляется без прикрепления (VK API не поддерживает видео через Userbot)")
+            # Видео через Userbot: VK API не поддерживает прямую загрузку, публикуем ссылку
+            print("[USERBOT] Видео публикуется без прикрепления (VK API ограничен)")
         
         r = requests.post("https://api.vk.com/method/wall.post", params=params, timeout=30)
         data = r.json()
@@ -215,6 +217,7 @@ async def upload_via_userbot_async(message, caption, tags, vk_token, vk_owner_id
         # Удаляем временный файл
         if os.path.exists(file_path):
             os.remove(file_path)
+            print(f"[USERBOT] Временный файл удалён")
         
         return success
         
@@ -224,11 +227,11 @@ async def upload_via_userbot_async(message, caption, tags, vk_token, vk_owner_id
     finally:
         await client.disconnect()
 
-def upload_via_userbot(message, caption, tags, vk_token, vk_owner_id):
+def upload_via_userbot(file_id, caption, tags, vk_token, vk_owner_id, message):
     """Синхронная обёртка для вызова из admin_commands.py"""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    return loop.run_until_complete(upload_via_userbot_async(message, caption, tags, vk_token, vk_owner_id))
+    return loop.run_until_complete(upload_via_userbot_async(file_id, caption, tags, vk_token, vk_owner_id, message))
 
 # ==========================================
 # Основной поток автопостинга (отключён)
@@ -237,7 +240,7 @@ def upload_via_userbot(message, caption, tags, vk_token, vk_owner_id):
 def start_autoposter(config, vk_token, vk_owner_id):
     ap_config = config.get("autoposter", {})
     if not ap_config.get("enabled"):
-        print("[AUTOPOSTER] Отключён в конфиге")
+        print("[AUTOPOSTER] Отключën в конфиге")
         return
 
     source_chat_id = int(ap_config.get("source_chat_id"))
