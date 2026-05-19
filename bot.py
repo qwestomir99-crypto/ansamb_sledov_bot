@@ -66,12 +66,12 @@ if ENABLE_QUOTES:
         print(f"[DEBUG] quotes_loop ОШИБКА: {e}")
 if ENABLE_PUBLISHER:
     try:
-        from dialogue.dramchik import publish_loop
-        print("[DEBUG] dramchik (publisher) импортирован")
+        from dialogue.publisher import publish_loop
+        print("[DEBUG] publish_loop импортирован")
     except Exception as e:
-        print(f"[DEBUG] dramchik ОШИБКА: {e}")
+        print(f"[DEBUG] publish_loop ОШИБКА: {e}")
 
-from dialogue.kritik import (
+from dialogue.admin_commands import (
     handle_admin_command, is_admin_authorized,
     get_admin_menu, get_user_menu,
     handle_callback_mode, handle_callback_ping,
@@ -85,7 +85,7 @@ from dialogue.kritik import (
     ask_for_post_text
 )
 
-from dialogue.saper import should_respond_to_talk
+from dialogue.activity_modes import should_respond_to_talk
 
 if ENABLE_SCHEDULER:
     try:
@@ -96,19 +96,19 @@ if ENABLE_SCHEDULER:
 
 if ENABLE_AUTOPOSTER:
     try:
-        from services.tzar import start_autoposter
-        print("[DEBUG] tzar (autoposter) импортирован")
+        from services.autoposter import start_autoposter
+        print("[DEBUG] start_autoposter импортирован")
     except Exception as e:
-        print(f"[DEBUG] tzar ОШИБКА: {e}")
+        print(f"[DEBUG] start_autoposter ОШИБКА: {e}")
 
-from dialogue.star_brat import ask_agent
+from dialogue.agent import ask_agent
 
 if ENABLE_CALLBACKS:
     try:
-        from dialogue.shturman import register_callback_handlers
-        print("[DEBUG] shturman (callbacks) импортирован")
+        from dialogue.callbacks import register_callback_handlers
+        print("[DEBUG] register_callback_handlers импортирован")
     except Exception as e:
-        print(f"[DEBUG] shturman ОШИБКА: {e}")
+        print(f"[DEBUG] register_callback_handlers ОШИБКА: {e}")
 
 CONFIG_FILE = "config.json"
 
@@ -251,18 +251,18 @@ if ENABLE_SCHEDULER:
 if ENABLE_PUBLISHER:
     try:
         threading.Thread(target=publish_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
-        print("[DEBUG] 4e. Dramchik (publisher) запущен")
+        print("[DEBUG] 4e. Publisher запущен")
     except Exception as e:
-        print(f"[DEBUG] 4e. Dramchik ошибка: {e}")
+        print(f"[DEBUG] 4e. Publisher ошибка: {e}")
         traceback.print_exc()
 
 # ---------- РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ ----------
 if ENABLE_CALLBACKS:
     try:
         register_callback_handlers(bot, config)
-        print("[DEBUG] 5. Shturman (callbacks) зарегистрированы")
+        print("[DEBUG] 5. Callback-обработчики зарегистрированы")
     except Exception as e:
-        print(f"[DEBUG] 5. Shturman ошибка: {e}")
+        print(f"[DEBUG] 5. Callback-обработчики ошибка: {e}")
         traceback.print_exc()
 
 # ---------- ВЫЗОВ АГЕНТА (РЕЗЕРВ) ----------
@@ -288,7 +288,7 @@ def handle_message(message):
     # --- ИНТЕРАКТИВНАЯ СПРАВКА # ---
     if text == "#":
         try:
-            from dialogue.botsman import get_help_keyboard
+            from dialogue.help_menu import get_help_keyboard
             bot.reply_to(
                 message,
                 "📖 *Справка по командам*\n\nВыберите команду для подробного описания:",
@@ -361,7 +361,7 @@ def handle_message(message):
             bot.reply_to(message, "❌ Только для админа")
             return
         try:
-            from dialogue.kraken import reset_to_etalon
+            from dialogue.adaptive_modes import reset_to_etalon
             reset_to_etalon()
             bot.reply_to(message, "✅ Адаптивные режимы сброшены к эталону")
             print("[HANDLERS] Выполнен сброс адаптивных режимов")
@@ -377,7 +377,7 @@ def handle_message(message):
         mood = text.replace("#настроение", "", 1).strip()
         
         try:
-            from dialogue.sema import (
+            from dialogue.user_settings import (
                 get_available_moods, get_user_mood, get_user_style,
                 get_user_emoji, set_user_mood, MOODS
             )
