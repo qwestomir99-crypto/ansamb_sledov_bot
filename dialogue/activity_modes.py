@@ -1,17 +1,46 @@
+# ==========================================
+# Модуль: dialogue/activity_modes.py
+# Справка: README.md → Режимы дня
+# Задача: определение текущего режима (эталонного или адаптивного)
+# Комментарий: поддерживает адаптивные режимы через adaptive_modes.py
+# Зависит от: config.json, settings.py, adaptive_modes.py
+# Вызывается из: bot.py, publisher.py, quotes.py
+# ==========================================
+
 import json
 from datetime import datetime
 
 CONFIG_FILE = "config.json"
+
+# Импорт адаптивных режимов (если модуль есть)
+try:
+    from dialogue.adaptive_modes import (
+        get_current_adaptive_mode,
+        get_adaptive_quotes_interval,
+        should_adaptive_publish
+    )
+    ADAPTIVE_AVAILABLE = True
+    print("[ACTIVITY_MODES] Адаптивные режимы загружены")
+except ImportError:
+    ADAPTIVE_AVAILABLE = False
+    print("[ACTIVITY_MODES] Адаптивные режимы не доступны, использую эталон")
 
 def load_config():
     with open(CONFIG_FILE, "r") as f:
         return json.load(f)
 
 def get_current_mode():
-    """Определяет текущий режим по времени или force_mode"""
-    config = load_config()
+    """Возвращает текущий режим (адаптивный или эталонный)"""
+    if ADAPTIVE_AVAILABLE:
+        from dialogue.adaptive_modes import ADAPTIVE_ENABLED
+        if ADAPTIVE_ENABLED:
+            adaptive_mode = get_current_adaptive_mode()
+            # Если адаптивный режим вернул название, отличное от эталонного, используем его
+            if adaptive_mode != "обычный":
+                return adaptive_mode
     
-    # Проверяем принудительный режим
+    # Иначе — эталонный режим по времени
+    config = load_config()
     force_mode = config.get("force_mode")
     force_mode_until = config.get("force_mode_until")
     
@@ -20,7 +49,6 @@ def get_current_mode():
         if datetime.now() < until:
             return force_mode
     
-    # Определяем по времени
     now = datetime.now()
     current_hour = now.hour
     
@@ -33,7 +61,7 @@ def get_current_mode():
         if start <= end:
             if start <= current_hour < end:
                 return mode_name
-        else:  # через полночь (например, 23:00 - 06:00)
+        else:
             if current_hour >= start or current_hour < end:
                 return mode_name
     
@@ -48,7 +76,23 @@ def get_current_mode_config():
     mode = get_current_mode()
     config = load_config()
     modes = config.get("modes", {})
-    return modes.get(mode, {})
+    mode_config = modes.get(mode, {})
+    
+    # Если адаптивные режимы включены, корректируем интервалы
+    if ADAPTIVE_AVAILABLE:
+        from dialogue.adaptive_modes import ADAPTIVE_ENABLED
+        if ADAPTIVE_ENABLED:
+            # Получаем скорректированные интервалы
+            base_quotes_interval = mode_config.get("quotes_interval", 60)
+            base_publisher_interval = mode_config.get("publisher_interval", 0)
+            
+            corrected_config = mode_config.copy()
+            corrected_config["quotes_interval"] = get_adaptive_quotes_interval(base_quotes_interval)
+            corrected_config["publisher_interval"] = get_adaptive_publisher_interval(base_publisher_interval)
+            corrected_config["publisher"] = should_adaptive_publish()
+            return corrected_config
+    
+    return mode_config
 
 def should_respond_to_talk():
     """Можно ли отвечать на #говори"""
@@ -74,3 +118,8 @@ def get_ping_interval():
     """Возвращает интервал пинга в секундах для текущего режима"""
     mode_config = get_current_mode_config()
     return mode_config.get("ping_interval", 60)
+
+def get_publisher_interval():
+    """Возвращает интервал публикаций в минутах для текущего режима"""
+    mode_config = get_current_mode_config()
+    return mode_config.get("publisher_interval", 0)
