@@ -13,6 +13,7 @@ import os
 import json
 from datetime import datetime
 import threading
+from debug_utils import debug_log
 from dialogue.activity_modes import should_publish_quotes, get_quotes_interval, load_config
 from dialogue.user_settings import get_user_quotes_interval
 
@@ -99,12 +100,14 @@ def send_quote_with_photo(bot, chat_id, quote):
         if post and post.get('photo_url'):
             caption = f"{post['text']}\n\n📜 {quote}\n\n{' '.join(post.get('tags', [])[:3])}"
             bot.send_photo(chat_id, post['photo_url'], caption=caption, parse_mode='Markdown')
+            debug_log("QUOTES", "Цитата отправлена с фото")
             return True
         else:
             bot.send_message(chat_id, f"📜 *Цитата дня* • {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n{quote}\n\n#ЦитатаДня #СапёрыАутентичности", parse_mode='Markdown')
+            debug_log("QUOTES", "Цитата отправлена без фото (пост не найден)")
             return False
     except Exception as e:
-        print(f"[QUOTES] Ошибка добавления фото: {e}")
+        debug_log("QUOTES", f"Ошибка добавления фото: {e}", "ERROR")
         bot.send_message(chat_id, f"📜 *Цитата дня* • {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n{quote}\n\n#ЦитатаДня #СапёрыАутентичности", parse_mode='Markdown')
         return False
 
@@ -133,7 +136,7 @@ def quotes_loop(bot, TG_CHAT_ID):
             
             if current_interval != last_interval:
                 last_interval = current_interval
-                print(f"[QUOTES] Интервал обновлён: {current_interval} минут")
+                debug_log("QUOTES", f"Интервал обновлён: {current_interval} минут")
             
             if current_interval <= 0:
                 time.sleep(60)
@@ -153,8 +156,8 @@ def quotes_loop(bot, TG_CHAT_ID):
             
             # Отправляем цитату с фото из VK
             send_quote_with_photo(bot, TG_CHAT_ID, quote)
-            print(f"[QUOTES] Цитата отправлена (интервал {current_interval} мин)")
+            debug_log("QUOTES", f"Цитата отправлена (интервал {current_interval} мин)")
     
     quote_thread = threading.Thread(target=_run, daemon=True)
     quote_thread.start()
-    print(f"[QUOTES] Цитаты запущены")
+    debug_log("QUOTES", "Цитаты запущены")
