@@ -2,11 +2,12 @@
 # Модуль: dialogue/callbacks.py
 # Справка: README.md → Обработчики кнопок
 # Задача: обработка callback_query (нажатий на кнопки)
-# Комментарий: добавлены проверки, чтобы не редактировать сообщение тем же текстом (ошибка 400)
+# Комментарий: добавлены обработчики подменю и кнопка "Дебаг"
 # Зависит от: admin_commands.py, help_menu.py, user_settings.py
 # Вызывается из: bot.py
 # ==========================================
 
+import os
 from dialogue.admin_commands import (
     is_admin_authorized,
     handle_callback_mode, handle_callback_ping,
@@ -54,7 +55,7 @@ def register_callback_handlers(bot, config):
             bot.answer_callback_query(call.id)
             return
 
-        # ---------- ПОДМЕНЮ (с проверкой на повтор) ----------
+        # ---------- ПОДМЕНЮ ----------
         if data == "submenu_modes":
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
@@ -121,6 +122,32 @@ def register_callback_handlers(bot, config):
                 )
             else:
                 bot.answer_callback_query(call.id, "Уже в меню диагностики")
+            return
+
+        # ---------- ДЕБАГ ----------
+        if data == "debug":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            
+            debug_file = "debug.log"
+            if os.path.exists(debug_file):
+                try:
+                    with open(debug_file, "r", encoding="utf-8") as f:
+                        lines = f.readlines()
+                    last_lines = lines[-500:] if len(lines) > 500 else lines
+                    debug_text = "".join(last_lines)
+                    if debug_text.strip():
+                        for i in range(0, len(debug_text), 4000):
+                            bot.send_message(user_id, f"```\n{debug_text[i:i+4000]}\n```", parse_mode='Markdown')
+                        bot.edit_message_text("✅ Дебаг отправлен в личку", chat_id, message_id)
+                    else:
+                        bot.edit_message_text("📭 Дебаг пуст", chat_id, message_id)
+                except Exception as e:
+                    bot.edit_message_text(f"❌ Ошибка чтения дебага: {e}", chat_id, message_id)
+            else:
+                bot.edit_message_text("📭 Файл debug.log не найден", chat_id, message_id)
+            bot.answer_callback_query(call.id)
             return
 
         # ---------- НАСТРОЕНИЕ ----------
