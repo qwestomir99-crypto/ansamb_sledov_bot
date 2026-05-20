@@ -2,7 +2,7 @@
 # Модуль: dialogue/callbacks.py
 # Справка: README.md → Обработчики кнопок
 # Задача: обработка callback_query (нажатий на кнопки)
-# Комментарий: добавлены обработчики подменю (режимы, контент, цитаты, диагностика)
+# Комментарий: добавлены проверки, чтобы не редактировать сообщение тем же текстом (ошибка 400)
 # Зависит от: admin_commands.py, help_menu.py, user_settings.py
 # Вызывается из: bot.py
 # ==========================================
@@ -54,19 +54,22 @@ def register_callback_handlers(bot, config):
             bot.answer_callback_query(call.id)
             return
 
-        # ---------- ПОДМЕНЮ ----------
+        # ---------- ПОДМЕНЮ (с проверкой на повтор) ----------
         if data == "submenu_modes":
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
             from dialogue.admin_commands import get_modes_submenu
-            bot.edit_message_text(
-                "🎛 *Управление режимами и пингом:*",
-                chat_id, message_id,
-                parse_mode='Markdown',
-                reply_markup=get_modes_submenu()
-            )
-            bot.answer_callback_query(call.id)
+            new_text = "🎛 *Управление режимами и пингом:*"
+            if call.message.text != new_text:
+                bot.edit_message_text(
+                    new_text,
+                    chat_id, message_id,
+                    parse_mode='Markdown',
+                    reply_markup=get_modes_submenu()
+                )
+            else:
+                bot.answer_callback_query(call.id, "Уже в меню режимов")
             return
 
         if data == "submenu_content":
@@ -74,13 +77,16 @@ def register_callback_handlers(bot, config):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
             from dialogue.admin_commands import get_content_submenu
-            bot.edit_message_text(
-                "📝 *Управление контентом:*",
-                chat_id, message_id,
-                parse_mode='Markdown',
-                reply_markup=get_content_submenu()
-            )
-            bot.answer_callback_query(call.id)
+            new_text = "📝 *Управление контентом:*"
+            if call.message.text != new_text:
+                bot.edit_message_text(
+                    new_text,
+                    chat_id, message_id,
+                    parse_mode='Markdown',
+                    reply_markup=get_content_submenu()
+                )
+            else:
+                bot.answer_callback_query(call.id, "Уже в меню контента")
             return
 
         if data == "submenu_quotes":
@@ -88,13 +94,16 @@ def register_callback_handlers(bot, config):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
             from dialogue.admin_commands import get_quotes_submenu
-            bot.edit_message_text(
-                "📜 *Управление цитатами:*",
-                chat_id, message_id,
-                parse_mode='Markdown',
-                reply_markup=get_quotes_submenu()
-            )
-            bot.answer_callback_query(call.id)
+            new_text = "📜 *Управление цитатами:*"
+            if call.message.text != new_text:
+                bot.edit_message_text(
+                    new_text,
+                    chat_id, message_id,
+                    parse_mode='Markdown',
+                    reply_markup=get_quotes_submenu()
+                )
+            else:
+                bot.answer_callback_query(call.id, "Уже в меню цитат")
             return
 
         if data == "submenu_diagnostic":
@@ -102,13 +111,16 @@ def register_callback_handlers(bot, config):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
             from dialogue.admin_commands import get_diagnostic_submenu
-            bot.edit_message_text(
-                "🔧 *Диагностика:*",
-                chat_id, message_id,
-                parse_mode='Markdown',
-                reply_markup=get_diagnostic_submenu()
-            )
-            bot.answer_callback_query(call.id)
+            new_text = "🔧 *Диагностика:*"
+            if call.message.text != new_text:
+                bot.edit_message_text(
+                    new_text,
+                    chat_id, message_id,
+                    parse_mode='Markdown',
+                    reply_markup=get_diagnostic_submenu()
+                )
+            else:
+                bot.answer_callback_query(call.id, "Уже в меню диагностики")
             return
 
         # ---------- НАСТРОЕНИЕ ----------
@@ -243,13 +255,16 @@ def register_callback_handlers(bot, config):
         # ---------- СПРАВКА: НАЗАД ----------
         if data == "help_back":
             from dialogue.help_menu import get_help_keyboard
-            bot.edit_message_text(
-                "📖 *Справка по командам*\n\nВыберите команду для подробного описания:",
-                chat_id, message_id,
-                parse_mode='Markdown',
-                reply_markup=get_help_keyboard()
-            )
-            bot.answer_callback_query(call.id)
+            new_text = "📖 *Справка по командам*\n\nВыберите команду для подробного описания:"
+            if call.message.text != new_text:
+                bot.edit_message_text(
+                    new_text,
+                    chat_id, message_id,
+                    parse_mode='Markdown',
+                    reply_markup=get_help_keyboard()
+                )
+            else:
+                bot.answer_callback_query(call.id, "Уже в главном меню справки")
             return
 
         # ---------- ПОЛЬЗОВАТЕЛЬСКИЕ КНОПКИ ----------
