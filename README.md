@@ -106,13 +106,13 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 20.05.2026 12:28:53*
+*Обновлено: 20.05.2026 12:56:43*
 
 | Файл | Статус |
 |------|--------|
 | `agent.py` | ❌ Без шапки |
 | `agent/agent.py` | ❌ Без шапки |
-| `bot.py` | ❌ Без шапки |
+| `bot.py` | ✅ Redmi-шапка |
 | `dialogue/__init__.py` | ❌ Без шапки |
 | `dialogue/activity_modes.py` | ✅ Redmi-шапка |
 | `dialogue/adaptive_modes.py` | ✅ Redmi-шапка |
