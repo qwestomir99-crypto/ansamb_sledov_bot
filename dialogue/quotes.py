@@ -1,9 +1,9 @@
 # ==========================================
 # Модуль: dialogue/quotes.py
 # Справка: README.md → Цитаты
-# Задача: публикация цитат по расписанию
+# Задача: публикация цитат по расписанию + случайный пост из VK
 # Комментарий: интервал цитат зависит от настроения пользователя (если задано)
-# Зависит от: config.json, activity_modes.py, user_settings.py
+# Зависит от: config.json, activity_modes.py, user_settings.py, services.photo_reader
 # Вызывается из: bot.py
 # ==========================================
 
@@ -90,6 +90,24 @@ def set_quotes_interval_minutes(minutes):
 quote_thread_running = False
 quote_thread = None
 
+def send_quote_with_photo(bot, chat_id, quote):
+    """Отправляет цитату с фото из VK (если есть)"""
+    try:
+        from services.photo_reader import get_random_post
+        
+        post = get_random_post()
+        if post and post.get('photo_url'):
+            caption = f"{post['text']}\n\n📜 {quote}\n\n{' '.join(post.get('tags', [])[:3])}"
+            bot.send_photo(chat_id, post['photo_url'], caption=caption, parse_mode='Markdown')
+            return True
+        else:
+            bot.send_message(chat_id, f"📜 *Цитата дня* • {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n{quote}\n\n#ЦитатаДня #СапёрыАутентичности", parse_mode='Markdown')
+            return False
+    except Exception as e:
+        print(f"[QUOTES] Ошибка добавления фото: {e}")
+        bot.send_message(chat_id, f"📜 *Цитата дня* • {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n{quote}\n\n#ЦитатаДня #СапёрыАутентичности", parse_mode='Markdown')
+        return False
+
 def quotes_loop(bot, TG_CHAT_ID):
     global quote_thread_running, quote_thread
     
@@ -111,7 +129,6 @@ def quotes_loop(bot, TG_CHAT_ID):
             base_interval = get_quotes_interval()
             
             # Для общего канала используем базовый интервал (без привязки к пользователю)
-            # Но для отладки можно залогировать
             current_interval = base_interval
             
             if current_interval != last_interval:
@@ -133,12 +150,10 @@ def quotes_loop(bot, TG_CHAT_ID):
                 continue
                 
             quote = random.choice(quotes)
-            message = f"📜 *Цитата дня* • {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n{quote}\n\n#ЦитатаДня #СапёрыАутентичности"
-            try:
-                bot.send_message(TG_CHAT_ID, message, parse_mode='Markdown')
-                print(f"[QUOTES] Цитата отправлена (интервал {current_interval} мин)")
-            except Exception as e:
-                print(f"[QUOTES] Ошибка отправки: {e}")
+            
+            # Отправляем цитату с фото из VK
+            send_quote_with_photo(bot, TG_CHAT_ID, quote)
+            print(f"[QUOTES] Цитата отправлена (интервал {current_interval} мин)")
     
     quote_thread = threading.Thread(target=_run, daemon=True)
     quote_thread.start()
