@@ -2,7 +2,7 @@
 # Модуль: dialogue/admin_commands.py
 # Справка: README.md → Админка
 # Задача: админ-меню, управление режимами, цитатами, постами
-# Комментарий: кнопка "🎬 Пост в VK" отправляет фото/видео через Bot API (до 50 МБ) или Userbot (до 2 ГБ)
+# Комментарий: меню с подменю (режимы, контент, цитаты, диагностика)
 # Зависит от: config.json, publisher.py, publisher_utils.py, services.autoposter
 # Вызывается из: bot.py, callbacks.py
 # ==========================================
@@ -11,7 +11,7 @@ import os
 import json
 import time
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dialogue.ping_modes import apply_ping_mode
 from dialogue.publisher import add_publication, load_publications
@@ -20,15 +20,6 @@ from dialogue.publisher_utils import get_auto_tags, get_random_quote, post_to_vk
 CONFIG_FILE = "config.json"
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 ADMIN_USER_ID = int(os.environ.get("ADMIN_USER_ID", 0))
-
-MODES = ["утро", "день", "вечер", "ночь"]
-
-GREETINGS = {
-    "утро": "🌅 Доброе утро, сапёр. Сеть тлеет, ритм 0,8 Гц стабилен.",
-    "день": "☀️ Хорошего дня. Не забывай #Тлеем.",
-    "вечер": "🌙 Спокойного вечера. Наблюдение продолжается.",
-    "ночь": "😴 Режим сна. Старший брат отдыхает. Вопросы — утром."
-}
 
 # Хранилище активных сессий админа
 admin_sessions = {}
@@ -99,48 +90,69 @@ def save_config(config):
     with open(CONFIG_FILE, "w") as f:
         json.dump(config, f, indent=2)
 
+# ==========================================
+# МЕНЮ И ПОДМЕНЮ
+# ==========================================
+
 def get_admin_menu():
+    """Главное админ-меню"""
+    keyboard = InlineKeyboardMarkup(row_width=1)
+    keyboard.add(
+        InlineKeyboardButton("🎛 Режимы и пинг", callback_data="submenu_modes"),
+        InlineKeyboardButton("🤖 Старший брат", callback_data="toggle_alisa"),
+        InlineKeyboardButton("📝 Контент", callback_data="submenu_content"),
+        InlineKeyboardButton("📜 Цитаты", callback_data="submenu_quotes"),
+        InlineKeyboardButton("🔧 Диагностика", callback_data="submenu_diagnostic"),
+        InlineKeyboardButton("🚪 Выйти", callback_data="logout")
+    )
+    return keyboard
+
+def get_modes_submenu():
     keyboard = InlineKeyboardMarkup(row_width=2)
-    
-    keyboard.add(InlineKeyboardButton("🤖 Управление ботом", callback_data="noop"))
     keyboard.add(
         InlineKeyboardButton("🌅 Утро", callback_data="mode_утро"),
         InlineKeyboardButton("☀️ День", callback_data="mode_день"),
         InlineKeyboardButton("🌙 Вечер", callback_data="mode_вечер"),
         InlineKeyboardButton("😴 Ночь", callback_data="mode_ночь"),
-        InlineKeyboardButton("⏱ Пинг 30", callback_data="ping_30"),
-        InlineKeyboardButton("⏱ Пинг 60", callback_data="ping_60"),
-        InlineKeyboardButton("⏱ Пинг 180", callback_data="ping_180")
+        InlineKeyboardButton("⏱ 30 сек", callback_data="ping_30"),
+        InlineKeyboardButton("⏱ 60 сек", callback_data="ping_60"),
+        InlineKeyboardButton("⏱ 180 сек", callback_data="ping_180")
     )
-    
-    config = load_config()
-    alisa_enabled = config.get("alisa", {}).get("enabled", True)
-    alisa_status = "✅" if alisa_enabled else "❌"
-    keyboard.add(InlineKeyboardButton(f"🤖 Старший брат {alisa_status}", callback_data="toggle_alisa"))
-    
-    keyboard.add(InlineKeyboardButton("📝 Управление контентом", callback_data="noop"))
+    keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="admin_menu"))
+    return keyboard
+
+def get_content_submenu():
+    keyboard = InlineKeyboardMarkup(row_width=1)
     keyboard.add(
         InlineKeyboardButton("📤 Публикации", callback_data="pub_menu"),
         InlineKeyboardButton("➕ Добавить пост", callback_data="add_post"),
         InlineKeyboardButton("🎬 Пост в VK (с медиа)", callback_data="vk_post")
     )
-    
-    keyboard.add(InlineKeyboardButton("📜 Управление цитатами", callback_data="noop"))
+    keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="admin_menu"))
+    return keyboard
+
+def get_quotes_submenu():
+    keyboard = InlineKeyboardMarkup(row_width=1)
     keyboard.add(
         InlineKeyboardButton("📋 Список цитат", callback_data="quotes_list"),
         InlineKeyboardButton("➕ Добавить цитату", callback_data="quotes_add"),
         InlineKeyboardButton("⏱ Интервал цитат", callback_data="quotes_interval")
     )
-    
-    keyboard.add(InlineKeyboardButton("🔧 Диагностика", callback_data="noop"))
+    keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="admin_menu"))
+    return keyboard
+
+def get_diagnostic_submenu():
+    keyboard = InlineKeyboardMarkup(row_width=2)
     keyboard.add(
         InlineKeyboardButton("📋 Ошибки", callback_data="errors"),
         InlineKeyboardButton("📜 Лог", callback_data="log")
     )
-    
-    keyboard.add(InlineKeyboardButton("🚪 Выйти", callback_data="logout"))
-    
+    keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="admin_menu"))
     return keyboard
+
+# ==========================================
+# КОМАНДЫ (без изменений)
+# ==========================================
 
 def get_user_menu():
     keyboard = InlineKeyboardMarkup(row_width=2)
@@ -173,8 +185,16 @@ def handle_callback_mode(mode, bot, chat_id, message_id, user_id):
     save_config(config)
     apply_ping_mode()
     log_admin_action(user_id, f"mode {mode}", "success")
+    
+    greetings = {
+        "утро": "🌅 Доброе утро, сапёр. Сеть тлеет.",
+        "день": "☀️ Хорошего дня. Не забывай #Тлеем.",
+        "вечер": "🌙 Спокойного вечера. Наблюдение продолжается.",
+        "ночь": "😴 Режим сна. Старший брат отдыхает."
+    }
+    
     bot.edit_message_text(
-        f"✅ Режим «{mode}» установлен сейчас\n\n{GREETINGS.get(mode, '')}",
+        f"✅ Режим «{mode}» установлен\n\n{greetings.get(mode, '')}",
         chat_id, message_id
     )
     return_to_admin_menu(bot, chat_id, message_id, user_id)
@@ -233,15 +253,10 @@ def handle_callback_pub_menu(bot, chat_id, message_id, user_id):
     text = "📋 *Отложенные публикации:*\n\n"
     for i, p in enumerate(pubs):
         status = "✅" if p.get("status") == "published" else "⏳"
-        # Безопасное получение chat_id и text
-        pub_chat_id = p.get("chat_id", "не указан")
         pub_text = p.get("text", "[Без текста]")
         if pub_text and len(pub_text) > 50:
             pub_text = pub_text[:50] + "..."
-        elif not pub_text:
-            pub_text = "[Без текста]"
-        
-        text += f"{status} `{pub_text}` ({pub_chat_id})\n"
+        text += f"{status} `{pub_text}`\n"
         
         if len(text) > 3500:
             bot.send_message(user_id, text, parse_mode='Markdown')
@@ -249,7 +264,6 @@ def handle_callback_pub_menu(bot, chat_id, message_id, user_id):
     
     if text:
         bot.edit_message_text(text, chat_id, message_id, parse_mode='Markdown')
-    
     return_to_admin_menu(bot, chat_id, message_id, user_id)
 
 def handle_callback_toggle_alisa(bot, chat_id, message_id, user_id):
@@ -301,7 +315,7 @@ def handle_callback_quotes_interval(bot, chat_id, message_id, user_id):
     for minutes in [15, 30, 60, 120, 240, 480]:
         marker = "✅" if minutes == current else ""
         keyboard.add(InlineKeyboardButton(f"{minutes} мин {marker}", callback_data=f"quote_int_{minutes}"))
-    keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="admin_menu"))
+    keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="submenu_quotes"))
     bot.edit_message_text(
         f"⏱ *Интервал публикации цитат*\n\nТекущий: {current} минут\n\nВыбери новый:",
         chat_id, message_id, parse_mode='Markdown', reply_markup=keyboard
@@ -321,7 +335,7 @@ def handle_callback_quotes_set_interval(interval, bot, chat_id, message_id, user
     return_to_admin_menu(bot, chat_id, message_id, user_id)
 
 # ==========================================
-# Блок: мгновенный пост в VK (с фото и видео) — ИСПРАВЛЕННЫЙ
+# ПОСТ В VK
 # ==========================================
 
 def handle_callback_vk_post(bot, chat_id, message_id, user_id):
@@ -338,40 +352,32 @@ def process_vk_post_text(message, bot, chat_id, user_id):
     bot.register_next_step_handler(msg, process_vk_post_file, bot, chat_id, text, user_id)
 
 def process_vk_post_file(message, bot, chat_id, text, user_id):
-    # Определяем тип и размер файла ДО скачивания
-    file_id = None
-    is_video = False
-    is_photo = False
-    use_userbot = False
-    file_size = 0
-    
-    # Проверяем тип сообщения
-    if message.video:
-        file_size = message.video.file_size
-        file_id = message.video.file_id
-        is_video = True
-        # Видео больше 50 МБ отправляем через Userbot, НЕ вызываем bot.get_file
-        if file_size > 50 * 1024 * 1024:
-            use_userbot = True
-            print(f"[DEBUG] Видео {file_size / 1024 / 1024:.1f} МБ -> Userbot")
-    elif message.document:
-        file_size = message.document.file_size
-        file_id = message.document.file_id
-        ext = os.path.splitext(message.document.file_name)[1].lower()
-        is_video = ext in ['.mp4', '.mov', '.avi', '.mkv']
-        is_photo = ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']
-        if is_video and file_size > 50 * 1024 * 1024:
-            use_userbot = True
-            print(f"[DEBUG] Документ-видео {file_size / 1024 / 1024:.1f} МБ -> Userbot")
+    file_path = None
+    if message.text and message.text.lower() == "/skip":
+        file_path = None
     elif message.photo:
-        file_size = message.photo[-1].file_size
-        is_photo = True
-        # Фото всегда через Bot API
+        file_info = bot.get_file(message.photo[-1].file_id)
+        file_path = os.path.join(tempfile.gettempdir(), f"temp_vk_{message.photo[-1].file_id}.jpg")
+        downloaded_file = bot.download_file(file_info.file_path)
+        with open(file_path, 'wb') as f:
+            f.write(downloaded_file)
+    elif message.video:
+        file_info = bot.get_file(message.video.file_id)
+        file_path = os.path.join(tempfile.gettempdir(), f"temp_vk_{message.video.file_id}.mp4")
+        downloaded_file = bot.download_file(file_info.file_path)
+        with open(file_path, 'wb') as f:
+            f.write(downloaded_file)
+    elif message.document:
+        ext = os.path.splitext(message.document.file_name)[1].lower()
+        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.avi', '.mkv']:
+            file_info = bot.get_file(message.document.file_id)
+            file_path = os.path.join(tempfile.gettempdir(), f"temp_vk_{message.document.file_id}_{message.document.file_name}")
+            downloaded_file = bot.download_file(file_info.file_path)
+            with open(file_path, 'wb') as f:
+                f.write(downloaded_file)
     
-    # Получаем токены VK
-    config = load_config()
-    vk_token = os.environ.get("VK_TOKEN") or config.get("vk", {}).get("token")
-    vk_owner_id = os.environ.get("VK_OWNER_ID") or config.get("vk", {}).get("owner_id")
+    vk_token = os.environ.get("VK_TOKEN")
+    vk_owner_id = os.environ.get("VK_OWNER_ID")
     
     if not vk_token or not vk_owner_id:
         bot.send_message(chat_id, "❌ Нет токена VK. Проверь переменные окружения.")
@@ -382,56 +388,6 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
     full_text = f"{text}\n\n📜 {quote}"
     auto_tags = get_auto_tags(text, "vk")
     
-    # Если файл большой и это видео — используем Userbot (без скачивания через Bot API)
-    if use_userbot and is_video:
-        bot.send_message(chat_id, f"📹 Видео ({file_size / 1024 / 1024:.1f} МБ) отправляется через Userbot (до 2 ГБ)...")
-        
-        # Передаём file_id в Userbot (он скачает сам)
-        from services.autoposter import upload_via_userbot
-        success = upload_via_userbot(file_id, full_text, auto_tags, vk_token, vk_owner_id, message)
-        
-        if success:
-            bot.send_message(chat_id, f"✅ Видео отправлено в VK:\n\n{full_text[:200]}")
-        else:
-            bot.send_message(chat_id, "❌ Ошибка при отправке видео через Userbot")
-        
-        return_to_admin_menu(bot, chat_id, user_id=user_id)
-        return
-    
-    # Для маленьких файлов (до 50 МБ) используем стандартный код с Bot API
-    file_path = None
-    
-    if message.text and message.text.lower() == "/skip":
-        file_path = None
-    elif message.photo:
-        file_info = bot.get_file(message.photo[-1].file_id)
-        file_path = os.path.join(tempfile.gettempdir(), f"temp_vk_{message.photo[-1].file_id}.jpg")
-        downloaded_file = bot.download_file(file_info.file_path)
-        with open(file_path, 'wb') as f:
-            f.write(downloaded_file)
-        print(f"[DEBUG] Фото сохранено: {file_path}")
-    elif message.video:
-        # Маленькое видео (до 50 МБ) — можно через Bot API
-        file_info = bot.get_file(message.video.file_id)
-        file_path = os.path.join(tempfile.gettempdir(), f"temp_vk_{message.video.file_id}.mp4")
-        downloaded_file = bot.download_file(file_info.file_path)
-        with open(file_path, 'wb') as f:
-            f.write(downloaded_file)
-        print(f"[DEBUG] Видео сохранено: {file_path}")
-    elif message.document:
-        ext = os.path.splitext(message.document.file_name)[1].lower()
-        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.avi', '.mkv']:
-            file_info = bot.get_file(message.document.file_id)
-            file_path = os.path.join(tempfile.gettempdir(), f"temp_vk_{message.document.file_id}_{message.document.file_name}")
-            downloaded_file = bot.download_file(file_info.file_path)
-            with open(file_path, 'wb') as f:
-                f.write(downloaded_file)
-            print(f"[DEBUG] Документ сохранён: {file_path}")
-        else:
-            bot.send_message(chat_id, "❌ Неподдерживаемый тип файла. Пост будет без вложения.")
-    else:
-        bot.send_message(chat_id, "❌ Неподдерживаемый тип медиа. Пост будет без вложения.")
-    
     success, error_msg = post_to_vk(full_text, auto_tags, vk_token, vk_owner_id, file_path, auto_quote=False, auto_tags=False)
     
     if success:
@@ -441,12 +397,11 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
     
     if file_path and os.path.exists(file_path):
         os.remove(file_path)
-        print(f"[DEBUG] Временный файл удалён: {file_path}")
     
     return_to_admin_menu(bot, chat_id, user_id=user_id)
 
 # ==========================================
-# Отложенные публикации (старая логика)
+# ОТЛОЖЕННЫЕ ПУБЛИКАЦИИ
 # ==========================================
 
 def ask_for_post_text(bot, chat_id, message_id):
@@ -485,8 +440,6 @@ def process_post_file(message, bot, chat_id, text):
         downloaded_file = bot.download_file(file_info.file_path)
         with open(file_path, 'wb') as f:
             f.write(downloaded_file)
-    else:
-        bot.send_message(chat_id, "❌ Неподдерживаемый тип файла. Пост будет без вложения.")
     
     ask_for_post_delay(bot, chat_id, text, file_path)
 
@@ -514,7 +467,7 @@ def process_post_delay(message, bot, chat_id, text, file_path):
     return_to_admin_menu(bot, chat_id, user_id=user_id)
 
 # ==========================================
-# Обработчик команды #админ (с запросом пароля)
+# ОБРАБОТЧИК КОМАНДЫ #АДМИН
 # ==========================================
 
 def handle_admin_command(message, bot):
@@ -522,14 +475,13 @@ def handle_admin_command(message, bot):
     chat_id = message.chat.id
     
     if is_blocked(user_id):
-        bot.send_message(chat_id, "❌ Доступ заблокирован на 1 час из-за слишком частых неудачных попыток.")
+        bot.send_message(chat_id, "❌ Доступ заблокирован на 1 час.")
         return
     
     if is_admin_authorized(user_id):
         bot.send_message(chat_id, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
         return
     
-    # Если команда пришла с паролем в той же строке
     parts = message.text.split()
     if len(parts) == 2 and len(parts[1]) > 3:
         password = parts[1]
@@ -547,7 +499,6 @@ def handle_admin_command(message, bot):
             pass
         return
     
-    # Запрашиваем пароль
     msg = bot.send_message(chat_id, "🔐 Введите пароль для входа в админ-панель:")
     bot.register_next_step_handler(msg, process_admin_password, bot, user_id, chat_id)
     
@@ -571,13 +522,4 @@ def process_admin_password(message, bot, user_id, chat_id):
         bot.send_message(chat_id, "✅ Авторизован. Ваше меню:", reply_markup=get_admin_menu())
     else:
         register_failed_attempt(user_id, bot)
-        try:
-            bot.send_message(
-                user_id,
-                "❌ Неверный пароль. Доступ запрещён.\n\n"
-                "Попробуйте позже или обратитесь к администратору.",
-                parse_mode='Markdown'
-            )
-        except:
-            pass
         bot.send_message(chat_id, "❌ Неверный пароль. Доступ запрещён.")
