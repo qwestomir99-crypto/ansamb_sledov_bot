@@ -7,6 +7,7 @@
 import os
 import random
 import requests
+from debug_utils import debug_log
 
 def get_random_post():
     """Возвращает случайный пост с фото с твоей стены VK"""
@@ -15,7 +16,7 @@ def get_random_post():
     owner_id = os.environ.get("VK_OWNER_ID")
     
     if not token or not owner_id:
-        print("[PHOTO] ❌ Нет VK_TOKEN или VK_OWNER_ID")
+        debug_log("PHOTO_READER", "❌ Нет VK_TOKEN или VK_OWNER_ID", "ERROR")
         return None
     
     url = "https://api.vk.com/method/wall.get"
@@ -31,7 +32,7 @@ def get_random_post():
         data = r.json()
         
         if "error" in data:
-            print(f"[PHOTO] ❌ Ошибка: {data['error']['error_msg']}")
+            debug_log("PHOTO_READER", f"❌ Ошибка: {data['error']['error_msg']}", "ERROR")
             return None
         
         items = data.get("response", {}).get("items", [])
@@ -62,12 +63,12 @@ def get_random_post():
                         break
         
         if not posts_with_photo:
-            print("[PHOTO] ❌ Нет постов с фото")
+            debug_log("PHOTO_READER", "❌ Нет постов с фото", "WARNING")
             return None
         
-        print(f"[PHOTO] ✅ Найдено {len(posts_with_photo)} постов с фото")
+        debug_log("PHOTO_READER", f"✅ Найдено {len(posts_with_photo)} постов с фото")
         return random.choice(posts_with_photo)
         
     except Exception as e:
-        print(f"[PHOTO] ❌ Ошибка: {e}")
+        debug_log("PHOTO_READER", f"❌ Ошибка: {e}", "ERROR")
         return None
