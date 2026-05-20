@@ -2,7 +2,7 @@
 # Модуль: dialogue/callbacks.py
 # Справка: README.md → Обработчики кнопок
 # Задача: обработка callback_query (нажатий на кнопки)
-# Комментарий: добавлена обработка кнопок справки и настроения
+# Комментарий: добавлены обработчики подменю (режимы, контент, цитаты, диагностика)
 # Зависит от: admin_commands.py, help_menu.py, user_settings.py
 # Вызывается из: bot.py
 # ==========================================
@@ -54,7 +54,64 @@ def register_callback_handlers(bot, config):
             bot.answer_callback_query(call.id)
             return
 
-        # ---------- НАСТРОЕНИЕ (новые кнопки) ----------
+        # ---------- ПОДМЕНЮ ----------
+        if data == "submenu_modes":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            from dialogue.admin_commands import get_modes_submenu
+            bot.edit_message_text(
+                "🎛 *Управление режимами и пингом:*",
+                chat_id, message_id,
+                parse_mode='Markdown',
+                reply_markup=get_modes_submenu()
+            )
+            bot.answer_callback_query(call.id)
+            return
+
+        if data == "submenu_content":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            from dialogue.admin_commands import get_content_submenu
+            bot.edit_message_text(
+                "📝 *Управление контентом:*",
+                chat_id, message_id,
+                parse_mode='Markdown',
+                reply_markup=get_content_submenu()
+            )
+            bot.answer_callback_query(call.id)
+            return
+
+        if data == "submenu_quotes":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            from dialogue.admin_commands import get_quotes_submenu
+            bot.edit_message_text(
+                "📜 *Управление цитатами:*",
+                chat_id, message_id,
+                parse_mode='Markdown',
+                reply_markup=get_quotes_submenu()
+            )
+            bot.answer_callback_query(call.id)
+            return
+
+        if data == "submenu_diagnostic":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            from dialogue.admin_commands import get_diagnostic_submenu
+            bot.edit_message_text(
+                "🔧 *Диагностика:*",
+                chat_id, message_id,
+                parse_mode='Markdown',
+                reply_markup=get_diagnostic_submenu()
+            )
+            bot.answer_callback_query(call.id)
+            return
+
+        # ---------- НАСТРОЕНИЕ ----------
         if data.startswith("set_mood_"):
             mood_id = data.replace("set_mood_", "")
             try:
@@ -85,119 +142,88 @@ def register_callback_handlers(bot, config):
         if data.startswith("mode_"):
             mode = data.split("_")[1]
             if not is_admin_authorized(user_id):
-                bot.answer_callback_query(call.id, "❌ Не авторизован. Введите #админ <пароль>")
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
             handle_callback_mode(mode, bot, chat_id, message_id, user_id)
+            return
 
         # ---------- ПИНГ ----------
-        elif data.startswith("ping_"):
+        if data.startswith("ping_"):
             interval = int(data.split("_")[1])
             if not is_admin_authorized(user_id):
-                bot.answer_callback_query(call.id, "❌ Не авторизован. Введите #админ <пароль>")
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
             handle_callback_ping(interval, bot, chat_id, message_id, user_id)
+            return
 
         # ---------- ОШИБКИ И ЛОГ ----------
-        elif data == "errors":
+        if data == "errors":
             if not is_admin_authorized(user_id):
-                bot.answer_callback_query(call.id, "❌ Не авторизован. Введите #админ <пароль>")
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
             handle_callback_errors(user_id, bot, chat_id, message_id)
+            return
 
-        elif data == "log":
+        if data == "log":
             if not is_admin_authorized(user_id):
-                bot.answer_callback_query(call.id, "❌ Не авторизован. Введите #админ <пароль>")
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
             handle_callback_log(user_id, bot, chat_id, message_id)
+            return
 
         # ---------- ВЫХОД ----------
-        elif data == "logout":
+        if data == "logout":
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
             handle_callback_logout(user_id, bot, chat_id, message_id)
+            return
 
         # ---------- ПУБЛИКАЦИИ ----------
-        elif data == "pub_menu":
+        if data == "pub_menu":
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
             handle_callback_pub_menu(bot, chat_id, message_id, user_id)
+            return
 
-        elif data == "add_post":
+        if data == "add_post":
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
             ask_for_post_text(bot, chat_id, message_id)
+            return
 
         # ---------- ПОСТ В VK ----------
-        elif data == "vk_post":
+        if data == "vk_post":
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
             handle_callback_vk_post(bot, chat_id, message_id, user_id)
+            return
 
-        # ---------- АЛИСА ----------
-        elif data == "toggle_alisa":
+        # ---------- СТАРШИЙ БРАТ ----------
+        if data == "toggle_alisa":
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
             handle_callback_toggle_alisa(bot, chat_id, message_id, user_id)
+            return
 
         # ---------- ЦИТАТЫ ----------
-        elif data == "quotes_list":
+        if data == "quotes_list":
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
             handle_callback_quotes_list(bot, chat_id, message_id, user_id)
+            return
 
-        elif data == "quotes_add":
+        if data == "quotes_add":
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
             handle_callback_quotes_add_start(bot, chat_id, message_id, user_id)
+            return
 
-        elif data == "quotes_interval":
-            if not is_admin_authorized(user_id):
-                bot.answer_callback_query(call.id, "❌ Не авторизован")
-                return
-            handle_callback_quotes_interval(bot, chat_id, message_id, user_id)
-
-        elif data.startswith("quote_int_"):
-            if not is_admin_authorized(user_id):
-                bot.answer_callback_query(call.id, "❌ Не авторизован")
-                return
-            interval = int(data.split("_")[2])
-            handle_callback_quotes_set_interval(interval, bot, chat_id, message_id, user_id)
-
-        # ---------- ПОЛЬЗОВАТЕЛЬСКИЕ КНОПКИ ----------
-        elif data == "tleem":
-            bot.send_message(chat_id, "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем.")
-        elif data == "fixiruem":
-            bot.send_message(chat_id, "🔒 Фиксация принята. Ритм 0,8 Гц подтверждён. Сеть тлеет.")
-        elif data == "vspishka":
-            bot.send_message(chat_id, "💥 Импульс зафиксирован. Синхронизация завершена. QSL.")
-        elif data == "dyshim":
-            ping_self()
-            bot.send_message(chat_id, "🌬 Пинг отправлен (бот не отвечает)")
-        elif data == "govorim":
-            bot.send_message(chat_id, "🗣 Напиши #говори <текст> в чат")
-        elif data == "help":
-            help_text = """
-📖 *Доступные хештеги:*
-
-🔹 *#тлеем* — разлом
-🔹 *#фиксируем* — синхронизация
-🔹 *#вспышка* — импульс
-🔹 *#дышим* — пинг
-🔹 *#говори <текст>* — вопрос Старшему брату
-🔹 *#меню* — меню
-🔹 *#* — интерактивная справка
-            """
-            bot.send_message(chat_id, help_text, parse_mode='Markdown')
-
-        else:
-            # Неизвестный callback — просто отвечаем
-            bot.answer_callback_query(call.id)
-
-        bot.answer_callback_query(call.id)
+        if data == "quotes_interval":
+            if not is_admin
