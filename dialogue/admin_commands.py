@@ -2,7 +2,7 @@
 # Модуль: dialogue/admin_commands.py
 # Справка: README.md → Админка
 # Задача: админ-меню, управление режимами, цитатами, постами
-# Комментарий: меню с подменю (режимы, контент, цитаты, диагностика)
+# Комментарий: кнопки в 3 колонки, названия сокращены для смартфона
 # Зависит от: config.json, publisher.py, publisher_utils.py, services.autoposter
 # Вызывается из: bot.py, callbacks.py
 # ==========================================
@@ -95,28 +95,29 @@ def save_config(config):
 # ==========================================
 
 def get_admin_menu():
-    """Главное админ-меню"""
-    keyboard = InlineKeyboardMarkup(row_width=1)
+    """Главное админ-меню (3 колонки)"""
+    keyboard = InlineKeyboardMarkup(row_width=3)
     keyboard.add(
-        InlineKeyboardButton("🎛 Режимы и пинг", callback_data="submenu_modes"),
-        InlineKeyboardButton("🤖 Старший брат", callback_data="toggle_alisa"),
+        InlineKeyboardButton("🎛 Режимы", callback_data="submenu_modes"),
+        InlineKeyboardButton("🤖 Брат", callback_data="toggle_alisa"),
         InlineKeyboardButton("📝 Контент", callback_data="submenu_content"),
         InlineKeyboardButton("📜 Цитаты", callback_data="submenu_quotes"),
         InlineKeyboardButton("🔧 Диагностика", callback_data="submenu_diagnostic"),
+        InlineKeyboardButton("🐞 Дебаг", callback_data="debug"),
         InlineKeyboardButton("🚪 Выйти", callback_data="logout")
     )
     return keyboard
 
 def get_modes_submenu():
-    keyboard = InlineKeyboardMarkup(row_width=2)
+    keyboard = InlineKeyboardMarkup(row_width=3)
     keyboard.add(
         InlineKeyboardButton("🌅 Утро", callback_data="mode_утро"),
         InlineKeyboardButton("☀️ День", callback_data="mode_день"),
         InlineKeyboardButton("🌙 Вечер", callback_data="mode_вечер"),
         InlineKeyboardButton("😴 Ночь", callback_data="mode_ночь"),
-        InlineKeyboardButton("⏱ 30 сек", callback_data="ping_30"),
-        InlineKeyboardButton("⏱ 60 сек", callback_data="ping_60"),
-        InlineKeyboardButton("⏱ 180 сек", callback_data="ping_180")
+        InlineKeyboardButton("⏱ 30", callback_data="ping_30"),
+        InlineKeyboardButton("⏱ 60", callback_data="ping_60"),
+        InlineKeyboardButton("⏱ 180", callback_data="ping_180")
     )
     keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="admin_menu"))
     return keyboard
@@ -126,7 +127,7 @@ def get_content_submenu():
     keyboard.add(
         InlineKeyboardButton("📤 Публикации", callback_data="pub_menu"),
         InlineKeyboardButton("➕ Добавить пост", callback_data="add_post"),
-        InlineKeyboardButton("🎬 Пост в VK (с медиа)", callback_data="vk_post")
+        InlineKeyboardButton("🎬 Пост в VK", callback_data="vk_post")
     )
     keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="admin_menu"))
     return keyboard
@@ -134,9 +135,9 @@ def get_content_submenu():
 def get_quotes_submenu():
     keyboard = InlineKeyboardMarkup(row_width=1)
     keyboard.add(
-        InlineKeyboardButton("📋 Список цитат", callback_data="quotes_list"),
-        InlineKeyboardButton("➕ Добавить цитату", callback_data="quotes_add"),
-        InlineKeyboardButton("⏱ Интервал цитат", callback_data="quotes_interval")
+        InlineKeyboardButton("📋 Список", callback_data="quotes_list"),
+        InlineKeyboardButton("➕ Добавить", callback_data="quotes_add"),
+        InlineKeyboardButton("⏱ Интервал", callback_data="quotes_interval")
     )
     keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="admin_menu"))
     return keyboard
@@ -149,10 +150,6 @@ def get_diagnostic_submenu():
     )
     keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="admin_menu"))
     return keyboard
-
-# ==========================================
-# КОМАНДЫ (без изменений)
-# ==========================================
 
 def get_user_menu():
     keyboard = InlineKeyboardMarkup(row_width=2)
