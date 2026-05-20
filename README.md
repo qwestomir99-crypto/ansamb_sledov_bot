@@ -106,7 +106,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 20.05.2026 18:29:53*
+*Обновлено: 20.05.2026 18:33:12*
 
 | Файл | Статус |
 |------|--------|
@@ -144,4 +144,5 @@
 | `services/photo_reader.py` | ❌ Без шапки |
 | `services/web.py` | ✅ Redmi-шапка |
 | `services/youtube_reader.py` | ✅ Redmi-шапка |
+| `settings.py` | ❌ Без шапки |
 | `tag_analyzer.py` | ❌ Без шапки |
