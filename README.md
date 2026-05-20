@@ -102,3 +102,51 @@
 Мы не чиним ошибки — мы превращаем их в ритуалы.
 
 **Сеть тлеет. Феникс ждёт. Сапёр на посту.** 🔥👁️
+
+
+## 📡 Redmi-аудит проекта
+
+*Обновлено: 20.05.2026 08:40:09*
+
+| Файл | Статус |
+|------|--------|
+| `admin_command.py` | ✅ Redmi-шапка |
+| `agent.py` | ❌ Без шапки |
+| `agent/agent.py` | ❌ Без шапки |
+| `bot.py` | ❌ Без шапки |
+| `dialogue/__init__.py` | ❌ Без шапки |
+| `dialogue/activity_modes.py` | ✅ Redmi-шапка |
+| `dialogue/adaptive_modes.py` | ✅ Redmi-шапка |
+| `dialogue/admin_commands.py` | ✅ Redmi-шапка |
+| `dialogue/agent.py` | ❌ Без шапки |
+| `dialogue/callbacks.py` | ✅ Redmi-шапка |
+| `dialogue/color_logger.py` | ❌ Без шапки |
+| `dialogue/exception_handler.py` | ❌ Без шапки |
+| `dialogue/handlers.py` | ✅ Redmi-шапка |
+| `dialogue/help_menu.py` | ✅ Redmi-шапка |
+| `dialogue/journalist.py` | ❌ Без шапки |
+| `dialogue/ping_modes.py` | ❌ Без шапки |
+| `dialogue/post_manager.py` | ❌ Без шапки |
+| `dialogue/publisher.py` | ❌ Без шапки |
+| `dialogue/publisher_utils.py` | ❌ Без шапки |
+| `dialogue/quotes.py` | ✅ Redmi-шапка |
+| `dialogue/scheduler.py` | ❌ Без шапки |
+| `dialogue/setting.py` | ❌ Без шапки |
+| `dialogue/user_settings.py` | ✅ Redmi-шапка |
+| `dialogue/vk_reader.py` | ✅ Redmi-шапка |
+| `dialogue/youtube_auto.py` | ❌ Без шапки |
+| `ping_utils.py` | ❌ Без шапки |
+| `redmi_audit.py` | ✅ Redmi-шапка |
+| `service/autoposter.py` | ❌ Без шапки |
+| `service/dialogue/exception_handler.py` | ❌ Без шапки |
+| `service/web.py` | ❌ Без шапки |
+| `services/__init__.py` | ❌ Без шапки |
+| `services/agent_pinger.py` | ❌ Без шапки |
+| `services/autoposter.py` | ❌ Без шапки |
+| `services/dialogue/exception_handler.py` | ❌ Без шапки |
+| `services/photo_reader.py` | ❌ Без шапки |
+| `services/web.py` | ❌ Без шапки |
+| `services/youtube_reader.py` | ❌ Без шапки |
+| `setting.py` | ❌ Без шапки |
+| `tag_analyzer.py` | ❌ Без шапки |
+| `yandex_gpt.py` | ❌ Без шапки |
