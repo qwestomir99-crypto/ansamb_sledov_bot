@@ -30,6 +30,7 @@ def get_help_keyboard():
         InlineKeyboardButton("🔄 #сброс", callback_data="help_reset"),
         InlineKeyboardButton("🌅 Режимы дня", callback_data="help_modes")
     )
+    keyboard.add(InlineKeyboardButton("❌ Выход", callback_data="help_exit"))
     
     return keyboard
 
@@ -42,25 +43,30 @@ def get_help_text(command):
         "govorim": "🗣 *#говори <текст>*\n\nСпросить у Старшего брата. Отвечает через внешнего агента.\n\nПример: `#говори Как ритм?`",
         "menu_cmd": "📖 *#меню* / *#помощь*\n\nОткрывает меню пользователя или админа (после авторизации).\n\nПример: `#меню`",
         "admin": "🛡️ *#админ <пароль>*\n\nВход в админ-панель. Пароль задаётся в переменных окружения Render.\n\nПример: `#админ ne_tleem2026`",
-        "mood": "🎭 *#настроение*\n*#настроение <id>*\n\nПросмотр или смена персонального настроения.\n\nДоступные настроения:\n• `сапёр` — факты, логи\n• `художник` — образы, метафоры\n• `поэт` — тишина, рифмы\n• `админ` — команды, сводки\n• `наблюдатель` — тихое наблюдение\n• `философ` — глубокие вопросы\n\nПример: `#настроение художник`",
+        "mood": "🎭 *#настроение*\n\nОткрывает меню выбора персонального настроения.\n\nПример: `#настроение`",
         "reset": "🔄 *#сброс*\n\nСброс адаптивных режимов к эталону. Только для админа.\n\nПример: `#сброс`",
         "modes": "🌅 *Режимы дня*\n\n⏰ *Утро* (06:00–12:00)\n☀️ *День* (12:00–18:00)\n🌙 *Вечер* (18:00–23:00)\n😴 *Ночь* (23:00–06:00)\n\n⚡ *Адаптивные режимы:*\n• ускоренный — высокая активность\n• замедленный — мало активности\n• авральный — много ошибок\n• сон — полное затишье\n\nРитм 0,8 Гц стабилен."
     }
-    return texts.get(command, "ℹ️ *Команда не найдена*\n\nПопробуйте `#справка` для полного списка.")
+    return texts.get(command, "ℹ️ *Команда не найдена*\n\nПопробуйте `#` для интерактивной справки.")
 
 def register_help_handlers(bot):
     @bot.callback_query_handler(func=lambda call: call.data.startswith("help_"))
     def help_callback(call):
         command = call.data.split("_")[1]
-        text = get_help_text(command)
         
-        # Проверяем, изменилось ли сообщение
-        if call.message.text == text:
-            bot.answer_callback_query(call.id)
+        # Кнопка выхода
+        if command == "exit":
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            bot.answer_callback_query(call.id, "Справка закрыта")
             return
         
+        text = get_help_text(command)
+        
         keyboard = InlineKeyboardMarkup()
-        keyboard.add(InlineKeyboardButton("◀️ Назад к списку", callback_data="help_back"))
+        keyboard.add(
+            InlineKeyboardButton("◀️ Назад к списку", callback_data="help_back"),
+            InlineKeyboardButton("❌ Выход", callback_data="help_exit")
+        )
         
         try:
             bot.edit_message_text(
@@ -73,8 +79,6 @@ def register_help_handlers(bot):
         except Exception as e:
             if "message is not modified" not in str(e):
                 print(f"[HELP_MENU] Ошибка: {e}")
-            bot.answer_callback_query(call.id)
-            return
         
         bot.answer_callback_query(call.id)
     
