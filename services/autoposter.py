@@ -1,8 +1,8 @@
 # ==========================================
 # Файл: services/autoposter.py
 # Справка: README.md → Автопостинг YouTube
-# Задача: публикация случайных видео с YouTube в VK
-# Комментарий: собирает видео с канала, выбирает случайное, публикует с цитатой
+# Задача: публикация случайных видео с YouTube в VK с превью
+# Комментарий: видео отправляется как attachment, чтобы VK показывал обложку
 # Зависит от: requests, os, random, json
 # Вызывается из: bot.py (отдельный поток)
 # ==========================================
@@ -11,10 +11,6 @@ import os
 import random
 import json
 import requests
-from datetime import datetime
-
-# Файл для хранения ID последнего опубликованного видео (опционально)
-LAST_VIDEO_FILE = "dialogue/data/last_youtube_video.txt"
 
 def log(msg, level="INFO"):
     print(f"[AUTOPOSTER] {level}: {msg}")
@@ -84,12 +80,16 @@ def get_random_quote():
     log(f"📜 Выбрана цитата: {quote[:50]}...")
     return quote
 
-def post_to_vk(message, access_token, owner_id):
-    """Отправляет пост в VK"""
+def post_to_vk_with_preview(message, video_url, access_token, owner_id):
+    """
+    Отправляет пост в VK с видео-ссылкой как attachment.
+    Это заставляет VK показывать превью (обложку видео).
+    """
     if not access_token or not owner_id:
         log("Нет токена VK или owner_id", "ERROR")
         return False, "Нет авторизации VK"
     
+    # Добавляем хештеги
     try:
         with open("config.json", "r") as f:
             config = json.load(f)
@@ -99,11 +99,13 @@ def post_to_vk(message, access_token, owner_id):
     
     full_message = f"{message}\n\n{default_tags}"
     
+    # Отправляем ссылку как attachment — VK подтянет превью
     params = {
         "access_token": access_token,
         "v": "5.199",
         "owner_id": owner_id,
         "message": full_message,
+        "attachments": video_url,
         "from_group": 1
     }
     
@@ -112,7 +114,7 @@ def post_to_vk(message, access_token, owner_id):
         data = r.json()
         
         if "response" in data:
-            log(f"✅ Опубликовано в VK: {message[:50]}...")
+            log(f"✅ Опубликовано в VK с превью: {message[:50]}...")
             return True, None
         else:
             error_msg = data.get("error", {}).get("error_msg", "неизвестная ошибка")
@@ -123,7 +125,7 @@ def post_to_vk(message, access_token, owner_id):
         return False, str(e)
 
 def check_and_publish():
-    """Публикует случайное видео с YouTube в VK"""
+    """Публикует случайное видео с YouTube в VK с превью"""
     log("=== НАЧАЛО ПУБЛИКАЦИИ СЛУЧАЙНОГО ВИДЕО ===")
     
     try:
@@ -141,15 +143,16 @@ def check_and_publish():
     
     quote = get_random_quote()
     
-    post_text = f"📜 *{quote}*\n\n🎬 *СЛУЧАЙНОЕ ВИДЕО С КАНАЛА*\n{video['title']}\n\n{video['url']}"
+    post_text = f"📜 *{quote}*\n\n🎬 *СЛУЧАЙНОЕ ВИДЕО С КАНАЛА*\n{video['title']}"
     
     vk_token = os.environ.get("VK_TOKEN")
     vk_owner_id = os.environ.get("VK_OWNER_ID")
     
-    success, error = post_to_vk(post_text, vk_token, vk_owner_id)
+    # Отправляем с video_url как attachment для превью
+    success, error = post_to_vk_with_preview(post_text, video['url'], vk_token, vk_owner_id)
     
     if success:
-        log("✅ Случайное видео успешно опубликовано в VK!")
+        log("✅ Случайное видео успешно опубликовано в VK с превью!")
         return True
     else:
         log(f"❌ Ошибка публикации: {error}", "ERROR")
