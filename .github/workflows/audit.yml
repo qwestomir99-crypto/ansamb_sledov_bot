@@ -2,23 +2,31 @@ name: Redmi Audit
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Run audit
+          
+      - name: Run audit script
         run: python redmi_audit.py
-      - name: Commit report
+        
+      - name: Commit and push if changed
         run: |
-          git config user.name "Redmi Auditor"
-          git config user.email "audit@redmi.local"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add README.md
           git diff --quiet && git diff --staged --quiet || git commit -m "📡 Redmi audit update"
           git push
