@@ -3,6 +3,8 @@
 # Справка: README.md → Обработчики команд
 # Задача: обработка команд пользователей и админов
 # Комментарий: удалена старая #справка, #настроение переделано в меню с кнопками
+# Зависит от: admin_commands.py, activity_modes.py, agent.py
+# Вызывается из: bot.py
 # ==========================================
 
 import random
@@ -14,6 +16,7 @@ from dialogue.admin_commands import (
 )
 from dialogue.activity_modes import should_respond_to_talk
 from dialogue.agent import ask_agent
+from debug_utils import debug_log
 from ping_utils import ping_self
 
 CONFIG_FILE = "config.json"
@@ -46,6 +49,7 @@ def register_handlers(bot, config):
     @bot.message_handler(func=lambda message: True)
     def handle_message(message):
         text = message.text.lower()
+        debug_log("HANDLERS", f"Получена команда: {text[:50]}...")
 
         # --- ИНТЕРАКТИВНАЯ СПРАВКА # ---
         if text == "#":
@@ -123,7 +127,7 @@ def register_handlers(bot, config):
                     bot.reply_to(message, "📭 База цитат пуста. Добавьте цитаты через админку.")
             except Exception as e:
                 bot.reply_to(message, "❌ Ошибка при выборе цитаты.")
-                print(f"[RITUAL] Ошибка: {e}")
+                debug_log("HANDLERS", f"Ошибка: {e}", "ERROR")
             return
         # --- КОНЕЦ РИТУАЛЬНЫХ КОМАНД ---
 
@@ -142,7 +146,7 @@ def register_handlers(bot, config):
                 from dialogue.adaptive_modes import reset_to_etalon
                 reset_to_etalon()
                 bot.reply_to(message, "✅ Адаптивные режимы сброшены к эталону")
-                print("[HANDLERS] Выполнен сброс адаптивных режимов")
+                debug_log("HANDLERS", "Выполнен сброс адаптивных режимов")
             except ImportError:
                 bot.reply_to(message, "❌ Модуль адаптивных режимов не загружен")
             except Exception as e:
