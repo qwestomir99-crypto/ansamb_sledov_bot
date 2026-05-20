@@ -1,6 +1,7 @@
 # ==========================================
 # Модуль: services/photo_reader.py
-# Задача: получать случайный пост (текст + фото) из группы VK
+# Задача: получать случайный пост (текст + фото) с твоей стены VK
+# Переменные окружения: VK_TOKEN, VK_OWNER_ID
 # ==========================================
 
 import random
@@ -8,17 +9,11 @@ import requests
 import os
 import json
 
-# Файл для кэша постов
 CACHE_FILE = "dialogue/data/vk_posts_cache.json"
-
-# ID группы «Сапёры Аутентичности» (отрицательное число!)
-VK_GROUP_ID = -226615780
-
-# Токен VK из переменных окружения
 VK_TOKEN = os.environ.get("VK_TOKEN")
+VK_OWNER_ID = os.environ.get("VK_OWNER_ID")  # твой ID (положительное число)
 
 def load_posts_cache():
-    """Загружает кэш постов из файла"""
     if os.path.exists(CACHE_FILE):
         try:
             with open(CACHE_FILE, 'r', encoding='utf-8') as f:
@@ -28,27 +23,25 @@ def load_posts_cache():
     return []
 
 def save_posts_cache(posts):
-    """Сохраняет кэш постов в файл"""
     os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
     with open(CACHE_FILE, 'w', encoding='utf-8') as f:
         json.dump(posts, f, ensure_ascii=False, indent=2)
 
 def fetch_posts_from_vk():
-    """Получает все посты со стены группы VK, включая текст и фото"""
-    if not VK_TOKEN:
-        print("[PHOTO] ❌ Нет VK_TOKEN")
+    if not VK_TOKEN or not VK_OWNER_ID:
+        print("[PHOTO] ❌ Нет VK_TOKEN или VK_OWNER_ID")
         return []
     
     posts = []
     offset = 0
-    count = 100  # максимум за раз
+    count = 100
     
-    print("[PHOTO] Загрузка постов из VK...")
+    print("[PHOTO] Загрузка постов с твоей стены...")
     
     while True:
         url = "https://api.vk.com/method/wall.get"
         params = {
-            "owner_id": VK_GROUP_ID,
+            "owner_id": VK_OWNER_ID,  # положительное число — твоя стена
             "count": count,
             "offset": offset,
             "access_token": VK_TOKEN,
@@ -68,7 +61,6 @@ def fetch_posts_from_vk():
                 break
             
             for post in items:
-                # Пропускаем закреплённые посты
                 if post.get("is_pinned"):
                     continue
                 
@@ -76,21 +68,18 @@ def fetch_posts_from_vk():
                 if not text:
                     continue
                 
-                # Ищем первую фотографию в посте
                 photo_url = None
                 attachments = post.get("attachments", [])
                 for att in attachments:
                     if att["type"] == "photo":
                         sizes = att["photo"]["sizes"]
                         if sizes:
-                            photo_url = sizes[-1]["url"]  # самое большое
+                            photo_url = sizes[-1]["url"]
                             break
                 
-                # Пост без фото — пропускаем
                 if not photo_url:
                     continue
                 
-                # Извлекаем хештеги из текста
                 tags = [word for word in text.split() if word.startswith('#')]
                 
                 posts.append({
@@ -113,7 +102,6 @@ def fetch_posts_from_vk():
     return posts
 
 def get_random_post(force_refresh=False):
-    """Возвращает случайный пост из кэша или из VK"""
     posts = []
     
     if not force_refresh:
@@ -130,7 +118,6 @@ def get_random_post(force_refresh=False):
     return random.choice(posts)
 
 def get_random_photo(force_refresh=False):
-    """Для обратной совместимости — возвращает только URL случайного фото"""
     post = get_random_post(force_refresh)
     if post:
         return post.get("photo_url")
