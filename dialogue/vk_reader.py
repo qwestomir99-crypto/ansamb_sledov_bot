@@ -1,7 +1,7 @@
 # ==========================================
 # Модуль: dialogue/vk_reader.py
 # Справка: README.md → VK Reader
-# Задача: читает посты с твоей стены ВК, сохраняет в кэш для фото-стрелялки
+# Задача: читает посты с твоей стены ВК, сохраняет в кэш (текст + фото)
 # Комментарий: ритм 0,8 Гц. При первом запуске грузит 100 постов — чтобы архив не пылился.
 # Зависит от: config.json, VK_TOKEN, VK_OWNER_ID
 # Вызывается из: bot.py
@@ -44,7 +44,7 @@ def add_vk_post(post):
     print(f"[VK_READER] 📥 Пост сохранён: {post.get('text', '')[:50]}...")
 
 def fetch_last_posts(vk_token, owner_id, count=5):
-    """Рвёмся к VK API. Возвращает список постов с метаданными."""
+    """Получает последние посты из VK (с фото)"""
     params = {
         "access_token": vk_token,
         "v": "5.199",
@@ -59,9 +59,20 @@ def fetch_last_posts(vk_token, owner_id, count=5):
             items = data["response"].get("items", [])
             posts = []
             for item in items:
+                # Извлекаем фото, если есть
+                photo_url = None
+                attachments = item.get("attachments", [])
+                for att in attachments:
+                    if att.get("type") == "photo":
+                        sizes = att.get("photo", {}).get("sizes", [])
+                        if sizes:
+                            photo_url = sizes[-1]["url"]
+                            break
+                
                 posts.append({
                     "id": item["id"],
                     "text": item.get("text", ""),
+                    "photo_url": photo_url,
                     "date": datetime.fromtimestamp(item["date"]).isoformat(),
                     "likes": item.get("likes", {}).get("count", 0),
                     "reposts": item.get("reposts", {}).get("count", 0),
@@ -115,6 +126,8 @@ def vk_reader_loop(bot, vk_token, owner_id, tg_chat_id):
                     add_vk_post(post)
                     if post["text"]:
                         print(f"[VK_READER] 🔍 Новый пост: {post['text'][:50]}...")
+                    if post.get("photo_url"):
+                        print(f"[VK_READER] 📸 Фото: {post['photo_url'][:60]}...")
                     last_post_id = post["id"]
 
         except Exception as e:
