@@ -106,7 +106,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 20.05.2026 09:07:52*
+*Обновлено: 20.05.2026 09:17:13*
 
 | Файл | Статус |
 |------|--------|
@@ -140,4 +140,5 @@
 | `service/dialogue/exception_handler.py` | ❌ Без шапки |
 | `service/web.py` | ❌ Без шапки |
 | `services/__init__.py` | ❌ Без шапки |
+| `services/agent_pinger.py` | ✅ Redmi-шапка |
 | `tag_analyzer.py` | ❌ Без шапки |
