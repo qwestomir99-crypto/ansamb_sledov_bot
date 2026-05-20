@@ -226,4 +226,58 @@ def register_callback_handlers(bot, config):
             return
 
         if data == "quotes_interval":
-            if not is_admin
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            handle_callback_quotes_interval(bot, chat_id, message_id, user_id)
+            return
+
+        if data.startswith("quote_int_"):
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            interval = int(data.split("_")[2])
+            handle_callback_quotes_set_interval(interval, bot, chat_id, message_id, user_id)
+            return
+
+        # ---------- СПРАВКА: НАЗАД ----------
+        if data == "help_back":
+            from dialogue.help_menu import get_help_keyboard
+            bot.edit_message_text(
+                "📖 *Справка по командам*\n\nВыберите команду для подробного описания:",
+                chat_id, message_id,
+                parse_mode='Markdown',
+                reply_markup=get_help_keyboard()
+            )
+            bot.answer_callback_query(call.id)
+            return
+
+        # ---------- ПОЛЬЗОВАТЕЛЬСКИЕ КНОПКИ ----------
+        if data == "tleem":
+            bot.send_message(chat_id, "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем.")
+        elif data == "fixiruem":
+            bot.send_message(chat_id, "🔒 Фиксация принята. Ритм 0,8 Гц подтверждён. Сеть тлеет.")
+        elif data == "vspishka":
+            bot.send_message(chat_id, "💥 Импульс зафиксирован. Синхронизация завершена. QSL.")
+        elif data == "dyshim":
+            ping_self()
+            bot.send_message(chat_id, "🌬 Пинг отправлен (бот не отвечает)")
+        elif data == "govorim":
+            bot.send_message(chat_id, "🗣 Напиши #говори <текст> в чат")
+        elif data == "help":
+            help_text = """
+📖 *Доступные хештеги:*
+
+🔹 *#тлеем* — разлом
+🔹 *#фиксируем* — синхронизация
+🔹 *#вспышка* — импульс
+🔹 *#дышим* — пинг
+🔹 *#говори <текст>* — вопрос Старшему брату
+🔹 *#меню* — меню
+🔹 *#* — интерактивная справка
+            """
+            bot.send_message(chat_id, help_text, parse_mode='Markdown')
+        else:
+            bot.answer_callback_query(call.id)
+
+        bot.answer_callback_query(call.id)
