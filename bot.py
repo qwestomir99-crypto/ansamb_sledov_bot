@@ -46,6 +46,7 @@ if DEBUG_IMPORTS:
 
 # Импорт модулей (с проверкой флагов)
 from ping_utils import ping_self, start_background_pinger
+from services.agent_pinger import start_agent_pinger
 
 if ENABLE_JOURNALIST:
     try:
@@ -257,19 +258,17 @@ if ENABLE_PUBLISHER:
         print(f"[DEBUG] 4e. Publisher ошибка: {e}")
         traceback.print_exc()
 
-# ---------- ПОТОК YOUTUBE АВТОПОСТИНГА (НОВЫЙ) ----------
+# ---------- ПОТОК YOUTUBE АВТОПОСТИНГА ----------
 if ENABLE_AUTOPOSTER:
     try:
         from services.autoposter import check_and_publish
         import time
         
         def youtube_autoposter_loop():
-            """Отдельный поток для периодической проверки YouTube"""
             interval_minutes = YOUTUBE_CHECK_INTERVAL
             interval_seconds = interval_minutes * 60
             print(f"[AUTOPOSTER] Поток YouTube запущен, проверка каждые {interval_minutes} минут")
             
-            # Первая проверка через 30 секунд
             time.sleep(30)
             
             while True:
@@ -484,6 +483,9 @@ if DEBUG_IMPORTS:
 # ---------- ЗАПУСК ----------
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
 start_background_pinger(60)
+
+# Запуск пингера агента (чтобы не засыпал на бесплатном тарифе Render)
+start_agent_pinger()
 
 if ENABLE_AUTOPOSTER:
     try:
