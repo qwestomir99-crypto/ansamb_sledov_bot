@@ -214,3 +214,20 @@ def get_all_users_moods():
     for user_id, user_data in settings.items():
         result[user_id] = user_data.get("mood", "сапёр")
     return result
+
+# ==========================================
+# Функция для клавиатуры настроения
+# ==========================================
+
+def get_moods_keyboard():
+    """Возвращает Inline-клавиатуру для выбора настроения"""
+    from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+    
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    for mood_id, mood_data in MOODS.items():
+        keyboard.add(InlineKeyboardButton(
+            f"{mood_data['emoji']} {mood_data['name']}",
+            callback_data=f"set_mood_{mood_id}"
+        ))
+    keyboard.add(InlineKeyboardButton("❌ Закрыть", callback_data="close_mood_menu"))
+    return keyboard
