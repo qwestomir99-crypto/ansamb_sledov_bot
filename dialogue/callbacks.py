@@ -2,8 +2,8 @@
 # Модуль: dialogue/callbacks.py
 # Справка: README.md → Обработчики кнопок
 # Задача: обработка callback_query (нажатий на кнопки)
-# Комментарий: добавлена обработка кнопок справки
-# Зависит от: admin_commands.py, help_menu.py
+# Комментарий: добавлена обработка кнопок справки и настроения
+# Зависит от: admin_commands.py, help_menu.py, user_settings.py
 # Вызывается из: bot.py
 # ==========================================
 
@@ -52,6 +52,33 @@ def register_callback_handlers(bot, config):
                 reply_markup=get_admin_menu()
             )
             bot.answer_callback_query(call.id)
+            return
+
+        # ---------- НАСТРОЕНИЕ (новые кнопки) ----------
+        if data.startswith("set_mood_"):
+            mood_id = data.replace("set_mood_", "")
+            try:
+                from dialogue.user_settings import set_user_mood, MOODS
+                if mood_id in MOODS:
+                    set_user_mood(user_id, mood_id)
+                    bot.answer_callback_query(
+                        call.id, 
+                        f"✅ Настроение «{MOODS[mood_id]['name']}» установлено"
+                    )
+                    bot.edit_message_text(
+                        f"🎭 Настроение изменено на *{MOODS[mood_id]['name']}*",
+                        chat_id, message_id,
+                        parse_mode='Markdown'
+                    )
+                else:
+                    bot.answer_callback_query(call.id, "❌ Ошибка: настроение не найдено")
+            except ImportError:
+                bot.answer_callback_query(call.id, "❌ Модуль настроений не загружен")
+            return
+
+        if data == "close_mood_menu":
+            bot.delete_message(chat_id, message_id)
+            bot.answer_callback_query(call.id, "Меню закрыто")
             return
 
         # ---------- РЕЖИМЫ ----------
