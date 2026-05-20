@@ -2,11 +2,12 @@
 # Модуль: dialogue/handlers.py
 # Справка: README.md → Обработчики команд
 # Задача: обработка команд пользователей и админов
-# Комментарий: добавлена команда #ютуб_тест для проверки YouTube API
+# Комментарий: удалена старая #справка, #настроение переделано в меню с кнопками
 # ==========================================
 
 import random
 import json
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dialogue.admin_commands import (
     handle_admin_command, is_admin_authorized,
     get_admin_menu, get_user_menu
@@ -21,36 +22,17 @@ def load_config():
     with open(CONFIG_FILE, "r") as f:
         return json.load(f)
 
-def get_help_text():
-    config = load_config()
-    default_tags = config.get("publisher", {}).get("default_tags", "#СапёрыАутентичности #МихоельАв #2026плита")
-    vk_tags = config.get("autoposter", {}).get("vk_tags", "#Ансамбль #СледНаКонтаке")
-    
-    help_text = f"""
-📖 *Доступные хештеги и команды:*
-
-🔹 *#тлеем* / *#tleem* — зафиксировать разлом
-🔹 *#фиксируем* / *#fixiruem* — подтвердить синхронизацию
-🔹 *#вспышка* / *#vspishka* — импульс
-🔹 *#дышим* — пинг бота
-🔹 *#говори <текст>* — спросить у Старшего брата
-🔹 *#меню* / *#помощь* — открыть меню
-🔹 *#сброс* — сбросить адаптивные режимы к эталону (только админ)
-🔹 *#настроение* — показать/сменить персональное настроение
-🔹 *#ютуб_тест* — проверить работу YouTube API
-🔹 *#* — интерактивная справка с кнопками
-
-🏷 *Основные теги:*
-📝 Telegram: `{default_tags}`
-📘 VK: `{vk_tags}`
-
-🛡️ *Админ-команды:*
-🔹 *#админ <пароль>* — вход в админ-панель
-
-📌 *Режимы:* утро, день, вечер, ночь + адаптивные
-🎭 *Настроения:* сапёр, художник, поэт, админ, наблюдатель, философ
-"""
-    return help_text
+def get_moods_keyboard():
+    """Возвращает клавиатуру для выбора настроения"""
+    from dialogue.user_settings import MOODS
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    for mood_id, mood_data in MOODS.items():
+        keyboard.add(InlineKeyboardButton(
+            f"{mood_data['emoji']} {mood_data['name']}",
+            callback_data=f"set_mood_{mood_id}"
+        ))
+    keyboard.add(InlineKeyboardButton("❌ Закрыть", callback_data="close_mood_menu"))
+    return keyboard
 
 silence_answers = ["👁️", "⏚"]
 
@@ -168,52 +150,18 @@ def register_handlers(bot, config):
             return
         # --- КОНЕЦ #сброс ---
 
-        # --- КОМАНДА #настроение (персональное настроение) ---
-        if text.startswith("#настроение"):
-            mood = text.replace("#настроение", "", 1).strip()
-            
-            try:
-                from dialogue.user_settings import (
-                    get_available_moods, get_user_mood, get_user_style,
-                    get_user_emoji, set_user_mood, MOODS
-                )
-            except ImportError:
-                bot.reply_to(message, "❌ Модуль настроений не загружен")
+        # --- КОМАНДА #настроение (меню с кнопками) ---
+        if text == "#настроение":
+            if not is_admin_authorized(message.from_user.id):
+                bot.reply_to(message, "❌ Только для админа")
                 return
             
-            if not mood:
-                current_mood = get_user_mood(message.from_user.id)
-                moods_list = get_available_moods()
-                text_moods = "\n".join([f"  • {m['emoji']} *{m['name']}* — `{m['id']}` — {m['style']}" for m in moods_list])
-                bot.reply_to(
-                    message,
-                    f"🎭 *Текущее настроение:* {get_user_emoji(message.from_user.id)} *{get_user_mood(message.from_user.id).capitalize()}*\n\n"
-                    f"*Доступные настроения:*\n{text_moods}\n\n"
-                    f"✨ *Изменить:* `#настроение <id>`\n"
-                    f"Пример: `#настроение художник`",
-                    parse_mode='Markdown'
-                )
-                return
-            
-            if mood in MOODS:
-                set_user_mood(message.from_user.id, mood)
-                bot.reply_to(
-                    message,
-                    f"{MOODS[mood]['emoji']} *Настроение «{MOODS[mood]['name']}» установлено!*\n\n"
-                    f"🎨 *Стиль:* {MOODS[mood]['style']}\n"
-                    f"⏱️ *Интервал цитат:* {MOODS[mood]['quotes_interval']} мин\n"
-                    f"📤 *Интервал публикаций:* {MOODS[mood]['publisher_interval']} мин\n\n"
-                    f"🌟 *Ритм 0,8 Гц остаётся неизменным.*",
-                    parse_mode='Markdown'
-                )
-                print(f"[HANDLERS] Пользователь {message.from_user.id} сменил настроение на {mood}")
-            else:
-                bot.reply_to(
-                    message,
-                    f"❌ Настроение `{mood}` не найдено.\n"
-                    f"Доступные: `сапёр`, `художник`, `поэт`, `админ`, `наблюдатель`, `философ`",
-                    parse_mode='Markdown'
-                )
+            bot.send_message(
+                message.chat.id,
+                "🎭 *Выбери настроение:*",
+                parse_mode='Markdown',
+                reply_markup=get_moods_keyboard()
+            )
             return
         # --- КОНЕЦ #настроение ---
 
@@ -221,9 +169,8 @@ def register_handlers(bot, config):
             ping_self()
             return
 
-        if text == "#справка" or text == "#help":
-            bot.reply_to(message, get_help_text(), parse_mode='Markdown')
-            return
+        # --- СТАРАЯ СПРАВКА УДАЛЕНА ---
+        # Оставлена только интерактивная по команде #
 
         if any(x in text for x in ["#тлеем", "#tleem"]):
             bot.reply_to(message, "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем.")
