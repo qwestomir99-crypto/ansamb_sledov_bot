@@ -41,5 +41,23 @@
             "publisher": false,
             "talk": false
         }
+    },
+    "telegram": {
+        "publish_channel": "@qwestomir"
+    },
+    "quotes": {
+        "file": "dialogue/data/quotes.txt",
+        "interval_minutes": 60
+    },
+    "publisher": {
+        "default_tags": "#СапёрыАутентичности #МихоельАв #2026плита"
+    },
+    "autoposter": {
+        "vk_tags": "#Ансамбль #СледНаКонтаке",
+        "test_on_start": false
+    },
+    "settings": {
+        "REPOST_ENABLED": false,
+        "REPOST_QUOTE_CHANCE": 50
     }
 }
