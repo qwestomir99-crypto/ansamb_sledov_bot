@@ -1,0 +1,7 @@
+{
+  "enabled": false,
+  "modules": [],
+  "interval_minutes": 0,
+  "send_to_telegram": true,
+  "last_sent": 0
+}
