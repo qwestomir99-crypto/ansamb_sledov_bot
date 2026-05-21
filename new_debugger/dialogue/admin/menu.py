@@ -2,7 +2,7 @@
 # Файл: new_debugger/dialogue/admin/menu.py
 # Справка: README.md → Админка (меню)
 # Задача: все функции для построения кнопок и подменю
-# Комментарий: добавлено подменю дебаггера с отдельными кнопками Вкл/Выкл
+# Комментарий: добавлено подменю дебаггера и кнопка Шаббата в диагностике
 # ==========================================
 
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -70,7 +70,8 @@ def get_diagnostic_submenu():
     keyboard.add(
         InlineKeyboardButton("📋 Ошибки", callback_data="errors"),
         InlineKeyboardButton("📜 Лог", callback_data="log"),
-        InlineKeyboardButton("🐞 Дебаг", callback_data="debug")
+        InlineKeyboardButton("🐞 Дебаг", callback_data="debug"),
+        InlineKeyboardButton("🕯 Шаббат", callback_data="shabbat_info")
     )
     keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="admin_menu"))
     return keyboard
