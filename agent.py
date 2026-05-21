@@ -1,6 +1,8 @@
 import os
 import logging
 import requests
+import threading
+import time
 from flask import Flask, request, jsonify
 from datetime import datetime
 
@@ -10,11 +12,9 @@ app = Flask(__name__)
 # 1. НАСТРОЙКА ЛОГИРОВАНИЯ
 # ==========================================
 
-# Создаём папку для логов, если её нет
 LOG_DIR = "logs"
 os.makedirs(LOG_DIR, exist_ok=True)
 
-# Настройка логирования: и в консоль, и в файл
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -34,7 +34,6 @@ FOLDER_ID = os.environ.get("YC_FOLDER_ID")
 YANDEX_GPT_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 
 def log_request_details(prompt, headers, payload):
-    """Детально логируем запрос"""
     logger.info("=" * 60)
     logger.info("📤 НОВЫЙ ЗАПРОС К YANDEX GPT")
     logger.info(f"🕐 Время: {datetime.now().isoformat()}")
@@ -47,7 +46,6 @@ def log_request_details(prompt, headers, payload):
     logger.info("=" * 60)
 
 def log_response_details(response):
-    """Детально логируем ответ от Yandex GPT"""
     logger.info("=" * 60)
     logger.info("📥 ОТВЕТ ОТ YANDEX GPT")
     logger.info(f"🕐 Время: {datetime.now().isoformat()}")
@@ -56,7 +54,6 @@ def log_response_details(response):
     logger.info("=" * 60)
 
 def log_error_details(error, response=None):
-    """Детально логируем ошибку"""
     logger.error("=" * 60)
     logger.error("❌ ОШИБКА В YANDEX GPT")
     logger.error(f"🕐 Время: {datetime.now().isoformat()}")
@@ -73,9 +70,7 @@ def log_error_details(error, response=None):
 
 @app.route('/ask', methods=['POST'])
 def ask():
-    """Эндпоинт для команды #говори"""
     try:
-        # Получаем промпт
         data = request.get_json()
         if not data:
             logger.warning("Пустой запрос или не JSON")
@@ -86,12 +81,10 @@ def ask():
             logger.warning("Поле prompt отсутствует или пустое")
             return jsonify({"error": "no prompt"}), 400
         
-        # Проверяем конфигурацию
         if not API_KEY or not FOLDER_ID:
-            logger.error("YC_API_KEY или YC_FOLDER_ID не заданы в переменных окружения")
+            logger.error("YC_API_KEY или YC_FOLDER_ID не заданы")
             return jsonify({"error": "Yandex GPT not configured"}), 500
         
-        # Формируем запрос к Yandex GPT
         headers = {
             "Authorization": f"Api-Key {API_KEY}",
             "Content-Type": "application/json"
@@ -106,19 +99,13 @@ def ask():
             "messages": [{"role": "user", "text": prompt}]
         }
         
-        # Логируем запрос
         log_request_details(prompt, headers, payload)
         
-        # Отправляем запрос
         response = requests.post(YANDEX_GPT_URL, headers=headers, json=payload, timeout=30)
-        
-        # Логируем ответ
         log_response_details(response)
         
-        # Проверяем статус
         response.raise_for_status()
         
-        # Парсим ответ
         result = response.json()
         answer = result['result']['alternatives'][0]['message']['text']
         
@@ -131,7 +118,7 @@ def ask():
         return jsonify({"error": f"Request failed: {str(e)}"}), 500
     
     except KeyError as e:
-        logger.error(f"❌ Ошибка парсинга JSON от Yandex GPT: отсутствует ключ {e}")
+        logger.error(f"❌ Ошибка парсинга JSON: отсутствует ключ {e}")
         if 'response' in locals():
             logger.error(f"📄 Содержимое ответа: {response.text}")
         return jsonify({"error": f"Parse error: {str(e)}"}), 500
@@ -142,7 +129,6 @@ def ask():
 
 @app.route('/health', methods=['GET'])
 def health():
-    """Эндпоинт для проверки работоспособности"""
     return jsonify({
         "status": "ok",
         "service": "yandex-gpt-agent",
@@ -154,7 +140,6 @@ def health():
 
 @app.route('/logs', methods=['GET'])
 def get_logs():
-    """Эндпоинт для просмотра логов (только для админа, по секретному токену)"""
     secret = request.args.get('secret')
     if secret != os.environ.get("LOGS_SECRET", "tleem2026"):
         return jsonify({"error": "Forbidden"}), 403
@@ -166,8 +151,30 @@ def get_logs():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ==========================================
+# 4. ВНУТРЕННИЙ ПИНГ (keep-alive)
+# ==========================================
+
+def keep_alive():
+    """Пинг самого себя каждую минуту, чтобы не засыпать на Render"""
+    while True:
+        time.sleep(60)
+        try:
+            requests.get('http://127.0.0.1:10000/', timeout=5)
+            logger.debug("AGENT: Внутренний пинг успешен")
+        except Exception as e:
+            logger.debug(f"AGENT: Ошибка пинга: {e}")
+
+# Запускаем поток с пингом
+threading.Thread(target=keep_alive, daemon=True).start()
+
+# ==========================================
+# 5. ЗАПУСК
+# ==========================================
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     logger.info(f"🚀 Запуск агента на порту {port}")
     logger.info(f"📁 Логи будут сохраняться в {os.path.join(LOG_DIR, 'agent.log')}")
+    logger.info("🔄 Внутренний пинг запущен (каждые 60 секунд)")
     app.run(host='0.0.0.0', port=port, debug=False)
