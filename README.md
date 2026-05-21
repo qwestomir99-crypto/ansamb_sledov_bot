@@ -106,7 +106,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 21.05.2026 08:04:16*
+*Обновлено: 21.05.2026 09:20:18*
 
 | Файл | Статус |
 |------|--------|
@@ -149,6 +149,7 @@
 | `services/autoposter.py` | ✅ Redmi-шапка |
 | `services/dialogue/exception_handler.py` | ✅ Redmi-шапка |
 | `services/photo_reader.py` | ❌ Без шапки |
+| `services/vk_uploader.py` | ✅ Redmi-шапка |
 | `services/web.py` | ✅ Redmi-шапка |
 | `services/web_server.py` | ❌ Без шапки |
 | `services/youtube_reader.py` | ✅ Redmi-шапка |
