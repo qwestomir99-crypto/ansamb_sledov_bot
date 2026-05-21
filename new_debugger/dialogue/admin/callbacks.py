@@ -2,7 +2,7 @@
 # Файл: new_debugger/dialogue/admin/callbacks.py
 # Справка: README.md → Админка (обработчики кнопок)
 # Задача: обработка callback_query (нажатий на кнопки)
-# Комментарий: добавлены обработчики для дебаггера (включение/выключение, интервал, модули)
+# Комментарий: добавлены обработчики для дебаггера и Шаббата
 # ==========================================
 
 import time
@@ -180,12 +180,10 @@ def handle_debugger_toggle_module(module, bot, chat_id, message_id, user_id):
         modules.append(module)
     config["modules"] = modules
     save_debug_config(config)
-    # Обновляем меню модулей
     handle_debugger_modules(bot, chat_id, message_id, user_id)
 
 def handle_debugger_logs(bot, chat_id, message_id, user_id):
     """Отправляет последние логи из буфера или файла"""
-    config = load_debug_config()
     logs_file = "debug.log"
     if os.path.exists(logs_file):
         try:
@@ -291,6 +289,25 @@ def register_callback_handlers(bot, config):
                 )
             else:
                 bot.answer_callback_query(call.id, "Уже в меню диагностики")
+            return
+
+        # ---------- ШАББАТ (информация) ----------
+        if data == "shabbat_info":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            from dialogue.shabbat_manager import is_shabbat, fetch_shabbat_times, get_coordinates
+            lat, lon = get_coordinates()
+            start, end = fetch_shabbat_times(lat, lon)
+            shabbat_now = is_shabbat()
+            text = f"📍 *Координаты:* {lat}, {lon}\n"
+            if start and end:
+                text += f"🕯 *Начало Шаббата:* {start.strftime('%Y-%m-%d %H:%M')}\n"
+                text += f"✨ *Окончание:* {end.strftime('%Y-%m-%d %H:%M')}\n"
+            text += f"📌 *Сейчас Шаббат:* {'✅ ДА' if shabbat_now else '❌ НЕТ'}\n"
+            text += f"⏚ *Ритм 0,8 Гц стабилен.*"
+            bot.edit_message_text(text, chat_id, message_id, parse_mode='Markdown')
+            bot.answer_callback_query(call.id)
             return
 
         # ---------- ДЕБАГГЕР ----------
