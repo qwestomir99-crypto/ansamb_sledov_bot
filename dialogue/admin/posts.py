@@ -2,7 +2,7 @@
 # Файл: dialogue/admin/posts.py
 # Справка: README.md → Админка (публикации)
 # Задача: отложенные публикации и постинг в VK
-# Комментарий: обработчики кнопок "Публикации", "Добавить пост", "Пост в VK"
+# Комментарий: загрузка видео вынесена в services/vk_uploader.py
 # ==========================================
 
 import os
@@ -11,6 +11,7 @@ from datetime import datetime
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dialogue.publisher import add_publication, load_publications
 from dialogue.publisher_utils import get_auto_tags, get_random_quote, post_to_vk
+from services.vk_uploader import upload_video_to_vk
 from dialogue.admin.auth import log_admin_action
 from dialogue.admin.menu import get_admin_menu, get_quotes_submenu
 
@@ -34,6 +35,7 @@ def handle_pub_menu(bot, chat_id, message_id, user_id):
     
     if text:
         bot.edit_message_text(text, chat_id, message_id, parse_mode='Markdown')
+    return_to_admin_menu(bot, chat_id, message_id, user_id)
 
 def ask_for_post_text(bot, chat_id, message_id):
     msg = bot.send_message(chat_id, "✍️ Введите текст поста (можно с Markdown) или /skip для поста без текста")
@@ -105,6 +107,7 @@ def process_vk_post_text(message, bot, chat_id, user_id):
     text = message.text.strip()
     if not text:
         bot.send_message(chat_id, "❌ Текст не может быть пустым")
+        return_to_admin_menu(bot, chat_id, user_id=user_id)
         return
     msg = bot.send_message(chat_id, "📎 Пришлите фото, видео или нажмите /skip")
     bot.register_next_step_handler(msg, process_vk_post_file, bot, chat_id, text, user_id)
@@ -139,18 +142,33 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
     
     if not vk_token or not vk_owner_id:
         bot.send_message(chat_id, "❌ Нет токена VK. Проверь переменные окружения.")
+        return_to_admin_menu(bot, chat_id, user_id=user_id)
         return
     
     quote = get_random_quote()
     full_text = f"{text}\n\n📜 {quote}"
     auto_tags = get_auto_tags(text, "vk")
     
-    success, error_msg = post_to_vk(full_text, auto_tags, vk_token, vk_owner_id, file_path, auto_quote=False, auto_tags=False)
-    
-    if success:
-        bot.send_message(chat_id, f"✅ Пост отправлен в VK:\n\n{full_text[:200]}")
+    # Единый сервис загрузки видео (выбор способа по размеру)
+    if file_path:
+        success, result = upload_video_to_vk(file_path, vk_token, vk_owner_id, full_text, auto_tags)
+        if success:
+            bot.send_message(chat_id, f"✅ Видео отправлено в VK:\n\n{full_text[:200]}")
+        else:
+            bot.send_message(chat_id, f"❌ Ошибка: {result}")
     else:
-        bot.send_message(chat_id, error_msg or "❌ Ошибка при отправке в VK")
+        # Для фото и текста используем старую логику post_to_vk
+        success, error_msg = post_to_vk(full_text, auto_tags, vk_token, vk_owner_id, file_path, auto_quote=False, auto_tags=False)
+        if success:
+            bot.send_message(chat_id, f"✅ Пост отправлен в VK:\n\n{full_text[:200]}")
+        else:
+            bot.send_message(chat_id, error_msg or "❌ Ошибка при отправке в VK")
     
     if file_path and os.path.exists(file_path):
         os.remove(file_path)
+    
+    return_to_admin_menu(bot, chat_id, user_id=user_id)
+
+def return_to_admin_menu(bot, chat_id, message_id=None, user_id=None):
+    from dialogue.admin_commands import return_to_admin_menu as _return
+    _return(bot, chat_id, message_id, user_id)
