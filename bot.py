@@ -2,7 +2,7 @@
 # Файл: bot.py
 # Справка: README.md → Главный модуль
 # Задача: точка входа, запуск потоков, команды
-# Комментарий: Flask вынесен в services/web_server.py
+# Комментарий: добавлено ожидание готовности агента перед стартом
 # ==========================================
 
 print("[DEBUG] 0. Начало загрузки bot.py")
@@ -147,6 +147,28 @@ if ENABLE_AUTOPOSTER:
 
 if ENABLE_CALLBACKS:
     register_callback_handlers(bot, config)
+
+# ------------------------------------------------------------
+# Ожидание готовности агента
+# ------------------------------------------------------------
+def wait_for_agent():
+    """Ждёт, пока агент станет доступен (до 60 секунд)"""
+    agent_url = "https://agent-3kek.onrender.com/health"
+    print("[BOT] Ожидание готовности агента...")
+    for attempt in range(30):
+        try:
+            r = requests.get(agent_url, timeout=2)
+            if r.status_code == 200:
+                print("[BOT] ✅ Агент готов")
+                return True
+        except:
+            pass
+        print(f"[BOT] Ожидание агента, попытка {attempt+1}/30")
+        time.sleep(2)
+    print("[BOT] ⚠️ Агент не ответил, продолжаем без него")
+    return False
+
+wait_for_agent()
 
 # ------------------------------------------------------------
 # Обработчики команд
