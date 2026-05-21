@@ -13,12 +13,14 @@ ENABLE_AUTOPOSTER = True
 ENABLE_CALLBACKS = True
 ENABLE_ALISA = False
 
-# -------------------- YOUTUBE АВТОПОСТИНГ --------------------
+# -------------------- YOUTUBЕ АВТОПОСТИНГ --------------------
 YOUTUBE_CHECK_INTERVAL = 60
 
 # -------------------- ОТЛАДКА --------------------
 DEBUG_MODE = True
 DEBUG_MODULES = ["AUTOPOSTER", "VK_READER", "QUOTES", "PHOTO_READER", "PUBLISHER"]
+DEBUG_IMPORTS = True
+DEBUG_THREADS = True
 
 # -------------------- НАСТРОЙКИ ПОЛЛИНГА --------------------
 SKIP_PENDING_UPDATES = True
