@@ -1,8 +1,8 @@
 # ==========================================
 # Файл: bot.py
-# Задача: точка входа, запуск потоков, команды, интеграция веб-морды
-# Комментарий: запускает FastAPI (веб-морда) в отдельном потоке.
-#              Все модули (цитаты, VK reader, журналист, автопостинг) остаются без изменений.
+# Задача: главный бот (Flask + Telegram)
+# Комментарий: добавлен временный маршрут /new для показа новой веб-морды
+#              из папки new_debugger/templates/admin.html
 # ==========================================
 
 print("[DEBUG] 0. Начало загрузки bot.py")
@@ -13,10 +13,11 @@ import os
 import sys
 import threading
 import time
+import traceback
 import requests
 import json
 from datetime import datetime
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from flask import Flask, request
 
 # Настройки
 try:
@@ -46,21 +47,21 @@ if DEBUG_IMPORTS:
 # Импорт модулей
 from ping_utils import ping_self, start_background_pinger
 from services.agent_pinger import start_agent_pinger
-from services.web_server import start_web_thread
 from dialogue.agent import ask_agent
-from dialogue.activity_modes import should_respond_to_talk, get_current_mode, set_mode
+from dialogue.activity_modes import should_respond_to_talk
 from dialogue.admin_commands import (
     handle_admin_command, is_admin_authorized,
-    get_admin_menu, get_user_menu
+    get_admin_menu, get_user_menu,
+    ask_for_post_text
 )
 from debug_utils import debug_log
 
 if ENABLE_JOURNALIST:
     from dialogue.journalist import journalist_loop
 if ENABLE_VK_READER:
-    from services.vk_reader import listen_messages, set_websocket_broadcast
+    from dialogue.vk_reader import vk_reader_loop
 if ENABLE_QUOTES:
-    from dialogue.quotes import quotes_loop, get_quotes_list, add_quote
+    from dialogue.quotes import quotes_loop
 if ENABLE_PUBLISHER:
     from dialogue.publisher import publish_loop
 if ENABLE_SCHEDULER:
@@ -94,82 +95,84 @@ silence_answers = ["👁️", "⏚"]
 os.chdir(os.path.dirname(sys.argv[0]))
 
 # ==========================================
-# Обработчики для веб-морды
+# Flask-сервер (старый, keep-alive)
 # ==========================================
-def web_get_mode():
-    try:
-        return get_current_mode()
-    except:
-        return "день"
+flask_app = Flask(__name__)
 
-def web_set_mode(mode):
-    try:
-        set_mode(mode)
-        debug_log("WEB", f"Режим изменён на {mode}")
-    except Exception as e:
-        debug_log("WEB", f"Ошибка смены режима: {e}", "ERROR")
+@flask_app.route('/')
+def health():
+    if request.remote_addr == '127.0.0.1':
+        return "Pong", 200
+    return {"status": "tleem", "rhythm": "0.8 Hz", "version": "3.2"}, 200
 
-def web_get_quotes():
-    try:
-        return get_quotes_list()
-    except:
-        return []
+@flask_app.route('/token', methods=['GET'])
+def get_token():
+    secret = request.args.get('secret')
+    if secret != os.environ.get("TOKEN_SECRET", "tleem2026"):
+        return "Forbidden", 403
+    return TOKEN, 200
 
-def web_add_quote(quote):
-    try:
-        add_quote(quote)
-        debug_log("WEB", f"Добавлена цитата: {quote[:50]}...")
-    except Exception as e:
-        debug_log("WEB", f"Ошибка добавления цитаты: {e}", "ERROR")
-
-def web_vk_post(text):
-    try:
-        from services.vk_uploader import post_to_vk
-        if VK_TOKEN and VK_OWNER_ID:
-            post_to_vk(text, VK_TOKEN, VK_OWNER_ID)
-            debug_log("WEB", f"Пост в VK отправлен: {text[:50]}...")
-    except Exception as e:
-        debug_log("WEB", f"Ошибка отправки в VK: {e}", "ERROR")
-
-def web_get_admin_log():
-    try:
-        with open("admin.log", "r", encoding='utf-8', errors='ignore') as f:
-            return f.read()[-10000:]
-    except:
-        return "Лог не найден"
-
-def web_get_error_log():
-    try:
-        with open("error.log", "r", encoding='utf-8', errors='ignore') as f:
-            return f.read()[-10000:]
-    except:
-        return "Лог не найден"
-
-def web_get_posts():
-    return []
-
-def web_add_post():
-    pass
+@flask_app.route('/ping', methods=['GET'])
+def ping():
+    return "pong", 200
 
 # ==========================================
-# Запуск веб-морды (FastAPI) — единый сервер
+# НОВЫЙ МАРШРУТ /new — показывает новую веб-морду
 # ==========================================
-web_handlers = {
-    'get_mode': web_get_mode,
-    'set_mode': web_set_mode,
-    'get_quotes': web_get_quotes,
-    'add_quote': web_add_quote,
-    'get_posts': web_get_posts,
-    'add_post': web_add_post,
-    'vk_post': web_vk_post,
-    'get_admin_log': web_get_admin_log,
-    'get_error_log': web_get_error_log,
-    'admin_password': ADMIN_PASSWORD
-}
+@flask_app.route('/new')
+def new_web_morda():
+    """Временный маршрут для новой веб-морды из new_debugger/templates/admin.html"""
+    from pathlib import Path
+    
+    # Ищем admin.html в new_debugger/templates/
+    base_path = Path(__file__).parent
+    html_path = base_path / "new_debugger" / "templates" / "admin.html"
+    
+    if not html_path.exists():
+        return f"""
+        <html>
+            <body style="background:#0a0a0a; color:#ff4444; font-family:monospace; padding:2rem;">
+                <h2>❌ admin.html не найден</h2>
+                <p>Искали: {html_path}</p>
+                <p>Текущая директория: {Path.cwd()}</p>
+                <hr>
+                <p>Убедись, что файл существует:<br>
+                <code>new_debugger/templates/admin.html</code></p>
+                <p>Содержимое папки new_debugger/templates/:</p>
+                <pre>{list((base_path / "new_debugger" / "templates").iterdir()) if (base_path / "new_debugger" / "templates").exists() else "папка не существует"}</pre>
+            </body>
+        </html>
+        """, 404
+    
+    html_content = html_path.read_text(encoding='utf-8')
+    
+    # Простая замена переменных (без Jinja2)
+    html_content = html_content.replace("{{ mode }}", "🌙 тестовый режим (Flask-костыль)")
+    html_content = html_content.replace("{{ time }}", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    
+    # Замена цитат на тестовые
+    test_quotes_html = '<li>«Сеть тлеет. Ритм 0,8 Гц.»</li><li>«Сапёр аутентичности на связи.»</li><li>«Ты — тень. Бот — голос.»</li>'
+    
+    if '<ul id="quotes-list">' in html_content:
+        import re
+        html_content = re.sub(
+            r'(<ul id="quotes-list">).*?(</ul>)',
+            rf'\1{test_quotes_html}\2',
+            html_content,
+            flags=re.DOTALL
+        )
+    
+    return html_content
 
-# Старт веб-морды (FastAPI)
-start_web_thread(web_handlers)
-print("[BOT] 🌐 Веб-морда (FastAPI) запущена")
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    flask_app.run(host='0.0.0.0', port=port, debug=False)
+
+# ==========================================
+# Запуск Flask в потоке
+# ==========================================
+threading.Thread(target=run_flask, daemon=True).start()
+print("[BOT] 🔧 Flask-сервер (keep-alive) запущен")
 
 # ==========================================
 # Очистка логов
@@ -187,24 +190,11 @@ clean_old_logs()
 threading.Thread(target=lambda: [time.sleep(86400) or clean_old_logs() for _ in range(999)], daemon=True).start()
 
 # ==========================================
-# Запуск потоков модулей
+# Потоки модулей
 # ==========================================
 if ENABLE_VK_READER:
-    if VK_TOKEN and VK_OWNER_ID:
-        try:
-            from services.web_server import broadcast_vk_message
-            set_websocket_broadcast(broadcast_vk_message)
-            threading.Thread(
-                target=listen_messages,
-                args=(VK_TOKEN, VK_OWNER_ID, bot, TG_CHAT_ID),
-                daemon=True
-            ).start()
-            print("[BOT] VK Long Poll слушатель запущен")
-        except Exception as e:
-            print(f"[BOT] Ошибка запуска VK Long Poll: {e}")
-    else:
-        print("[BOT] VK токен или owner_id не заданы, слушатель не запущен")
-
+    threading.Thread(target=vk_reader_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
+    print("[BOT] VK_reader запущен")
 if ENABLE_JOURNALIST:
     threading.Thread(target=journalist_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
 if ENABLE_QUOTES:
@@ -252,7 +242,7 @@ def wait_for_agent():
 wait_for_agent()
 
 # ==========================================
-# Обработчики команд Telegram
+# Обработчики команд
 # ==========================================
 @bot.message_handler(commands=['start'])
 def send_start(message):
@@ -363,7 +353,7 @@ def handle_message(message):
         bot.reply_to(message, random.choice(silence_answers))
 
 # ==========================================
-# Запуск бота
+# Запуск
 # ==========================================
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
 start_background_pinger(60)
