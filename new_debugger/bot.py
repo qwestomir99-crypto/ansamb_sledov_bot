@@ -2,9 +2,9 @@
 # Файл: bot.py
 # Задача: точка входа, запуск потоков, команды, интеграция веб-морды
 # Комментарий: обновлён для поддержки нового дебаггера, Шаббата и веб-интерфейса.
-#              Запускает веб-сервер (Flask) из services/web_server.py.
-#              Передаёт в веб-морду обработчики для управления режимами,
-#              цитатами, постами в VK и просмотром логов.
+#              Запускает два сервера:
+#              - порт 10000: внутренний (health checks, keep-alive для Render)
+#              - порт 8080: веб-морда (админка из браузера)
 # ==========================================
 
 print("[DEBUG] 0. Начало загрузки bot.py")
@@ -19,6 +19,7 @@ import traceback
 import requests
 import json
 from datetime import datetime
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # Настройки
 try:
@@ -164,7 +165,7 @@ def web_add_post():
     pass
 
 # ------------------------------------------------------------
-# Запуск веб-морды
+# Запуск веб-морды (порт 8080) — внешний интерфейс
 # ------------------------------------------------------------
 web_handlers = {
     'get_mode': web_get_mode,
@@ -179,23 +180,40 @@ web_handlers = {
     'admin_password': ADMIN_PASSWORD
 }
 
-# Запускаем веб-сервер в отдельном потоке
 start_web_thread(web_handlers, host="0.0.0.0", port=8080)
-print("[BOT] 🌐 Веб-морда запущена на порту 8080")
+print("[BOT] 🌐 Веб-морда (внешняя) запущена на порту 8080")
 
 # ------------------------------------------------------------
-# Пинг для keep-alive
+# Внутренний сервер для Render и keep-alive (порт 10000)
 # ------------------------------------------------------------
-def keep_alive():
-    while True:
-        time.sleep(60)
-        try:
-            requests.get('http://127.0.0.1:8080/', timeout=3)
-        except:
+def run_internal_server():
+    """Минимальный HTTP-сервер для health checks и keep-alive"""
+    class HealthHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == '/' or self.path == '/health':
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'OK')
+            else:
+                self.send_response(404)
+                self.end_headers()
+        
+        def log_message(self, format, *args):
+            # Отключаем логи этого сервера для чистоты
             pass
-threading.Thread(target=keep_alive, daemon=True).start()
+    
+    try:
+        server = HTTPServer(('0.0.0.0', 10000), HealthHandler)
+        server.serve_forever()
+    except Exception as e:
+        print(f"[BOT] Внутренний сервер ошибка: {e}")
 
+threading.Thread(target=run_internal_server, daemon=True).start()
+print("[BOT] 🔧 Внутренний сервер (keep-alive) запущен на порту 10000")
+
+# ------------------------------------------------------------
 # Очистка логов
+# ------------------------------------------------------------
 def clean_old_logs(days=7):
     now = time.time()
     for logfile in ['admin.log', 'error.log']:
