@@ -1,3 +1,11 @@
+# ==========================================
+# Файл: agent.py
+# Задача: агент для обработки #говори через Yandex GPT
+# Комментарий: отдельный микросервис, работает на Render.
+#              Принимает POST /ask, отвечает через Yandex GPT API.
+#              Добавлен keep-alive пинг каждые 60 секунд.
+# ==========================================
+
 import os
 import logging
 import requests
@@ -38,11 +46,10 @@ def log_request_details(prompt, headers, payload):
     logger.info("📤 НОВЫЙ ЗАПРОС К YANDEX GPT")
     logger.info(f"🕐 Время: {datetime.now().isoformat()}")
     logger.info(f"📝 Промпт: {prompt[:200]}{'...' if len(prompt) > 200 else ''}")
-    logger.info(f"🔑 API Key: {API_KEY[:10]}... (первые 10 символов)")
+    logger.info(f"🔑 API Key: {API_KEY[:10] if API_KEY else 'None'}... (первые 10 символов)")
     logger.info(f"📁 Folder ID: {FOLDER_ID}")
     logger.info(f"🌐 URL: {YANDEX_GPT_URL}")
     logger.info(f"📦 Payload: {payload}")
-    logger.info(f"📋 Headers: Authorization = Api-Key ***, Content-Type = application/json")
     logger.info("=" * 60)
 
 def log_response_details(response):
