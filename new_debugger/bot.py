@@ -5,6 +5,7 @@
 #              Запускает два сервера:
 #              - порт 10000: внутренний (health checks, keep-alive для Render)
 #              - порт 8080: веб-морда (админка из браузера)
+#              Также запускает VK Long Poll слушатель с пробросом в веб-морду.
 # ==========================================
 
 print("[DEBUG] 0. Начало загрузки bot.py")
@@ -49,7 +50,7 @@ if DEBUG_IMPORTS:
 # Импорт модулей
 from ping_utils import ping_self, start_background_pinger
 from services.agent_pinger import start_agent_pinger
-from services.web_server import start_web_thread
+from services.web_server import start_web_thread, broadcast_vk_message
 from dialogue.agent import ask_agent
 from dialogue.activity_modes import should_respond_to_talk, get_current_mode, set_mode
 from dialogue.admin_commands import (
@@ -62,7 +63,7 @@ from debug_utils import debug_log
 if ENABLE_JOURNALIST:
     from dialogue.journalist import journalist_loop
 if ENABLE_VK_READER:
-    from dialogue.vk_reader import vk_reader_loop
+    from services.vk_reader import listen_messages, set_websocket_broadcast
 if ENABLE_QUOTES:
     from dialogue.quotes import quotes_loop, get_quotes_list, add_quote
 if ENABLE_PUBLISHER:
@@ -97,9 +98,9 @@ bot = telebot.TeleBot(TOKEN)
 silence_answers = ["👁️", "⏚"]
 os.chdir(os.path.dirname(sys.argv[0]))
 
-# ------------------------------------------------------------
+# ==========================================
 # Обработчики для веб-морды
-# ------------------------------------------------------------
+# ==========================================
 def web_get_mode():
     """Возвращает текущий режим (утро/день/вечер/ночь)"""
     try:
@@ -131,7 +132,7 @@ def web_add_quote(quote):
         debug_log("WEB", f"Ошибка добавления цитаты: {e}", "ERROR")
 
 def web_vk_post(text):
-    """Отправляет текстовый пост в VK"""
+    """Отправляет текстовый пост в VK на стену сообщества"""
     try:
         from services.vk_uploader import post_to_vk
         if VK_TOKEN and VK_OWNER_ID:
@@ -164,9 +165,9 @@ def web_add_post():
     """Добавляет отложенный пост (заглушка)"""
     pass
 
-# ------------------------------------------------------------
+# ==========================================
 # Запуск веб-морды (порт 8080) — внешний интерфейс
-# ------------------------------------------------------------
+# ==========================================
 web_handlers = {
     'get_mode': web_get_mode,
     'set_mode': web_set_mode,
@@ -183,9 +184,9 @@ web_handlers = {
 start_web_thread(web_handlers, host="0.0.0.0", port=8080)
 print("[BOT] 🌐 Веб-морда (внешняя) запущена на порту 8080")
 
-# ------------------------------------------------------------
+# ==========================================
 # Внутренний сервер для Render и keep-alive (порт 10000)
-# ------------------------------------------------------------
+# ==========================================
 def run_internal_server():
     """Минимальный HTTP-сервер для health checks и keep-alive"""
     class HealthHandler(BaseHTTPRequestHandler):
@@ -211,9 +212,9 @@ def run_internal_server():
 threading.Thread(target=run_internal_server, daemon=True).start()
 print("[BOT] 🔧 Внутренний сервер (keep-alive) запущен на порту 10000")
 
-# ------------------------------------------------------------
+# ==========================================
 # Очистка логов
-# ------------------------------------------------------------
+# ==========================================
 def clean_old_logs(days=7):
     now = time.time()
     for logfile in ['admin.log', 'error.log']:
@@ -226,9 +227,23 @@ def clean_old_logs(days=7):
 clean_old_logs()
 threading.Thread(target=lambda: [time.sleep(86400) or clean_old_logs() for _ in range(999)], daemon=True).start()
 
-# Потоки модулей
+# ==========================================
+# Запуск потоков модулей
+# ==========================================
 if ENABLE_VK_READER:
-    threading.Thread(target=vk_reader_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
+    if VK_TOKEN and VK_OWNER_ID:
+        # Подключаем проброс сообщений в веб-морду
+        set_websocket_broadcast(broadcast_vk_message)
+        # Запускаем слушателя VK Long Poll
+        threading.Thread(
+            target=listen_messages,
+            args=(VK_TOKEN, VK_OWNER_ID, bot, TG_CHAT_ID),
+            daemon=True
+        ).start()
+        print("[BOT] VK Long Poll слушатель запущен")
+    else:
+        print("[BOT] VK токен или owner_id не заданы, слушатель не запущен")
+
 if ENABLE_JOURNALIST:
     threading.Thread(target=journalist_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
 if ENABLE_QUOTES:
@@ -254,9 +269,9 @@ if ENABLE_AUTOPOSTER:
 if ENABLE_CALLBACKS:
     register_callback_handlers(bot, config)
 
-# ------------------------------------------------------------
+# ==========================================
 # Ожидание готовности агента
-# ------------------------------------------------------------
+# ==========================================
 def wait_for_agent():
     """Ждёт, пока агент станет доступен (до 60 секунд)"""
     agent_url = "https://agent-3kek.onrender.com/health"
@@ -276,9 +291,9 @@ def wait_for_agent():
 
 wait_for_agent()
 
-# ------------------------------------------------------------
-# Обработчики команд
-# ------------------------------------------------------------
+# ==========================================
+# Обработчики команд Telegram
+# ==========================================
 @bot.message_handler(commands=['start'])
 def send_start(message):
     bot.reply_to(message, "Сапёр аутентичности. Ритм 0,8 Гц. Для входа в протокол — #Тлеем.")
@@ -398,7 +413,9 @@ def handle_message(message):
     elif any(phrase in text for phrase in ["что это", "зачем тег", "кто вы", "что за ритуал"]):
         bot.reply_to(message, random.choice(silence_answers))
 
-# Запуск
+# ==========================================
+# Запуск бота
+# ==========================================
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
 start_background_pinger(60)
 start_agent_pinger()
