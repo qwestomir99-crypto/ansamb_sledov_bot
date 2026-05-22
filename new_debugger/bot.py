@@ -1,8 +1,10 @@
 # ==========================================
-# Файл: new_debugger/bot.py
-# Справка: README.md → Главный модуль
-# Задача: точка входа, запуск потоков, команды
-# Комментарий: обновлён для поддержки нового дебаггера и Шаббата
+# Файл: bot.py
+# Задача: точка входа, запуск потоков, команды, интеграция веб-морды
+# Комментарий: обновлён для поддержки нового дебаггера, Шаббата и веб-интерфейса.
+#              Запускает веб-сервер (Flask) из services/web_server.py.
+#              Передаёт в веб-морду обработчики для управления режимами,
+#              цитатами, постами в VK и просмотром логов.
 # ==========================================
 
 print("[DEBUG] 0. Начало загрузки bot.py")
@@ -46,9 +48,9 @@ if DEBUG_IMPORTS:
 # Импорт модулей
 from ping_utils import ping_self, start_background_pinger
 from services.agent_pinger import start_agent_pinger
-from services.web_server import run_flask
+from services.web_server import start_web_thread
 from dialogue.agent import ask_agent
-from dialogue.activity_modes import should_respond_to_talk
+from dialogue.activity_modes import should_respond_to_talk, get_current_mode, set_mode
 from dialogue.admin_commands import (
     handle_admin_command, is_admin_authorized,
     get_admin_menu, get_user_menu,
@@ -61,7 +63,7 @@ if ENABLE_JOURNALIST:
 if ENABLE_VK_READER:
     from dialogue.vk_reader import vk_reader_loop
 if ENABLE_QUOTES:
-    from dialogue.quotes import quotes_loop
+    from dialogue.quotes import quotes_loop, get_quotes_list, add_quote
 if ENABLE_PUBLISHER:
     from dialogue.publisher import publish_loop
 if ENABLE_SCHEDULER:
@@ -94,15 +96,101 @@ bot = telebot.TeleBot(TOKEN)
 silence_answers = ["👁️", "⏚"]
 os.chdir(os.path.dirname(sys.argv[0]))
 
-# Запуск Flask
-threading.Thread(target=run_flask, daemon=True).start()
+# ------------------------------------------------------------
+# Обработчики для веб-морды
+# ------------------------------------------------------------
+def web_get_mode():
+    """Возвращает текущий режим (утро/день/вечер/ночь)"""
+    try:
+        return get_current_mode()
+    except:
+        return "день"
 
+def web_set_mode(mode):
+    """Устанавливает режим"""
+    try:
+        set_mode(mode)
+        debug_log("WEB", f"Режим изменён на {mode}")
+    except Exception as e:
+        debug_log("WEB", f"Ошибка смены режима: {e}", "ERROR")
+
+def web_get_quotes():
+    """Возвращает список цитат"""
+    try:
+        return get_quotes_list()
+    except:
+        return []
+
+def web_add_quote(quote):
+    """Добавляет новую цитату"""
+    try:
+        add_quote(quote)
+        debug_log("WEB", f"Добавлена цитата: {quote[:50]}...")
+    except Exception as e:
+        debug_log("WEB", f"Ошибка добавления цитаты: {e}", "ERROR")
+
+def web_vk_post(text):
+    """Отправляет текстовый пост в VK"""
+    try:
+        from services.vk_uploader import post_to_vk
+        if VK_TOKEN and VK_OWNER_ID:
+            post_to_vk(text, VK_TOKEN, VK_OWNER_ID)
+            debug_log("WEB", f"Пост в VK отправлен: {text[:50]}...")
+    except Exception as e:
+        debug_log("WEB", f"Ошибка отправки в VK: {e}", "ERROR")
+
+def web_get_admin_log():
+    """Возвращает содержимое admin.log"""
+    try:
+        with open("admin.log", "r", encoding='utf-8', errors='ignore') as f:
+            return f.read()[-10000:]
+    except:
+        return "Лог не найден"
+
+def web_get_error_log():
+    """Возвращает содержимое error.log"""
+    try:
+        with open("error.log", "r", encoding='utf-8', errors='ignore') as f:
+            return f.read()[-10000:]
+    except:
+        return "Лог не найден"
+
+def web_get_posts():
+    """Возвращает список отложенных постов (заглушка)"""
+    return []
+
+def web_add_post():
+    """Добавляет отложенный пост (заглушка)"""
+    pass
+
+# ------------------------------------------------------------
+# Запуск веб-морды
+# ------------------------------------------------------------
+web_handlers = {
+    'get_mode': web_get_mode,
+    'set_mode': web_set_mode,
+    'get_quotes': web_get_quotes,
+    'add_quote': web_add_quote,
+    'get_posts': web_get_posts,
+    'add_post': web_add_post,
+    'vk_post': web_vk_post,
+    'get_admin_log': web_get_admin_log,
+    'get_error_log': web_get_error_log,
+    'admin_password': ADMIN_PASSWORD
+}
+
+# Запускаем веб-сервер в отдельном потоке
+start_web_thread(web_handlers, host="0.0.0.0", port=8080)
+print("[BOT] 🌐 Веб-морда запущена на порту 8080")
+
+# ------------------------------------------------------------
 # Пинг для keep-alive
+# ------------------------------------------------------------
 def keep_alive():
     while True:
         time.sleep(60)
         try:
-            requests.get('http://127.0.0.1:10000/')
+            requests.get('http://127.0.0.1:8080/', timeout=3)
         except:
             pass
 threading.Thread(target=keep_alive, daemon=True).start()
