@@ -106,7 +106,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 22.05.2026 11:29:03*
+*Обновлено: 22.05.2026 11:31:47*
 
 | Файл | Статус |
 |------|--------|
@@ -119,7 +119,7 @@
 | `dialogue/adaptive_modes.py` | ✅ Redmi-шапка |
 | `dialogue/admin/__init__.py` | ❌ Без шапки |
 | `dialogue/admin/auth.py` | ✅ Redmi-шапка |
-| `dialogue/admin/callbacks.py` | ✅ Redmi-шапка |
+| `dialogue/admin/callbacks.py` | ❌ Без шапки |
 | `dialogue/admin/diagnostics.py` | ✅ Redmi-шапка |
 | `dialogue/admin/menu.py` | ❌ Без шапки |
 | `dialogue/admin/posts.py` | ✅ Redmi-шапка |
