@@ -1,17 +1,20 @@
 # ==========================================
-# Файл: new_debugger/dialogue/admin/callbacks.py
-# Справка: README.md → Админка (обработчики кнопок)
+# Файл: dialogue/admin/callbacks.py
 # Задача: обработка callback_query (нажатий на кнопки)
-# Комментарий: добавлены обработчики для дебаггера и Шаббата
+# Комментарий: добавлены обработчики адаптивных режимов,
+#              разделение Старшего брата на вкл/выкл,
+#              сохранение состояния адаптивки в adaptive_config.json
 # ==========================================
 
 import time
 import os
+import json
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dialogue.admin.auth import is_admin_authorized, log_admin_action
 from dialogue.admin.menu import (
     get_admin_menu,
     get_modes_submenu,
+    get_adaptive_submenu,
     get_content_submenu,
     get_quotes_submenu,
     get_diagnostic_submenu,
@@ -32,6 +35,31 @@ from dialogue.admin.diagnostics import handle_errors, handle_log, handle_debug
 from dialogue.ping_modes import apply_ping_mode
 from ping_utils import ping_self
 from debug_utils import load_config as load_debug_config, save_config as save_debug_config
+
+# ==========================================
+# Работа с состоянием адаптивных режимов
+# ==========================================
+ADAPTIVE_CONFIG_FILE = "dialogue/data/adaptive_config.json"
+
+def load_adaptive_config():
+    """Загружает состояние адаптивных режимов"""
+    if not os.path.exists(ADAPTIVE_CONFIG_FILE):
+        return {"enabled": False}
+    try:
+        with open(ADAPTIVE_CONFIG_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return {"enabled": False}
+
+def save_adaptive_config(config):
+    """Сохраняет состояние адаптивных режимов"""
+    os.makedirs(os.path.dirname(ADAPTIVE_CONFIG_FILE), exist_ok=True)
+    with open(ADAPTIVE_CONFIG_FILE, "w") as f:
+        json.dump(config, f, indent=2)
+
+# ==========================================
+# Обработчики кнопок
+# ==========================================
 
 def handle_callback_mode(mode, bot, chat_id, message_id, user_id):
     from dialogue.admin_commands import load_config, save_config
@@ -69,30 +97,73 @@ def handle_callback_ping(interval, bot, chat_id, message_id, user_id):
     from dialogue.admin_commands import return_to_admin_menu
     return_to_admin_menu(bot, chat_id, message_id, user_id)
 
-def handle_callback_toggle_alisa(bot, chat_id, message_id, user_id):
+def handle_callback_toggle_alisa_on(bot, chat_id, message_id, user_id):
+    """Включить Старшего брата"""
     from dialogue.admin_commands import load_config, save_config
     config = load_config()
     if "alisa" not in config:
         config["alisa"] = {}
-    config["alisa"]["enabled"] = not config["alisa"].get("enabled", True)
+    config["alisa"]["enabled"] = True
     save_config(config)
-    
-    new_status = "🟢 Старший брат: ВКЛ" if config["alisa"]["enabled"] else "🔴 Старший брат: ВЫКЛ"
-    
-    keyboard = InlineKeyboardMarkup(row_width=2)
-    brother_button = InlineKeyboardButton(new_status, callback_data="toggle_alisa")
-    keyboard.add(
-        InlineKeyboardButton("🎛 Режимы", callback_data="submenu_modes"),
-        brother_button,
-        InlineKeyboardButton("📝 Контент", callback_data="submenu_content"),
-        InlineKeyboardButton("📜 Цитаты", callback_data="submenu_quotes"),
-        InlineKeyboardButton("🔧 Диагностика", callback_data="submenu_diagnostic"),
-        InlineKeyboardButton("🐞 Дебаггер", callback_data="debugger_menu"),
-        InlineKeyboardButton("🚪 Выйти", callback_data="logout")
-    )
-    
-    bot.edit_message_reply_markup(chat_id, message_id, reply_markup=keyboard)
-    bot.answer_callback_query(call.id, f"Старший брат {'включён' if config['alisa']['enabled'] else 'выключен'}")
+    log_admin_action(user_id, "alisa on", "success")
+    bot.answer_callback_query(call.id, "✅ Старший брат включён")
+    bot.edit_message_text("✅ Старший брат включён", chat_id, message_id)
+    from dialogue.admin_commands import return_to_admin_menu
+    return_to_admin_menu(bot, chat_id, message_id, user_id)
+
+def handle_callback_toggle_alisa_off(bot, chat_id, message_id, user_id):
+    """Выключить Старшего брата"""
+    from dialogue.admin_commands import load_config, save_config
+    config = load_config()
+    if "alisa" not in config:
+        config["alisa"] = {}
+    config["alisa"]["enabled"] = False
+    save_config(config)
+    log_admin_action(user_id, "alisa off", "success")
+    bot.answer_callback_query(call.id, "❌ Старший брат выключен")
+    bot.edit_message_text("❌ Старший брат выключен", chat_id, message_id)
+    from dialogue.admin_commands import return_to_admin_menu
+    return_to_admin_menu(bot, chat_id, message_id, user_id)
+
+def handle_adaptive_enable(bot, chat_id, message_id, user_id):
+    """Включить адаптивные режимы"""
+    config = load_adaptive_config()
+    config["enabled"] = True
+    save_adaptive_config(config)
+    # Также устанавливаем глобальную переменную в adaptive_modes
+    try:
+        from dialogue.adaptive_modes import set_adaptive_enabled
+        set_adaptive_enabled(True)
+    except:
+        pass
+    log_admin_action(user_id, "adaptive enable", "success")
+    bot.answer_callback_query(call.id, "✅ Адаптивные режимы включены")
+    bot.edit_message_text("✅ Адаптивные режимы включены", chat_id, message_id)
+
+def handle_adaptive_disable(bot, chat_id, message_id, user_id):
+    """Выключить адаптивные режимы"""
+    config = load_adaptive_config()
+    config["enabled"] = False
+    save_adaptive_config(config)
+    try:
+        from dialogue.adaptive_modes import set_adaptive_enabled
+        set_adaptive_enabled(False)
+    except:
+        pass
+    log_admin_action(user_id, "adaptive disable", "success")
+    bot.answer_callback_query(call.id, "❌ Адаптивные режимы выключены")
+    bot.edit_message_text("❌ Адаптивные режимы выключены", chat_id, message_id)
+
+def handle_adaptive_reset(bot, chat_id, message_id, user_id):
+    """Сброс адаптивных режимов к эталону"""
+    try:
+        from dialogue.adaptive_modes import reset_to_etalon
+        reset_to_etalon()
+    except:
+        pass
+    log_admin_action(user_id, "adaptive reset", "success")
+    bot.answer_callback_query(call.id, "📊 Адаптивные режимы сброшены к эталону")
+    bot.edit_message_text("📊 Адаптивные режимы сброшены к эталону", chat_id, message_id)
 
 # ==========================================
 # Обработчики дебаггера
@@ -113,7 +184,6 @@ def handle_debugger_disable(bot, chat_id, message_id, user_id):
     bot.answer_callback_query(call.id, "🔴 Дебаггер выключен")
 
 def handle_debugger_interval(bot, chat_id, message_id, user_id):
-    """Показывает меню выбора интервала"""
     keyboard = InlineKeyboardMarkup(row_width=3)
     for interval in [0, 1, 5, 10, 30]:
         text = "сразу" if interval == 0 else f"{interval} мин"
@@ -146,7 +216,6 @@ def handle_debugger_toggle_send(bot, chat_id, message_id, user_id):
     bot.answer_callback_query(call.id, f"Отправка в Telegram {status}")
 
 def handle_debugger_modules(bot, chat_id, message_id, user_id):
-    """Показывает список модулей для выбора"""
     config = load_debug_config()
     current_modules = config.get("modules", [])
     
@@ -183,7 +252,6 @@ def handle_debugger_toggle_module(module, bot, chat_id, message_id, user_id):
     handle_debugger_modules(bot, chat_id, message_id, user_id)
 
 def handle_debugger_logs(bot, chat_id, message_id, user_id):
-    """Отправляет последние логи из буфера или файла"""
     logs_file = "debug.log"
     if os.path.exists(logs_file):
         try:
@@ -202,6 +270,10 @@ def handle_debugger_logs(bot, chat_id, message_id, user_id):
     else:
         bot.edit_message_text("📭 Файл debug.log не найден", chat_id, message_id)
     bot.answer_callback_query(call.id)
+
+# ==========================================
+# Регистрация всех обработчиков
+# ==========================================
 
 def register_callback_handlers(bot, config):
     """Регистрирует обработчики кнопок (callback_query)"""
@@ -231,67 +303,75 @@ def register_callback_handlers(bot, config):
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
-            new_text = "🎛 *Управление режимами и пингом:*"
-            if call.message.text != new_text:
-                bot.edit_message_text(
-                    new_text,
-                    chat_id, message_id,
-                    parse_mode='Markdown',
-                    reply_markup=get_modes_submenu()
-                )
-            else:
-                bot.answer_callback_query(call.id, "Уже в меню режимов")
+            bot.edit_message_text(
+                "🎛 *Управление режимами и пингом:*",
+                chat_id, message_id,
+                parse_mode='Markdown',
+                reply_markup=get_modes_submenu()
+            )
+            bot.answer_callback_query(call.id)
+            return
+
+        if data == "submenu_adaptive":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            adaptive_config = load_adaptive_config()
+            status = "✅ Включены" if adaptive_config.get("enabled") else "❌ Отключены"
+            bot.edit_message_text(
+                f"🧠 *Адаптивные режимы*\n\n"
+                f"Статус: {status}\n\n"
+                "Адаптивка сама подстраивает интервалы цитат и постов под активность.\n\n"
+                "• ✅ Включить — адаптивка начнёт работать\n"
+                "• ❌ Выключить — вернуться к фиксированным режимам\n"
+                "• 📊 Сброс к эталону — принудительно вернуть стандартные настройки",
+                chat_id, message_id,
+                parse_mode='Markdown',
+                reply_markup=get_adaptive_submenu()
+            )
+            bot.answer_callback_query(call.id)
             return
 
         if data == "submenu_content":
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
-            new_text = "📝 *Управление контентом:*"
-            if call.message.text != new_text:
-                bot.edit_message_text(
-                    new_text,
-                    chat_id, message_id,
-                    parse_mode='Markdown',
-                    reply_markup=get_content_submenu()
-                )
-            else:
-                bot.answer_callback_query(call.id, "Уже в меню контента")
+            bot.edit_message_text(
+                "📝 *Управление контентом:*",
+                chat_id, message_id,
+                parse_mode='Markdown',
+                reply_markup=get_content_submenu()
+            )
+            bot.answer_callback_query(call.id)
             return
 
         if data == "submenu_quotes":
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
-            new_text = "📜 *Управление цитатами:*"
-            if call.message.text != new_text:
-                bot.edit_message_text(
-                    new_text,
-                    chat_id, message_id,
-                    parse_mode='Markdown',
-                    reply_markup=get_quotes_submenu()
-                )
-            else:
-                bot.answer_callback_query(call.id, "Уже в меню цитат")
+            bot.edit_message_text(
+                "📜 *Управление цитатами:*",
+                chat_id, message_id,
+                parse_mode='Markdown',
+                reply_markup=get_quotes_submenu()
+            )
+            bot.answer_callback_query(call.id)
             return
 
         if data == "submenu_diagnostic":
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
                 return
-            new_text = "🔧 *Диагностика:*"
-            if call.message.text != new_text:
-                bot.edit_message_text(
-                    new_text,
-                    chat_id, message_id,
-                    parse_mode='Markdown',
-                    reply_markup=get_diagnostic_submenu()
-                )
-            else:
-                bot.answer_callback_query(call.id, "Уже в меню диагностики")
+            bot.edit_message_text(
+                "🔧 *Диагностика:*",
+                chat_id, message_id,
+                parse_mode='Markdown',
+                reply_markup=get_diagnostic_submenu()
+            )
+            bot.answer_callback_query(call.id)
             return
 
-        # ---------- ШАББАТ (информация) ----------
+        # ---------- ШАББАТ ----------
         if data == "shabbat_info":
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
@@ -427,6 +507,43 @@ def register_callback_handlers(bot, config):
             handle_callback_ping(interval, bot, chat_id, message_id, user_id)
             return
 
+        # ---------- СТАРШИЙ БРАТ ----------
+        if data == "toggle_alisa_on":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            handle_callback_toggle_alisa_on(bot, chat_id, message_id, user_id)
+            return
+
+        if data == "toggle_alisa_off":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            handle_callback_toggle_alisa_off(bot, chat_id, message_id, user_id)
+            return
+
+        # ---------- АДАПТИВНЫЕ РЕЖИМЫ ----------
+        if data == "adaptive_enable":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            handle_adaptive_enable(bot, chat_id, message_id, user_id)
+            return
+
+        if data == "adaptive_disable":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            handle_adaptive_disable(bot, chat_id, message_id, user_id)
+            return
+
+        if data == "adaptive_reset":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            handle_adaptive_reset(bot, chat_id, message_id, user_id)
+            return
+
         # ---------- ОШИБКИ И ЛОГ ----------
         if data == "errors":
             if not is_admin_authorized(user_id):
@@ -442,7 +559,6 @@ def register_callback_handlers(bot, config):
             handle_log(user_id, bot, chat_id, message_id)
             return
 
-        # ---------- ДЕБАГ (старая кнопка) ----------
         if data == "debug":
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
@@ -476,7 +592,6 @@ def register_callback_handlers(bot, config):
             ask_for_post_text(bot, chat_id, message_id)
             return
 
-        # ---------- ПОСТ В VK ----------
         if data == "vk_post":
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
@@ -512,14 +627,6 @@ def register_callback_handlers(bot, config):
                 return
             interval = int(data.split("_")[2])
             handle_quotes_set_interval(interval, bot, chat_id, message_id, user_id)
-            return
-
-        # ---------- СТАРШИЙ БРАТ ----------
-        if data == "toggle_alisa":
-            if not is_admin_authorized(user_id):
-                bot.answer_callback_query(call.id, "❌ Не авторизован")
-                return
-            handle_callback_toggle_alisa(bot, chat_id, message_id, user_id)
             return
 
         # ---------- ПОЛЬЗОВАТЕЛЬСКИЕ КНОПКИ ----------
