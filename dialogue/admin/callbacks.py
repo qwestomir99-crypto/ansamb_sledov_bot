@@ -1,17 +1,21 @@
 # ==========================================
-# Файл: dialogue/admin/callbacks.py
+# Файл: new_debugger/dialogue/admin/callbacks.py
 # Справка: README.md → Админка (обработчики кнопок)
-# Задача: все handle_callback_* для режимов, пинга, цитат, диагностики и т.д.
-# Комментарий: добавлены обработчики подменю (включая Диагностику)
+# Задача: обработка callback_query (нажатий на кнопки)
+# Комментарий: добавлены обработчики для дебаггера и Шаббата
 # ==========================================
 
+import time
+import os
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dialogue.admin.auth import is_admin_authorized, log_admin_action
 from dialogue.admin.menu import (
     get_admin_menu,
     get_modes_submenu,
     get_content_submenu,
     get_quotes_submenu,
-    get_diagnostic_submenu
+    get_diagnostic_submenu,
+    get_debugger_menu
 )
 from dialogue.admin.quotes_admin import (
     handle_quotes_list,
@@ -27,7 +31,7 @@ from dialogue.admin.posts import (
 from dialogue.admin.diagnostics import handle_errors, handle_log, handle_debug
 from dialogue.ping_modes import apply_ping_mode
 from ping_utils import ping_self
-import time
+from debug_utils import load_config as load_debug_config, save_config as save_debug_config
 
 def handle_callback_mode(mode, bot, chat_id, message_id, user_id):
     from dialogue.admin_commands import load_config, save_config
@@ -75,7 +79,6 @@ def handle_callback_toggle_alisa(bot, chat_id, message_id, user_id):
     
     new_status = "🟢 Старший брат: ВКЛ" if config["alisa"]["enabled"] else "🔴 Старший брат: ВЫКЛ"
     
-    from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
     keyboard = InlineKeyboardMarkup(row_width=2)
     brother_button = InlineKeyboardButton(new_status, callback_data="toggle_alisa")
     keyboard.add(
@@ -84,14 +87,124 @@ def handle_callback_toggle_alisa(bot, chat_id, message_id, user_id):
         InlineKeyboardButton("📝 Контент", callback_data="submenu_content"),
         InlineKeyboardButton("📜 Цитаты", callback_data="submenu_quotes"),
         InlineKeyboardButton("🔧 Диагностика", callback_data="submenu_diagnostic"),
+        InlineKeyboardButton("🐞 Дебаггер", callback_data="debugger_menu"),
         InlineKeyboardButton("🚪 Выйти", callback_data="logout")
     )
     
     bot.edit_message_reply_markup(chat_id, message_id, reply_markup=keyboard)
     bot.answer_callback_query(call.id, f"Старший брат {'включён' if config['alisa']['enabled'] else 'выключен'}")
 
+# ==========================================
+# Обработчики дебаггера
+# ==========================================
+
+def handle_debugger_enable(bot, chat_id, message_id, user_id):
+    config = load_debug_config()
+    config["enabled"] = True
+    save_debug_config(config)
+    bot.edit_message_reply_markup(chat_id, message_id, reply_markup=get_debugger_menu())
+    bot.answer_callback_query(call.id, "✅ Дебаггер включён")
+
+def handle_debugger_disable(bot, chat_id, message_id, user_id):
+    config = load_debug_config()
+    config["enabled"] = False
+    save_debug_config(config)
+    bot.edit_message_reply_markup(chat_id, message_id, reply_markup=get_debugger_menu())
+    bot.answer_callback_query(call.id, "🔴 Дебаггер выключен")
+
+def handle_debugger_interval(bot, chat_id, message_id, user_id):
+    """Показывает меню выбора интервала"""
+    keyboard = InlineKeyboardMarkup(row_width=3)
+    for interval in [0, 1, 5, 10, 30]:
+        text = "сразу" if interval == 0 else f"{interval} мин"
+        keyboard.add(InlineKeyboardButton(text, callback_data=f"debugger_set_interval_{interval}"))
+    keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="debugger_menu"))
+    bot.edit_message_text(
+        "⏱ *Интервал отправки логов*\n\n"
+        "• 0 = отправлять сразу каждый лог\n"
+        "• 1, 5, 10, 30 = накопление и отправка пачкой",
+        chat_id, message_id,
+        parse_mode='Markdown',
+        reply_markup=keyboard
+    )
+    bot.answer_callback_query(call.id)
+
+def handle_debugger_set_interval(interval, bot, chat_id, message_id, user_id):
+    config = load_debug_config()
+    config["interval_minutes"] = interval
+    save_debug_config(config)
+    bot.edit_message_reply_markup(chat_id, message_id, reply_markup=get_debugger_menu())
+    text = "сразу" if interval == 0 else f"каждые {interval} мин"
+    bot.answer_callback_query(call.id, f"Интервал установлен: {text}")
+
+def handle_debugger_toggle_send(bot, chat_id, message_id, user_id):
+    config = load_debug_config()
+    config["send_to_telegram"] = not config.get("send_to_telegram", True)
+    save_debug_config(config)
+    bot.edit_message_reply_markup(chat_id, message_id, reply_markup=get_debugger_menu())
+    status = "включена" if config["send_to_telegram"] else "выключена"
+    bot.answer_callback_query(call.id, f"Отправка в Telegram {status}")
+
+def handle_debugger_modules(bot, chat_id, message_id, user_id):
+    """Показывает список модулей для выбора"""
+    config = load_debug_config()
+    current_modules = config.get("modules", [])
+    
+    modules_list = [
+        "AUTOPOSTER", "VK_UPLOADER", "VK_READER", "QUOTES",
+        "PUBLISHER", "HANDLERS", "POSTS", "AGENT"
+    ]
+    
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    for module in modules_list:
+        marker = "✅ " if module in current_modules else "⬜ "
+        keyboard.add(InlineKeyboardButton(f"{marker}{module}", callback_data=f"debugger_toggle_module_{module}"))
+    keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="debugger_menu"))
+    
+    bot.edit_message_text(
+        "📋 *Выбери модули для логирования*\n\n"
+        "✅ = логировать, ⬜ = не логировать\n\n"
+        "Пустой список = логировать все модули",
+        chat_id, message_id,
+        parse_mode='Markdown',
+        reply_markup=keyboard
+    )
+    bot.answer_callback_query(call.id)
+
+def handle_debugger_toggle_module(module, bot, chat_id, message_id, user_id):
+    config = load_debug_config()
+    modules = config.get("modules", [])
+    if module in modules:
+        modules.remove(module)
+    else:
+        modules.append(module)
+    config["modules"] = modules
+    save_debug_config(config)
+    handle_debugger_modules(bot, chat_id, message_id, user_id)
+
+def handle_debugger_logs(bot, chat_id, message_id, user_id):
+    """Отправляет последние логи из буфера или файла"""
+    logs_file = "debug.log"
+    if os.path.exists(logs_file):
+        try:
+            with open(logs_file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            last_lines = lines[-50:] if len(lines) > 50 else lines
+            log_text = "".join(last_lines)
+            if log_text.strip():
+                for i in range(0, len(log_text), 4000):
+                    bot.send_message(user_id, f"```\n{log_text[i:i+4000]}\n```", parse_mode='Markdown')
+                bot.edit_message_text("✅ Логи отправлены в личку", chat_id, message_id)
+            else:
+                bot.edit_message_text("📭 Логи пусты", chat_id, message_id)
+        except Exception as e:
+            bot.edit_message_text(f"❌ Ошибка чтения: {e}", chat_id, message_id)
+    else:
+        bot.edit_message_text("📭 Файл debug.log не найден", chat_id, message_id)
+    bot.answer_callback_query(call.id)
+
 def register_callback_handlers(bot, config):
-    """Регистрирует обработчики callback_query (нажатий на кнопки)"""
+    """Регистрирует обработчики кнопок (callback_query)"""
 
     @bot.callback_query_handler(func=lambda call: True)
     def handle_callback(call):
@@ -178,7 +291,98 @@ def register_callback_handlers(bot, config):
                 bot.answer_callback_query(call.id, "Уже в меню диагностики")
             return
 
-        # ---------- НАСТРОЕНИЕ (обработчики кнопок) ----------
+        # ---------- ШАББАТ (информация) ----------
+        if data == "shabbat_info":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            from dialogue.shabbat_manager import is_shabbat, fetch_shabbat_times, get_coordinates
+            lat, lon = get_coordinates()
+            start, end = fetch_shabbat_times(lat, lon)
+            shabbat_now = is_shabbat()
+            text = f"📍 *Координаты:* {lat}, {lon}\n"
+            if start and end:
+                text += f"🕯 *Начало Шаббата:* {start.strftime('%Y-%m-%d %H:%M')}\n"
+                text += f"✨ *Окончание:* {end.strftime('%Y-%m-%d %H:%M')}\n"
+            text += f"📌 *Сейчас Шаббат:* {'✅ ДА' if shabbat_now else '❌ НЕТ'}\n"
+            text += f"⏚ *Ритм 0,8 Гц стабилен.*"
+            bot.edit_message_text(text, chat_id, message_id, parse_mode='Markdown')
+            bot.answer_callback_query(call.id)
+            return
+
+        # ---------- ДЕБАГГЕР ----------
+        if data == "debugger_menu":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            bot.edit_message_text(
+                "🐞 *Управление дебаггером*",
+                chat_id, message_id,
+                parse_mode='Markdown',
+                reply_markup=get_debugger_menu()
+            )
+            bot.answer_callback_query(call.id)
+            return
+
+        if data == "debugger_enable":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            handle_debugger_enable(bot, chat_id, message_id, user_id)
+            return
+
+        if data == "debugger_disable":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            handle_debugger_disable(bot, chat_id, message_id, user_id)
+            return
+
+        if data == "debugger_interval":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            handle_debugger_interval(bot, chat_id, message_id, user_id)
+            return
+
+        if data.startswith("debugger_set_interval_"):
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            interval = int(data.split("_")[-1])
+            handle_debugger_set_interval(interval, bot, chat_id, message_id, user_id)
+            return
+
+        if data == "debugger_toggle_send":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            handle_debugger_toggle_send(bot, chat_id, message_id, user_id)
+            return
+
+        if data == "debugger_modules":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            handle_debugger_modules(bot, chat_id, message_id, user_id)
+            return
+
+        if data.startswith("debugger_toggle_module_"):
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            module = data.replace("debugger_toggle_module_", "")
+            handle_debugger_toggle_module(module, bot, chat_id, message_id, user_id)
+            return
+
+        if data == "debugger_logs":
+            if not is_admin_authorized(user_id):
+                bot.answer_callback_query(call.id, "❌ Не авторизован")
+                return
+            handle_debugger_logs(bot, chat_id, message_id, user_id)
+            return
+
+        # ---------- НАСТРОЕНИЕ ----------
         if data.startswith("set_mood_"):
             mood_id = data.replace("set_mood_", "")
             try:
@@ -238,7 +442,7 @@ def register_callback_handlers(bot, config):
             handle_log(user_id, bot, chat_id, message_id)
             return
 
-        # ---------- ДЕБАГ ----------
+        # ---------- ДЕБАГ (старая кнопка) ----------
         if data == "debug":
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
@@ -310,7 +514,7 @@ def register_callback_handlers(bot, config):
             handle_quotes_set_interval(interval, bot, chat_id, message_id, user_id)
             return
 
-        # ---------- СТАРШИЙ БРАТ (прямой вызов из меню) ----------
+        # ---------- СТАРШИЙ БРАТ ----------
         if data == "toggle_alisa":
             if not is_admin_authorized(user_id):
                 bot.answer_callback_query(call.id, "❌ Не авторизован")
