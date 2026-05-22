@@ -1,8 +1,8 @@
 # ==========================================
 # Файл: bot.py
-# Справка: README.md → Главный модуль
-# Задача: точка входа, запуск потоков, команды
-# Комментарий: добавлено ожидание готовности агента перед стартом
+# Задача: точка входа, запуск потоков, команды, интеграция веб-морды
+# Комментарий: запускает FastAPI (веб-морда) в отдельном потоке.
+#              Все модули (цитаты, VK reader, журналист, автопостинг) остаются без изменений.
 # ==========================================
 
 print("[DEBUG] 0. Начало загрузки bot.py")
@@ -13,10 +13,10 @@ import os
 import sys
 import threading
 import time
-import traceback
 import requests
 import json
 from datetime import datetime
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # Настройки
 try:
@@ -46,22 +46,21 @@ if DEBUG_IMPORTS:
 # Импорт модулей
 from ping_utils import ping_self, start_background_pinger
 from services.agent_pinger import start_agent_pinger
-from services.web_server import run_flask
+from services.web_server import start_web_thread
 from dialogue.agent import ask_agent
-from dialogue.activity_modes import should_respond_to_talk
+from dialogue.activity_modes import should_respond_to_talk, get_current_mode, set_mode
 from dialogue.admin_commands import (
     handle_admin_command, is_admin_authorized,
-    get_admin_menu, get_user_menu,
-    ask_for_post_text
+    get_admin_menu, get_user_menu
 )
 from debug_utils import debug_log
 
 if ENABLE_JOURNALIST:
     from dialogue.journalist import journalist_loop
 if ENABLE_VK_READER:
-    from dialogue.vk_reader import vk_reader_loop
+    from services.vk_reader import listen_messages, set_websocket_broadcast
 if ENABLE_QUOTES:
-    from dialogue.quotes import quotes_loop
+    from dialogue.quotes import quotes_loop, get_quotes_list, add_quote
 if ENABLE_PUBLISHER:
     from dialogue.publisher import publish_loop
 if ENABLE_SCHEDULER:
@@ -94,20 +93,87 @@ bot = telebot.TeleBot(TOKEN)
 silence_answers = ["👁️", "⏚"]
 os.chdir(os.path.dirname(sys.argv[0]))
 
-# Запуск Flask
-threading.Thread(target=run_flask, daemon=True).start()
+# ==========================================
+# Обработчики для веб-морды
+# ==========================================
+def web_get_mode():
+    try:
+        return get_current_mode()
+    except:
+        return "день"
 
-# Пинг для keep-alive
-def keep_alive():
-    while True:
-        time.sleep(60)
-        try:
-            requests.get('http://127.0.0.1:10000/')
-        except:
-            pass
-threading.Thread(target=keep_alive, daemon=True).start()
+def web_set_mode(mode):
+    try:
+        set_mode(mode)
+        debug_log("WEB", f"Режим изменён на {mode}")
+    except Exception as e:
+        debug_log("WEB", f"Ошибка смены режима: {e}", "ERROR")
 
+def web_get_quotes():
+    try:
+        return get_quotes_list()
+    except:
+        return []
+
+def web_add_quote(quote):
+    try:
+        add_quote(quote)
+        debug_log("WEB", f"Добавлена цитата: {quote[:50]}...")
+    except Exception as e:
+        debug_log("WEB", f"Ошибка добавления цитаты: {e}", "ERROR")
+
+def web_vk_post(text):
+    try:
+        from services.vk_uploader import post_to_vk
+        if VK_TOKEN and VK_OWNER_ID:
+            post_to_vk(text, VK_TOKEN, VK_OWNER_ID)
+            debug_log("WEB", f"Пост в VK отправлен: {text[:50]}...")
+    except Exception as e:
+        debug_log("WEB", f"Ошибка отправки в VK: {e}", "ERROR")
+
+def web_get_admin_log():
+    try:
+        with open("admin.log", "r", encoding='utf-8', errors='ignore') as f:
+            return f.read()[-10000:]
+    except:
+        return "Лог не найден"
+
+def web_get_error_log():
+    try:
+        with open("error.log", "r", encoding='utf-8', errors='ignore') as f:
+            return f.read()[-10000:]
+    except:
+        return "Лог не найден"
+
+def web_get_posts():
+    return []
+
+def web_add_post():
+    pass
+
+# ==========================================
+# Запуск веб-морды (FastAPI) — единый сервер
+# ==========================================
+web_handlers = {
+    'get_mode': web_get_mode,
+    'set_mode': web_set_mode,
+    'get_quotes': web_get_quotes,
+    'add_quote': web_add_quote,
+    'get_posts': web_get_posts,
+    'add_post': web_add_post,
+    'vk_post': web_vk_post,
+    'get_admin_log': web_get_admin_log,
+    'get_error_log': web_get_error_log,
+    'admin_password': ADMIN_PASSWORD
+}
+
+# Старт веб-морды (FastAPI)
+start_web_thread(web_handlers)
+print("[BOT] 🌐 Веб-морда (FastAPI) запущена")
+
+# ==========================================
 # Очистка логов
+# ==========================================
 def clean_old_logs(days=7):
     now = time.time()
     for logfile in ['admin.log', 'error.log']:
@@ -120,9 +186,25 @@ def clean_old_logs(days=7):
 clean_old_logs()
 threading.Thread(target=lambda: [time.sleep(86400) or clean_old_logs() for _ in range(999)], daemon=True).start()
 
-# Потоки модулей
+# ==========================================
+# Запуск потоков модулей
+# ==========================================
 if ENABLE_VK_READER:
-    threading.Thread(target=vk_reader_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
+    if VK_TOKEN and VK_OWNER_ID:
+        try:
+            from services.web_server import broadcast_vk_message
+            set_websocket_broadcast(broadcast_vk_message)
+            threading.Thread(
+                target=listen_messages,
+                args=(VK_TOKEN, VK_OWNER_ID, bot, TG_CHAT_ID),
+                daemon=True
+            ).start()
+            print("[BOT] VK Long Poll слушатель запущен")
+        except Exception as e:
+            print(f"[BOT] Ошибка запуска VK Long Poll: {e}")
+    else:
+        print("[BOT] VK токен или owner_id не заданы, слушатель не запущен")
+
 if ENABLE_JOURNALIST:
     threading.Thread(target=journalist_loop, args=(bot, TG_CHAT_ID), daemon=True).start()
 if ENABLE_QUOTES:
@@ -148,11 +230,10 @@ if ENABLE_AUTOPOSTER:
 if ENABLE_CALLBACKS:
     register_callback_handlers(bot, config)
 
-# ------------------------------------------------------------
+# ==========================================
 # Ожидание готовности агента
-# ------------------------------------------------------------
+# ==========================================
 def wait_for_agent():
-    """Ждёт, пока агент станет доступен (до 60 секунд)"""
     agent_url = "https://agent-3kek.onrender.com/health"
     print("[BOT] Ожидание готовности агента...")
     for attempt in range(30):
@@ -170,9 +251,9 @@ def wait_for_agent():
 
 wait_for_agent()
 
-# ------------------------------------------------------------
-# Обработчики команд
-# ------------------------------------------------------------
+# ==========================================
+# Обработчики команд Telegram
+# ==========================================
 @bot.message_handler(commands=['start'])
 def send_start(message):
     bot.reply_to(message, "Сапёр аутентичности. Ритм 0,8 Гц. Для входа в протокол — #Тлеем.")
@@ -182,7 +263,6 @@ def handle_message(message):
     text = message.text.lower()
     debug_log("HANDLERS", f"Получена команда: {text[:50]}...")
 
-    # Интерактивная справка #
     if text == "#":
         try:
             from dialogue.help_menu import get_help_keyboard
@@ -196,7 +276,6 @@ def handle_message(message):
             bot.reply_to(message, "❌ Модуль справки не загружен")
         return
 
-    # Меню / Помощь
     if text == "#меню" or text == "#помощь":
         if is_admin_authorized(message.from_user.id):
             bot.reply_to(message, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
@@ -204,12 +283,10 @@ def handle_message(message):
             bot.reply_to(message, "📋 Ваше меню:", reply_markup=get_user_menu())
         return
 
-    # Админ-вход
     if text.startswith("#админ"):
         handle_admin_command(message, bot)
         return
 
-    # Говори
     if text.startswith("#говори"):
         if not should_respond_to_talk():
             bot.reply_to(message, "🌙 Старший брат отдыхает. Спроси в другой раз.")
@@ -226,13 +303,11 @@ def handle_message(message):
             bot.reply_to(message, "🗣 *Старший брат:*\nНе отвечаю сейчас. Попробуй позже.")
         return
 
-    # Ритуальные команды (#тлеем, #фиксируем)
     if text in ["#тлеем", "#фиксируем", "#tleem", "#fixiruem"]:
         try:
             from dialogue.quotes import get_quotes_list
             quotes = get_quotes_list()
             if quotes:
-                import random
                 random_quote = random.choice(quotes)
                 bot.reply_to(message, f"👁️ {random_quote}")
             else:
@@ -242,12 +317,10 @@ def handle_message(message):
             debug_log("HANDLERS", f"Ошибка: {e}", "ERROR")
         return
 
-    # Вспышка
     if text in ["#вспышка", "#vspishka"]:
         bot.reply_to(message, "⚡ Ты снаружи картины. До погружения. Аутентичность — не маска. Это способ не сдаться.")
         return
 
-    # Сброс адаптивных режимов
     if text == "#сброс":
         if not is_admin_authorized(message.from_user.id):
             bot.reply_to(message, "❌ Только для админа")
@@ -263,7 +336,6 @@ def handle_message(message):
             bot.reply_to(message, f"❌ Ошибка сброса: {e}")
         return
 
-    # Настроение (меню с кнопками)
     if text == "#настроение":
         if not is_admin_authorized(message.from_user.id):
             bot.reply_to(message, "❌ Только для админа")
@@ -277,12 +349,10 @@ def handle_message(message):
         )
         return
 
-    # Дышим
     if "#дышим" in text:
         ping_self()
         return
 
-    # Обработка фраз
     if any(x in text for x in ["#тлеем", "#tleem"]):
         bot.reply_to(message, "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем.")
     elif any(x in text for x in ["#фиксируем", "#fixiruem"]):
@@ -292,7 +362,9 @@ def handle_message(message):
     elif any(phrase in text for phrase in ["что это", "зачем тег", "кто вы", "что за ритуал"]):
         bot.reply_to(message, random.choice(silence_answers))
 
-# Запуск
+# ==========================================
+# Запуск бота
+# ==========================================
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
 start_background_pinger(60)
 start_agent_pinger()
