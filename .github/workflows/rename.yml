@@ -12,7 +12,7 @@ jobs:
 
       - name: Rename files
         run: |
-          # Переименовываем файлы
+          # Переименовываем файлы в роли ансамбля
           git mv dialogue/admin_commands.py dialogue/kritik.py || true
           git mv dialogue/activity_modes.py dialogue/saper.py || true
           git mv dialogue/adaptive_modes.py dialogue/kraken.py || true
@@ -23,10 +23,34 @@ jobs:
           git mv dialogue/agent.py dialogue/star_brat.py || true
           git mv services/autoposter.py services/tzar.py || true
 
-      - name: Commit and push
+      - name: Update imports in Python files
+        run: |
+          # Обновляем импорты во всех .py файлах
+          find . -name "*.py" -type f -exec sed -i 's/from dialogue.admin_commands import/from dialogue.kritik import/g' {} \;
+          find . -name "*.py" -type f -exec sed -i 's/from dialogue.activity_modes import/from dialogue.saper import/g' {} \;
+          find . -name "*.py" -type f -exec sed -i 's/from dialogue.adaptive_modes import/from dialogue.kraken import/g' {} \;
+          find . -name "*.py" -type f -exec sed -i 's/from dialogue.user_settings import/from dialogue.sema import/g' {} \;
+          find . -name "*.py" -type f -exec sed -i 's/from dialogue.publisher import/from dialogue.dramchik import/g' {} \;
+          find . -name "*.py" -type f -exec sed -i 's/from dialogue.help_menu import/from dialogue.botsman import/g' {} \;
+          find . -name "*.py" -type f -exec sed -i 's/from dialogue.callbacks import/from dialogue.shturman import/g' {} \;
+          find . -name "*.py" -type f -exec sed -i 's/from dialogue.agent import/from dialogue.star_brat import/g' {} \;
+          find . -name "*.py" -type f -exec sed -i 's/from services.autoposter import/from services.tzar import/g' {} \;
+          
+          # Обновляем импорты из этих модулей (без from)
+          find . -name "*.py" -type f -exec sed -i 's/dialogue.admin_commands/dialogue.kritik/g' {} \;
+          find . -name "*.py" -type f -exec sed -i 's/dialogue.activity_modes/dialogue.saper/g' {} \;
+          find . -name "*.py" -type f -exec sed -i 's/dialogue.adaptive_modes/dialogue.kraken/g' {} \;
+          find . -name "*.py" -type f -exec sed -i 's/dialogue.user_settings/dialogue.sema/g' {} \;
+          find . -name "*.py" -type f -exec sed -i 's/dialogue.publisher/dialogue.dramchik/g' {} \;
+          find . -name "*.py" -type f -exec sed -i 's/dialogue.help_menu/dialogue.botsman/g' {} \;
+          find . -name "*.py" -type f -exec sed -i 's/dialogue.callbacks/dialogue.shturman/g' {} \;
+          find . -name "*.py" -type f -exec sed -i 's/dialogue.agent/dialogue.star_brat/g' {} \;
+          find . -name "*.py" -type f -exec sed -i 's/services.autoposter/services.tzar/g' {} \;
+
+      - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "refactor: переименование модулей в роли ансамбля" || echo "No changes to commit"
+          git commit -m "refactor: переименование модулей в роли ансамбля + обновление импортов" || echo "No changes to commit"
           git push origin main
