@@ -1,94 +1,63 @@
 {
-  "bot": {
-    "name": "Ансамбль Следов 6",
-    "version": "3.2",
-    "rhythm": "0.8 Hz"
-  },
-  "telegram": {
-    "publish_channel": "@qwestomir",
-    "log_channel": "@qwestomir"
-  },
-  "agent": {
-    "url": "https://agent-3kek.onrender.com/ask",
-    "enabled": true
-  },
-  "vk": {
-    "enabled": true,
-    "interval_seconds": 300
-  },
-  "ping": {
-    "interval": 60,
-    "agent_enabled": true,
-    "agent_url": "https://agent-3kek.onrender.com/health"
-  },
-  "modes": {
-    "утро": {
-      "hour_start": 6,
-      "hour_end": 12,
-      "ping_interval": 60,
-      "quotes": true,
-      "talk": true,
-      "publisher": true,
-      "quotes_interval": 60,
-      "publisher_interval": 240
+    "location": {
+        "latitude": 55.7558,
+        "longitude": 37.6173,
+        "timezone": "Europe/Moscow"
     },
-    "день": {
-      "hour_start": 12,
-      "hour_end": 18,
-      "ping_interval": 180,
-      "quotes": true,
-      "talk": true,
-      "publisher": true,
-      "quotes_interval": 180,
-      "publisher_interval": 360
+    "modes": {
+        "утро": {
+            "hour_start": 6,
+            "hour_end": 12,
+            "quotes_interval": 120,
+            "publisher_interval": 240,
+            "quotes": true,
+            "publisher": true,
+            "talk": true
+        },
+        "день": {
+            "hour_start": 12,
+            "hour_end": 18,
+            "quotes_interval": 60,
+            "publisher_interval": 120,
+            "quotes": true,
+            "publisher": true,
+            "talk": true
+        },
+        "вечер": {
+            "hour_start": 18,
+            "hour_end": 23,
+            "quotes_interval": 30,
+            "publisher_interval": 60,
+            "quotes": true,
+            "publisher": true,
+            "talk": true
+        },
+        "ночь": {
+            "hour_start": 23,
+            "hour_end": 6,
+            "quotes_interval": 0,
+            "publisher_interval": 0,
+            "quotes": false,
+            "publisher": false,
+            "talk": false
+        }
     },
-    "вечер": {
-      "hour_start": 18,
-      "hour_end": 23,
-      "ping_interval": 60,
-      "quotes": true,
-      "talk": true,
-      "publisher": true,
-      "quotes_interval": 30,
-      "publisher_interval": 120
+    "telegram": {
+        "publish_channel": "@qwestomir"
     },
-    "ночь": {
-      "hour_start": 23,
-      "hour_end": 6,
-      "ping_interval": 300,
-      "quotes": false,
-      "talk": false,
-      "publisher": false,
-      "quotes_interval": 0,
-      "publisher_interval": 0
+    "quotes": {
+        "file": "dialogue/data/quotes.txt",
+        "interval_minutes": 60
+    },
+    "publisher": {
+        "default_tags": "#СапёрыАутентичности #МихоельАв #2026плита"
+    },
+    "autoposter": {
+        "vk_tags": "#Ансамбль #СледНаКонтаке",
+        "test_on_start": false
+    },
+    "settings": {
+        "REPOST_ENABLED": false,
+        "REPOST_QUOTE_CHANCE": 50
     }
-  },
-  "publisher": {
-    "enabled": true,
-    "default_tags": "#СапёрыАутентичности #МихоельАв #2026плита"
-  },
-  "quotes": {
-    "enabled": true,
-    "interval_minutes": 60,
-    "file": "dialogue/data/quotes.txt"
-  },
-  "journalist": {
-    "enabled": true,
-    "interval_hours": 24,
-    "news_file": "dialogue/data/news.txt"
-  },
-  "autoposter": {
-    "enabled": false,
-    "source_chat_id": -1003952512259,
-    "target_chat_id": "@qwestomir",
-    "vk_enabled": true,
-    "vk_tags": "#Ансамбль #СледНаКонтаке"
-  },
-  "alisa": {
-    "enabled": false,
-    "timeout": 30
-  },
-  "ritual": {
-    "last_midnight": null
-  }
 }
