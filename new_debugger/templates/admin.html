@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Ансамбль Следов 6 — веб-морда</title>
+    <style>
+        body { background: #0a0a0a; color: #00ffcc; font-family: 'Courier New', monospace; padding: 2rem; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background: #111; border-left: 3px solid #00ffcc; padding: 1rem; margin: 1rem 0; border-radius: 8px; }
+        button, input, textarea { background: #222; color: #00ffcc; border: 1px solid #00ffcc; padding: 6px 12px; border-radius: 4px; }
+        button:hover { background: #00ffcc; color: #000; cursor: pointer; }
+        hr { border-color: #00ffcc33; }
+        a { color: #00ffcc; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🔥 Ансамбль Следов 6</h1>
+    <p>Ритм 0,8 Гц. Время: {{ time }}</p>
+    <p><a href="/logs/admin">📋 admin.log</a> | <a href="/logs/error">❌ error.log</a></p>
+    
+    <div class="card">
+        <h2>🤖 Текущий режим: <strong>{{ mode }}</strong></h2>
+        <form method="post" action="/set_mode">
+            <select name="mode">
+                <option value="утро">🌅 Утро</option>
+                <option value="день">☀️ День</option>
+                <option value="вечер">🌙 Вечер</option>
+                <option value="ночь">🌌 Ночь</option>
+            </select>
+            <button type="submit">Сменить</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>📜 Добавить цитату</h2>
+        <form method="post" action="/add_quote">
+            <textarea name="quote" rows="2" cols="50" placeholder="Текст цитаты..."></textarea><br>
+            <button type="submit">➕ Добавить</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>🎬 Пост в VK (текст)</h2>
+        <form method="post" action="/vk_post">
+            <textarea name="text" rows="3" cols="50" placeholder="Текст поста..."></textarea><br>
+            <button type="submit">📤 Отправить</button>
+        </form>
+    </div>
+</div>
+</body>
+</html>
