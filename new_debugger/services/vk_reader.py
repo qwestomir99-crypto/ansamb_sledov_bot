@@ -209,7 +209,6 @@ def stop_listener():
     global _active
     _active = False
 
-# Для обратной совместимости со старым кодом (vk_reader_loop)
 def vk_reader_loop(bot, vk_token, vk_owner_id, chat_id):
     """Старая функция-обёртка для совместимости"""
     if vk_token and vk_owner_id:
