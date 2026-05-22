@@ -3,7 +3,8 @@
 # Задача: веб-морда для управления ботом и проброс сообщений из VK
 # Комментарий: запускается отдельным потоком из bot.py.
 #              Аутентификация через форму логина (пароль в URL не нужен).
-#              Сессия хранится в куках, пароль не передаётся в строке.
+#              Сессия хранится в куках.
+#              Добавлен маршрут /new для предпросмотра новой веб-морды из new_debugger.
 # ==========================================
 
 import os
@@ -17,15 +18,14 @@ import uvicorn
 from fastapi import FastAPI, Request, Form, HTTPException, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Ансамбль Следов 6 — Веб-морда")
 
-# Секретный ключ для сессий (лучше из переменной окружения)
-SECRET_KEY = os.environ.get("WEB_SESSION_SECRET", "your-secret-key-change-me")
+# Секретный ключ для сессий
+SECRET_KEY = os.environ.get("WEB_SESSION_SECRET", "sapyor-tleem-fixiruem-0-8hz")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
 BASE_DIR = Path(__file__).parent.parent
@@ -60,25 +60,21 @@ bot_handlers = {
 # Проверка аутентификации через сессию
 # ==========================================
 def is_authenticated(request: Request) -> bool:
-    """Проверяет, авторизован ли пользователь по сессии"""
     return request.session.get("authenticated", False)
 
 def require_auth(request: Request):
-    """Декоратор-зависимость для защиты эндпоинтов"""
     if not is_authenticated(request):
         raise HTTPException(status_code=302, headers={"Location": "/login"})
 
 # ==========================================
-# Страницы аутентификации
+# Страницы аутентификации (старая версия)
 # ==========================================
 @app.get("/")
 async def root():
-    """Корень — редирект на админку"""
-    return RedirectResponse(url="/admin")
+    return RedirectResponse(url="/login")
 
-@app.get("/admin")
+@app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request):
-    """Админ-панель — доступ только после входа"""
     if not is_authenticated(request):
         return RedirectResponse(url="/login")
     
@@ -96,7 +92,6 @@ async def admin_page(request: Request):
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    """Страница входа с формой"""
     if is_authenticated(request):
         return RedirectResponse(url="/admin")
     
@@ -171,7 +166,6 @@ async def login_page(request: Request):
             <div id="error" class="error"></div>
         </div>
         <script>
-            // Если есть параметр error в URL — показываем ошибку
             const params = new URLSearchParams(window.location.search);
             if (params.get('error')) {
                 document.getElementById('error').innerText = 'Неверный пароль';
@@ -183,7 +177,6 @@ async def login_page(request: Request):
 
 @app.post("/login")
 async def login(request: Request, password: str = Form(...)):
-    """Обработка формы входа"""
     if password == bot_handlers['admin_password']:
         request.session["authenticated"] = True
         return RedirectResponse(url="/admin", status_code=303)
@@ -192,9 +185,55 @@ async def login(request: Request, password: str = Form(...)):
 
 @app.get("/logout")
 async def logout(request: Request):
-    """Выход из системы"""
     request.session.clear()
     return RedirectResponse(url="/login")
+
+# ==========================================
+# НОВЫЙ МАРШРУТ: предпросмотр новой веб-морды из new_debugger
+# ==========================================
+@app.get("/new", response_class=HTMLResponse)
+async def new_admin_preview(request: Request):
+    """
+    Временный доступ к новой веб-морде из папки new_debugger/templates/
+    """
+    if not is_authenticated(request):
+        return RedirectResponse(url="/login?error=1")
+    
+    # Путь к шаблонам новой версии
+    new_templates_dir = BASE_DIR / "new_debugger" / "templates"
+    
+    if not new_templates_dir.exists():
+        return HTMLResponse("""
+        <html>
+            <body style="background:#0a0a0a; color:#ff4444; font-family:monospace; padding:2rem;">
+                <h2>❌ Ошибка</h2>
+                <p>Папка new_debugger/templates/ не найдена.</p>
+                <p>Убедись, что файл admin.html лежит по пути:</p>
+                <pre>new_debugger/templates/admin.html</pre>
+                <a href="/admin">← Вернуться к старой админке</a>
+            </body>
+        </html>
+        """, status_code=404)
+    
+    new_templates = Jinja2Templates(directory=str(new_templates_dir))
+    
+    # Временно передаём заглушки для данных
+    # (потом заменишь на реальные обработчики)
+    mode = "тестовый режим"
+    quotes = [
+        "«Сеть тлеет. Ритм 0,8 Гц.»",
+        "«Сапёр аутентичности на связи.»",
+        "«Ты — тень. Бот — голос.»"
+    ]
+    posts = []
+    
+    return new_templates.TemplateResponse("admin.html", {
+        "request": request,
+        "mode": mode,
+        "quotes": quotes,
+        "posts": posts,
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    })
 
 # ==========================================
 # API для управления ботом (с защитой)
@@ -243,14 +282,10 @@ async def error_log(request: Request):
     return HTMLResponse(f"<pre style='background:#111; color:#f00; padding:1rem; overflow:auto'>{content}</pre>")
 
 # ==========================================
-# WebSocket (без аутентификации через сессию,
-# но можно добавить токен в query параметре)
+# WebSocket (без аутентификации для простоты)
 # ==========================================
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket для получения новых сообщений"""
-    # Принимаем без аутентификации для простоты
-    # (можно добавить проверку токена из query)
     await websocket.accept()
     _active_websockets.append(websocket)
     
@@ -274,7 +309,6 @@ async def websocket_endpoint(websocket: WebSocket):
             _active_websockets.remove(websocket)
 
 def broadcast_vk_message(message: Dict):
-    """Широковещательная рассылка нового сообщения"""
     _pending_messages.append(message)
     if len(_pending_messages) > 1000:
         _pending_messages.pop(0)
@@ -324,14 +358,12 @@ async def send_vk_message_api(request: Request, data: dict):
 # Запуск сервера
 # ==========================================
 def run_web_server(host="0.0.0.0", port=10000):
-    """Запуск FastAPI сервера"""
     uvicorn.run(app, host=host, port=port, log_level="warning")
 
 def start_web_thread(handlers_dict, host="0.0.0.0", port=10000):
-    """Интеграция с ботом: передаём функции-обработчики и запускаем поток"""
     global bot_handlers
     bot_handlers.update(handlers_dict)
     thread = Thread(target=run_web_server, args=(host, port), daemon=True)
     thread.start()
-    logger.info(f"Веб-морда запущена на http://{host}:{port}")
+    logger.info(f"🌐 Веб-морда запущена на http://{host}:{port}")
     return thread
