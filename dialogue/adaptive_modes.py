@@ -15,7 +15,7 @@ CONFIG_FILE = "config.json"
 ADAPTIVE_STATE_FILE = "dialogue/data/adaptive_state.json"
 
 # Настройки адаптации
-ADAPTIVE_ENABLED = False
+ADAPTIVE_ENABLED = True
 ADAPTIVE_COOLDOWN = 3600  # 1 час между сменами режимов
 DEADEND_TIMEOUT = 7200    # 2 часа тупика → возврат к эталону
 
