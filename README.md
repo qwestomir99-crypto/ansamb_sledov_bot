@@ -106,7 +106,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 22.05.2026 09:55:15*
+*Обновлено: 22.05.2026 09:58:48*
 
 | Файл | Статус |
 |------|--------|
@@ -139,6 +139,7 @@
 | `dialogue/quotes.py` | ✅ Redmi-шапка |
 | `dialogue/scheduler.py` | ❌ Без шапки |
 | `dialogue/setting.py` | ❌ Без шапки |
+| `dialogue/shabbat_manager.py` | ✅ Redmi-шапка |
 | `dialogue/user_settings.py` | ✅ Redmi-шапка |
 | `dialogue/vk_reader.py` | ✅ Redmi-шапка |
 | `dialogue/youtube_auto.py` | ❌ Без шапки |
