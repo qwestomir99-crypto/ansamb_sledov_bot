@@ -1,8 +1,7 @@
 # ==========================================
-# Файл: dialogue/admin/__init__.py
-# Справка: README.md → Админка (инициализация)
-# Задача: импортирует все публичные функции из подмодулей
-# Комментарий: чтобы можно было писать from dialogue.admin import *
+# Файл: new_debugger/dialogue/admin/__init__.py
+# Задача: импорт всех публичных функций из подмодулей админки
+# Комментарий: обновлён для поддержки дебаггера
 # ==========================================
 
 from .menu import (
@@ -11,7 +10,8 @@ from .menu import (
     get_content_submenu,
     get_quotes_submenu,
     get_diagnostic_submenu,
-    get_user_menu
+    get_user_menu,
+    get_debugger_menu
 )
 from .auth import (
     is_admin_authorized,
