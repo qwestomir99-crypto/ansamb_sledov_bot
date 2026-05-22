@@ -2,13 +2,15 @@
 # Модуль: dialogue/activity_modes.py
 # Справка: README.md → Режимы дня
 # Задача: определение текущего режима (эталонного или адаптивного)
-# Комментарий: поддерживает адаптивные режимы через adaptive_modes.py
-# Зависит от: config.json, settings.py, adaptive_modes.py
+# Комментарий: поддерживает адаптивные режимы и Шаббат
+# Зависит от: config.json, settings.py, adaptive_modes.py, shabbat_manager.py
 # Вызывается из: bot.py, publisher.py, quotes.py
 # ==========================================
 
 import json
 from datetime import datetime
+from debug_utils import debug_log
+from dialogue.shabbat_manager import is_shabbat
 
 CONFIG_FILE = "config.json"
 
@@ -35,7 +37,6 @@ def get_current_mode():
     """Возвращает текущий режим (адаптивный или эталонный)"""
     if ADAPTIVE_AVAILABLE and ADAPTIVE_ENABLED:
         adaptive_mode = get_current_adaptive_mode()
-        # Если адаптивный режим не "обычный", используем его
         if adaptive_mode and adaptive_mode != "обычный":
             return adaptive_mode
     
@@ -72,7 +73,21 @@ def get_current_activity_mode():
     return get_current_mode()
 
 def get_current_mode_config():
-    """Возвращает конфиг текущего режима (с учётом адаптации)"""
+    """Возвращает конфиг текущего режима (с учётом адаптации и Шаббата)"""
+    
+    # === ШАББАТ ===
+    if is_shabbat():
+        debug_log("ACTIVITY_MODES", "Шаббат — режим покоя")
+        return {
+            "quotes_interval": 0,
+            "publisher_interval": 0,
+            "publisher": False,
+            "quotes": False,
+            "talk": False,
+            "ping_interval": 300
+        }
+    # ===============
+    
     mode = get_current_mode()
     config = load_config()
     modes = config.get("modes", {})
