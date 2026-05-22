@@ -6,15 +6,16 @@ __pycache__/
 *.log
 error.log
 admin.log
+analytics/*.log
 
 # Temp files
 temp_*
 *.tmp
 
-# Analytics reports
+# Analytics reports (только CSV и временные JSON)
 analytics/
 *.csv
-*.json
+analytics/*.json
 
 # Environment
 .env
@@ -29,3 +30,12 @@ analytics/
 # OS
 .DS_Store
 Thumbs.db
+
+# Данные адаптивки (можно игнорировать)
+dialogue/data/adaptive_state.json
+dialogue/data/adaptive_config.json
+
+# Но НЕ игнорируем важные JSON
+!config.json
+!dialogue/data/post_pool.json
+!dialogue/data/vk_posts.json
