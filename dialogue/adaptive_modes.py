@@ -2,7 +2,8 @@
 # Модуль: dialogue/adaptive_modes.py
 # Справка: README.md → Адаптивные режимы
 # Задача: динамическое изменение режимов на основе метрик
-# Комментарий: исправлен бесконечный цикл «Тупик в режиме замедленный»
+# Комментарий: добавлена функция set_adaptive_enabled() для управления из админки,
+#              состояние сохраняется в adaptive_config.json
 # ==========================================
 
 import os
@@ -13,18 +14,52 @@ from collections import deque
 
 CONFIG_FILE = "config.json"
 ADAPTIVE_STATE_FILE = "dialogue/data/adaptive_state.json"
+ADAPTIVE_CONFIG_FILE = "dialogue/data/adaptive_config.json"
 
-# Настройки адаптации
-ADAPTIVE_ENABLED = True
+# Настройки адаптации (по умолчанию)
+ADAPTIVE_ENABLED = False
 ADAPTIVE_COOLDOWN = 3600  # 1 час между сменами режимов
 DEADEND_TIMEOUT = 7200    # 2 часа тупика → возврат к эталону
 
 # История метрик
 metrics_history = deque(maxlen=100)
 
+
+def load_adaptive_config():
+    """Загружает состояние адаптивных режимов из файла"""
+    global ADAPTIVE_ENABLED
+    if not os.path.exists(ADAPTIVE_CONFIG_FILE):
+        return {"enabled": False}
+    try:
+        with open(ADAPTIVE_CONFIG_FILE, "r") as f:
+            config = json.load(f)
+            ADAPTIVE_ENABLED = config.get("enabled", False)
+            return config
+    except:
+        return {"enabled": False}
+
+
+def save_adaptive_config(config):
+    """Сохраняет состояние адаптивных режимов в файл"""
+    global ADAPTIVE_ENABLED
+    os.makedirs(os.path.dirname(ADAPTIVE_CONFIG_FILE), exist_ok=True)
+    with open(ADAPTIVE_CONFIG_FILE, "w") as f:
+        json.dump(config, f, indent=2)
+    ADAPTIVE_ENABLED = config.get("enabled", False)
+
+
+def set_adaptive_enabled(enabled):
+    """Включает или выключает адаптивные режимы (вызывается из админки)"""
+    config = {"enabled": enabled}
+    save_adaptive_config(config)
+    print(f"[ADAPTIVE] Адаптивные режимы {'включены' if enabled else 'выключены'}")
+    return True
+
+
 def load_config():
     with open(CONFIG_FILE, "r") as f:
         return json.load(f)
+
 
 def load_adaptive_state():
     if not os.path.exists(ADAPTIVE_STATE_FILE):
@@ -54,6 +89,7 @@ def load_adaptive_state():
             "last_return_to_etalon": 0
         }
 
+
 def save_adaptive_state(state):
     try:
         os.makedirs(os.path.dirname(ADAPTIVE_STATE_FILE), exist_ok=True)
@@ -61,6 +97,7 @@ def save_adaptive_state(state):
             json.dump(state, f, indent=2)
     except Exception as e:
         print(f"[ADAPTIVE] Ошибка сохранения: {e}")
+
 
 def collect_metrics():
     """Собирает метрики для адаптации"""
@@ -74,6 +111,7 @@ def collect_metrics():
     metrics_history.append({**metrics, "timestamp": time.time()})
     return metrics
 
+
 def count_errors_last_hour():
     if not os.path.exists("error.log"):
         return 0
@@ -83,6 +121,7 @@ def count_errors_last_hour():
         return len(lines) if lines else 0
     except:
         return 0
+
 
 def count_commands_last_hour():
     if not os.path.exists("admin.log"):
@@ -98,6 +137,7 @@ def count_commands_last_hour():
     except:
         return 0
 
+
 def get_last_publication_age():
     pubs_file = "publications.json"
     if not os.path.exists(pubs_file):
@@ -112,6 +152,7 @@ def get_last_publication_age():
         return int(age)
     except:
         return 999
+
 
 def get_adaptive_mode(metrics):
     errors = metrics.get("errors_last_hour", 0)
@@ -143,6 +184,7 @@ def get_adaptive_mode(metrics):
     
     return "обычный"
 
+
 def is_dead_end(adaptive_mode, metrics):
     """Проверяет тупик — только если режим активен дольше DEADEND_TIMEOUT"""
     errors = metrics.get("errors_last_hour", 0)
@@ -158,6 +200,7 @@ def is_dead_end(adaptive_mode, metrics):
         return True
     
     return False
+
 
 def get_etalon_mode_by_time():
     config = load_config()
@@ -175,6 +218,7 @@ def get_etalon_mode_by_time():
                 return mode_name
     return "день"
 
+
 def get_adaptive_interval(base_interval, adaptive_mode):
     if adaptive_mode == "ускоренный":
         return max(15, base_interval // 2)
@@ -185,7 +229,11 @@ def get_adaptive_interval(base_interval, adaptive_mode):
     else:
         return base_interval
 
+
 def get_current_adaptive_mode():
+    # Загружаем актуальное состояние ADAPTIVE_ENABLED из файла
+    load_adaptive_config()
+    
     if not ADAPTIVE_ENABLED:
         return get_etalon_mode_by_time()
     
@@ -220,17 +268,21 @@ def get_current_adaptive_mode():
     
     return adaptive_mode
 
+
 def get_adaptive_quotes_interval(base_interval):
     adaptive_mode = get_current_adaptive_mode()
     return get_adaptive_interval(base_interval, adaptive_mode)
+
 
 def get_adaptive_publisher_interval(base_interval):
     adaptive_mode = get_current_adaptive_mode()
     return get_adaptive_interval(base_interval, adaptive_mode)
 
+
 def should_adaptive_publish():
     adaptive_mode = get_current_adaptive_mode()
     return adaptive_mode not in ["авральный", "сон"]
+
 
 def reset_to_etalon():
     state = load_adaptive_state()
