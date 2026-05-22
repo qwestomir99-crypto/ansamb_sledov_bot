@@ -2,7 +2,7 @@
 # Файл: bot.py
 # Задача: главный бот (Flask + Telegram)
 # Комментарий: добавлен временный маршрут /new для показа новой веб-морды
-#              из папки new_debugger/templates/admin.html
+#              из файла admin.html в корне репозитория
 # ==========================================
 
 print("[DEBUG] 0. Начало загрузки bot.py")
@@ -13,11 +13,11 @@ import os
 import sys
 import threading
 import time
-import traceback
 import requests
 import json
 from datetime import datetime
 from flask import Flask, request
+from pathlib import Path
 
 # Настройки
 try:
@@ -51,8 +51,7 @@ from dialogue.agent import ask_agent
 from dialogue.activity_modes import should_respond_to_talk
 from dialogue.admin_commands import (
     handle_admin_command, is_admin_authorized,
-    get_admin_menu, get_user_menu,
-    ask_for_post_text
+    get_admin_menu, get_user_menu
 )
 from debug_utils import debug_log
 
@@ -95,7 +94,7 @@ silence_answers = ["👁️", "⏚"]
 os.chdir(os.path.dirname(sys.argv[0]))
 
 # ==========================================
-# Flask-сервер (старый, keep-alive)
+# Flask-сервер
 # ==========================================
 flask_app = Flask(__name__)
 
@@ -116,51 +115,18 @@ def get_token():
 def ping():
     return "pong", 200
 
-# ==========================================
-# НОВЫЙ МАРШРУТ /new — показывает новую веб-морду
-# ==========================================
 @flask_app.route('/new')
 def new_web_morda():
-    """Временный маршрут для новой веб-морды из new_debugger/templates/admin.html"""
-    from pathlib import Path
-    
-    # Ищем admin.html в new_debugger/templates/
+    """Новая веб-морда из admin.html в корне"""
     base_path = Path(__file__).parent
     html_path = base_path / "admin.html"
     
     if not html_path.exists():
-        return f"""
-        <html>
-            <body style="background:#0a0a0a; color:#ff4444; font-family:monospace; padding:2rem;">
-                <h2>❌ admin.html не найден</h2>
-                <p>Искали: {html_path}</p>
-                <p>Текущая директория: {Path.cwd()}</p>
-                <hr>
-                <p>Убедись, что файл существует:<br>
-                <code>new_debugger/templates/admin.html</code></p>
-                <p>Содержимое папки new_debugger/templates/:</p>
-                <pre>{list((base_path / "new_debugger" / "templates").iterdir()) if (base_path / "new_debugger" / "templates").exists() else "папка не существует"}</pre>
-            </body>
-        </html>
-        """, 404
+        return "Файл admin.html не найден в корне", 404
     
     html_content = html_path.read_text(encoding='utf-8')
-    
-    # Простая замена переменных (без Jinja2)
-    html_content = html_content.replace("{{ mode }}", "🌙 тестовый режим (Flask-костыль)")
+    html_content = html_content.replace("{{ mode }}", "🌙 тестовый режим (Flask)")
     html_content = html_content.replace("{{ time }}", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    
-    # Замена цитат на тестовые
-    test_quotes_html = '<li>«Сеть тлеет. Ритм 0,8 Гц.»</li><li>«Сапёр аутентичности на связи.»</li><li>«Ты — тень. Бот — голос.»</li>'
-    
-    if '<ul id="quotes-list">' in html_content:
-        import re
-        html_content = re.sub(
-            r'(<ul id="quotes-list">).*?(</ul>)',
-            rf'\1{test_quotes_html}\2',
-            html_content,
-            flags=re.DOTALL
-        )
     
     return html_content
 
@@ -168,11 +134,8 @@ def run_flask():
     port = int(os.environ.get("PORT", 10000))
     flask_app.run(host='0.0.0.0', port=port, debug=False)
 
-# ==========================================
-# Запуск Flask в потоке
-# ==========================================
 threading.Thread(target=run_flask, daemon=True).start()
-print("[BOT] 🔧 Flask-сервер (keep-alive) запущен")
+print("[BOT] 🔧 Flask-сервер запущен")
 
 # ==========================================
 # Очистка логов
@@ -242,7 +205,7 @@ def wait_for_agent():
 wait_for_agent()
 
 # ==========================================
-# Обработчики команд
+# Обработчики команд Telegram
 # ==========================================
 @bot.message_handler(commands=['start'])
 def send_start(message):
@@ -353,7 +316,7 @@ def handle_message(message):
         bot.reply_to(message, random.choice(silence_answers))
 
 # ==========================================
-# Запуск
+# Запуск бота
 # ==========================================
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
 start_background_pinger(60)
