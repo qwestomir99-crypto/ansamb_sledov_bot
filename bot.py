@@ -126,7 +126,7 @@ def new_web_morda():
     
     # Ищем admin.html в new_debugger/templates/
     base_path = Path(__file__).parent
-    html_path = base_path / "new_debugger" / "templates" / "admin.html"
+    html_path = base_path / "admin.html"
     
     if not html_path.exists():
         return f"""
