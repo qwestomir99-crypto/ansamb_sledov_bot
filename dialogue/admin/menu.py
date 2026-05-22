@@ -1,118 +1,118 @@
 # ==========================================
-# Файл: new_debugger/dialogue/admin/menu.py
-# Справка: README.md → Админка (меню)
-# Задача: все функции для построения кнопок и подменю
-# Комментарий: добавлено подменю дебаггера и кнопка Шаббата в диагностике
+# Файл: dialogue/admin/menu.py
+# Задача: формирование меню админки (кнопки)
+# Комментарий: добавлены адаптивные режимы и разделение Старшего брата на вкл/выкл
 # ==========================================
 
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from dialogue.admin_commands import load_config
-from debug_utils import load_config as load_debug_config
 
 def get_admin_menu():
-    """Главное админ-меню (2 колонки) с динамической кнопкой Старший брат"""
-    config = load_config()
-    alisa_enabled = config.get("alisa", {}).get("enabled", True)
-    
-    if alisa_enabled:
-        brother_button = InlineKeyboardButton("🟢 Старший брат: ВКЛ", callback_data="toggle_alisa")
-    else:
-        brother_button = InlineKeyboardButton("🔴 Старший брат: ВЫКЛ", callback_data="toggle_alisa")
-    
-    keyboard = InlineKeyboardMarkup(row_width=2)
-    keyboard.add(
-        InlineKeyboardButton("🎛 Режимы", callback_data="submenu_modes"),
-        brother_button,
-        InlineKeyboardButton("📝 Контент", callback_data="submenu_content"),
-        InlineKeyboardButton("📜 Цитаты", callback_data="submenu_quotes"),
+    """Главное меню админки"""
+    markup = InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        InlineKeyboardButton("🤖 Управление ботом", callback_data="submenu_modes"),
+        InlineKeyboardButton("🧠 Адаптивные режимы", callback_data="submenu_adaptive"),
+        InlineKeyboardButton("📝 Публикации", callback_data="submenu_content"),
+        InlineKeyboardButton("➕ Добавить пост", callback_data="add_post"),
+        InlineKeyboardButton("🎬 Пост в VK (с медиа)", callback_data="vk_post"),
+        InlineKeyboardButton("📜 Управление цитатами", callback_data="submenu_quotes"),
         InlineKeyboardButton("🔧 Диагностика", callback_data="submenu_diagnostic"),
         InlineKeyboardButton("🐞 Дебаггер", callback_data="debugger_menu"),
         InlineKeyboardButton("🚪 Выйти", callback_data="logout")
     )
-    return keyboard
+    return markup
+
+def get_user_menu():
+    """Меню для обычного пользователя"""
+    markup = InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        InlineKeyboardButton("💥 #тлеем", callback_data="tleem"),
+        InlineKeyboardButton("🔒 #фиксируем", callback_data="fixiruem"),
+        InlineKeyboardButton("⚡ #вспышка", callback_data="vspishka"),
+        InlineKeyboardButton("🌬 #дышим", callback_data="dyshim"),
+        InlineKeyboardButton("🗣 #говори", callback_data="govorim"),
+        InlineKeyboardButton("📖 Справка", callback_data="help")
+    )
+    return markup
 
 def get_modes_submenu():
-    keyboard = InlineKeyboardMarkup(row_width=2)
-    keyboard.add(
+    """Подменю управления режимами и пингом (Старший брат — две кнопки)"""
+    markup = InlineKeyboardMarkup(row_width=2)
+    markup.add(
         InlineKeyboardButton("🌅 Утро", callback_data="mode_утро"),
         InlineKeyboardButton("☀️ День", callback_data="mode_день"),
         InlineKeyboardButton("🌙 Вечер", callback_data="mode_вечер"),
-        InlineKeyboardButton("😴 Ночь", callback_data="mode_ночь"),
-        InlineKeyboardButton("⏱ 30", callback_data="ping_30"),
-        InlineKeyboardButton("⏱ 60", callback_data="ping_60"),
-        InlineKeyboardButton("⏱ 180", callback_data="ping_180")
-    )
-    keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="admin_menu"))
-    return keyboard
-
-def get_content_submenu():
-    keyboard = InlineKeyboardMarkup(row_width=1)
-    keyboard.add(
-        InlineKeyboardButton("📤 Публикации", callback_data="pub_menu"),
-        InlineKeyboardButton("➕ Добавить пост", callback_data="add_post"),
-        InlineKeyboardButton("🎬 Пост в VK", callback_data="vk_post")
-    )
-    keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="admin_menu"))
-    return keyboard
-
-def get_quotes_submenu():
-    keyboard = InlineKeyboardMarkup(row_width=1)
-    keyboard.add(
-        InlineKeyboardButton("📋 Список", callback_data="quotes_list"),
-        InlineKeyboardButton("➕ Добавить", callback_data="quotes_add"),
-        InlineKeyboardButton("⏱ Интервал", callback_data="quotes_interval")
-    )
-    keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="admin_menu"))
-    return keyboard
-
-def get_diagnostic_submenu():
-    keyboard = InlineKeyboardMarkup(row_width=2)
-    keyboard.add(
-        InlineKeyboardButton("📋 Ошибки", callback_data="errors"),
-        InlineKeyboardButton("📜 Лог", callback_data="log"),
-        InlineKeyboardButton("🐞 Дебаг", callback_data="debug"),
-        InlineKeyboardButton("🕯 Шаббат", callback_data="shabbat_info")
-    )
-    keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="admin_menu"))
-    return keyboard
-
-def get_user_menu():
-    """Пользовательское меню (для неавторизованных)"""
-    keyboard = InlineKeyboardMarkup(row_width=2)
-    keyboard.add(
-        InlineKeyboardButton("💥 #Тлеем", callback_data="tleem"),
-        InlineKeyboardButton("🔒 #Фиксируем", callback_data="fixiruem"),
-        InlineKeyboardButton("⚡ #Вспышка", callback_data="vspishka"),
-        InlineKeyboardButton("🌬 #дышим", callback_data="dyshim"),
-        InlineKeyboardButton("🗣 #говорим", callback_data="govorim"),
-        InlineKeyboardButton("📖 #справка", callback_data="help")
-    )
-    return keyboard
-
-# ==========================================
-# Меню дебаггера
-# ==========================================
-
-def get_debugger_menu():
-    """Подменю для управления дебаггером (с отдельными кнопками Вкл/Выкл)"""
-    config = load_debug_config()
-    
-    interval = config.get("interval_minutes", 0)
-    interval_text = "сразу" if interval == 0 else f"каждые {interval} мин"
-    send_enabled = config.get("send_to_telegram", True)
-    
-    keyboard = InlineKeyboardMarkup(row_width=2)
-    keyboard.add(
-        InlineKeyboardButton("🟢 Включить дебаггер", callback_data="debugger_enable"),
-        InlineKeyboardButton("🔴 Выключить дебаггер", callback_data="debugger_disable")
-    )
-    keyboard.add(
-        InlineKeyboardButton(f"⏱ Интервал: {interval_text}", callback_data="debugger_interval"),
-        InlineKeyboardButton(f"📤 Telegram: {'✅ Вкл' if send_enabled else '❌ Выкл'}", callback_data="debugger_toggle_send")
-    )
-    keyboard.add(
-        InlineKeyboardButton("📋 Выбрать модули", callback_data="debugger_modules"),
-        InlineKeyboardButton("📊 Последние логи", callback_data="debugger_logs"),
+        InlineKeyboardButton("🌌 Ночь", callback_data="mode_ночь"),
+        InlineKeyboardButton("✅ Вкл. Старший брат", callback_data="toggle_alisa_on"),
+        InlineKeyboardButton("❌ Выкл. Старший брат", callback_data="toggle_alisa_off"),
+        InlineKeyboardButton("🕒 Пинг 30", callback_data="ping_30"),
+        InlineKeyboardButton("🕒 Пинг 60", callback_data="ping_60"),
+        InlineKeyboardButton("🕒 Пинг 180", callback_data="ping_180"),
         InlineKeyboardButton("◀️ Назад", callback_data="admin_menu")
     )
-    return keyboard
+    return markup
+
+def get_adaptive_submenu():
+    """Подменю управления адаптивными режимами"""
+    markup = InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        InlineKeyboardButton("✅ Включить адаптивку", callback_data="adaptive_enable"),
+        InlineKeyboardButton("❌ Выключить адаптивку", callback_data="adaptive_disable"),
+        InlineKeyboardButton("📊 Сброс к эталону", callback_data="adaptive_reset"),
+        InlineKeyboardButton("◀️ Назад", callback_data="admin_menu")
+    )
+    return markup
+
+def get_content_submenu():
+    """Подменю управления контентом"""
+    markup = InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        InlineKeyboardButton("📝 Список публикаций", callback_data="pub_menu"),
+        InlineKeyboardButton("➕ Добавить пост", callback_data="add_post"),
+        InlineKeyboardButton("◀️ Назад", callback_data="admin_menu")
+    )
+    return markup
+
+def get_quotes_submenu():
+    """Подменю управления цитатами"""
+    markup = InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        InlineKeyboardButton("📜 Список цитат", callback_data="quotes_list"),
+        InlineKeyboardButton("➕ Добавить цитату", callback_data="quotes_add"),
+        InlineKeyboardButton("⏱ Интервал цитат", callback_data="quotes_interval"),
+        InlineKeyboardButton("◀️ Назад", callback_data="admin_menu")
+    )
+    return markup
+
+def get_diagnostic_submenu():
+    """Подменю диагностики"""
+    markup = InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        InlineKeyboardButton("❌ Ошибки", callback_data="errors"),
+        InlineKeyboardButton("📋 Лог", callback_data="log"),
+        InlineKeyboardButton("🕯 Шаббат", callback_data="shabbat_info"),
+        InlineKeyboardButton("◀️ Назад", callback_data="admin_menu")
+    )
+    return markup
+
+def get_debugger_menu():
+    """Меню дебаггера"""
+    from debug_utils import load_config
+    config = load_config()
+    enabled = config.get("enabled", True)
+    interval = config.get("interval_minutes", 5)
+    send_to_tg = config.get("send_to_telegram", True)
+    
+    status_icon = "✅" if enabled else "❌"
+    send_icon = "✅" if send_to_tg else "❌"
+    
+    markup = InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        InlineKeyboardButton(f"{status_icon} Дебаггер", callback_data="debugger_enable" if not enabled else "debugger_disable"),
+        InlineKeyboardButton(f"⏱ Интервал ({interval} мин)", callback_data="debugger_interval"),
+        InlineKeyboardButton(f"{send_icon} Отправка в Telegram", callback_data="debugger_toggle_send"),
+        InlineKeyboardButton("📋 Модули", callback_data="debugger_modules"),
+        InlineKeyboardButton("📤 Логи", callback_data="debugger_logs"),
+        InlineKeyboardButton("◀️ Назад", callback_data="admin_menu")
+    )
+    return markup
