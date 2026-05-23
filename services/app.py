@@ -259,3 +259,6 @@ HTML_TEMPLATE = """
             div.innerHTML += `<br><button onclick="openVkReply(${msg.peer_id}, '${msg.sender}')" style="font-size:0.7rem; padding: 3px 6px; margin-top: 5px;">Ответить</button>`;
         }
         container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+
