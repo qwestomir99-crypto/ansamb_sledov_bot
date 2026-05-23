@@ -106,7 +106,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 23.05.2026 11:00:49*
+*Обновлено: 23.05.2026 11:04:47*
 
 | Файл | Статус |
 |------|--------|
@@ -143,6 +143,7 @@
 | `dialogue/user_settings.py` | ✅ Redmi-шапка |
 | `dialogue/vk_reader.py` | ✅ Redmi-шапка |
 | `dialogue/youtube_auto.py` | ❌ Без шапки |
+| `get_keys_fixed.py` | ❌ Без шапки |
 | `get_tg_keys.py` | ❌ Без шапки |
 | `handlers.py` | ✅ Redmi-шапка |
 | `new_debugger/bot.py` | ❌ Без шапки |
