@@ -70,6 +70,9 @@ if ENABLE_AUTOPOSTER:
 if ENABLE_CALLBACKS:
     from dialogue.callbacks import register_callback_handlers
 
+# ========== НОВЫЙ ИМПОРТ ДЛЯ БОЛЬШИХ ВИДЕО ==========
+from big_video_uploader import send_big_video
+
 # Загрузка конфига
 CONFIG_FILE = "config.json"
 def load_config():
@@ -207,6 +210,36 @@ wait_for_agent()
 # ==========================================
 # Обработчики команд Telegram
 # ==========================================
+
+# ========== НОВАЯ КОМАНДА ДЛЯ БОЛЬШИХ ВИДЕО ==========
+@bot.message_handler(commands=['bigvideo'])
+def handle_big_video(message):
+    try:
+        if not message.reply_to_message or not message.reply_to_message.video:
+            bot.reply_to(message, "❌ Ответь на видео командой /bigvideo")
+            return
+        
+        bot.reply_to(message, "⏳ Скачиваю и отправляю через user API...")
+        
+        video = message.reply_to_message.video
+        file_info = bot.get_file(video.file_id)
+        downloaded = bot.download_file(file_info.file_path)
+        
+        temp_path = f"/tmp/big_video_{video.file_id}.mp4"
+        with open(temp_path, "wb") as f:
+            f.write(downloaded)
+        
+        import asyncio
+        asyncio.run(send_big_video(temp_path, "Видео отправлено через user API"))
+        
+        os.remove(temp_path)
+        bot.reply_to(message, "✅ Видео отправлено через user API!")
+        
+    except Exception as e:
+        bot.reply_to(message, f"❌ Ошибка: {e}")
+        import traceback
+        traceback.print_exc()
+
 @bot.message_handler(commands=['start'])
 def send_start(message):
     bot.reply_to(message, "Сапёр аутентичности. Ритм 0,8 Гц. Для входа в протокол — #Тлеем.")
