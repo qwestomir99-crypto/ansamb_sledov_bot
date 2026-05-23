@@ -20,7 +20,6 @@ except ImportError:
 # НАСТРОЙКИ (Переменные окружения контейнера)
 # =====================================================================
 VK_TOKEN = os.environ.get("VK_TOKEN")
-# Безопасное приведение ID группы к числу
 try:
     VK_GROUP_ID = int(os.environ.get("VK_GROUP_ID", 0))
 except (ValueError, TypeError):
@@ -50,6 +49,7 @@ HTML_TEMPLATE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ансамбль Следов 6 — веб-морда</title>
+    <!-- Клиент Socket.io для связи с Flask-SocketIO на сервере -->
     <script src="https://socket.io"></script>
     <style>
         * { box-sizing: border-box; }
@@ -122,9 +122,9 @@ HTML_TEMPLATE = """
             <summary>📖 Последние цитаты (10)</summary>
             <ul id="quotes-list">
                 {% for q in quotes %}
-                    <li>{{ q[:100] }}{% if q|length > 100 %}...{% endif %}</li>
+                    <li>{{ q[:100] }}</li>
                 {% else %}
-                    <li>Нет ципат</li>
+                    <li>Нет цитат</li>
                 {% endfor %}
             </ul>
         </details>
@@ -158,11 +158,13 @@ HTML_TEMPLATE = """
     let currentReplyPeer = null;
     let ws = null;
 
+    // Автоматический старт при загрузке страницы в мобильном браузере
     document.addEventListener("DOMContentLoaded", () => {
         connectWebSocket();
         fetchState();
     });
 
+    // API: Переключение режима работы
     async function setMode() {
         const mode = document.getElementById("mode-select").value;
         try {
@@ -173,9 +175,10 @@ HTML_TEMPLATE = """
             });
             const data = await response.json();
             document.getElementById("current-mode").innerText = data.mode;
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error("Ошибка смены режима:", e); }
     }
 
+    // API: Добавление цитаты в список
     async function addQuote() {
         const quoteText = document.getElementById("quote-text").value;
         if (!quoteText.trim()) return alert("Текст цитаты пуст!");
@@ -188,9 +191,10 @@ HTML_TEMPLATE = """
             const data = await response.json();
             document.getElementById("quote-text").value = '';
             if (data.quotes) updateQuotesList(data.quotes);
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error("Ошибка добавления цитаты:", e); }
     }
 
+    // API: Публикация записи на стену сообщества
     async function sendVkPost() {
         const text = document.getElementById("vk-post-text").value;
         const statusDiv = document.getElementById("vk-post-status");
@@ -217,6 +221,7 @@ HTML_TEMPLATE = """
         }
     }
 
+    // Рендеринг обновленного списка цитат
     function updateQuotesList(quotes) {
         const list = document.getElementById("quotes-list");
         list.innerHTML = quotes.map(q => {
@@ -225,20 +230,23 @@ HTML_TEMPLATE = """
         }).join('') || '<li>Нет цитат</li>';
     }
 
+    // Синхронизация интерфейса с текущим статусом бэкенда
     async function fetchState() {
         try {
             const response = await fetch('/api/state');
             const data = await response.json();
             document.getElementById("current-mode").innerText = data.mode;
             if (data.quotes) updateQuotesList(data.quotes);
-        } catch(e) { console.error(e); }
+        } catch(e) { console.error("Ошибка получения состояния:", e); }
     }
 
+    // Инициализация WebSocket канала через библиотеку socket.io
     function connectWebSocket() {
         ws = io('/ws/messages');
         ws.on('message', (data) => { appendMessage(data); });
     }
 
+    // Добавление нового сообщения в ленту
     function appendMessage(msg) {
         const container = document.getElementById("vk-messages");
         if (container.querySelector("div[style*='color: #666']")) container.innerHTML = '';
@@ -251,18 +259,3 @@ HTML_TEMPLATE = """
             div.innerHTML += `<br><button onclick="openVkReply(${msg.peer_id}, '${msg.sender}')" style="font-size:0.7rem; padding: 3px 6px; margin-top: 5px;">Ответить</button>`;
         }
         container.appendChild(div);
-        container.scrollTop = container.scrollHeight;
-    }
-
-    function openVkReply(peerId, senderName) {
-        currentReplyPeer = peerId;
-        document.getElementById("vk-reply-area").classList.remove("hidden");
-        document.getElementById("vk-reply-text").placeholder = `Ответ для ${senderName}...`;
-    }
-
-    function closeVkReply() {
-        currentReplyPeer = null;
-        document.getElementById("vk-reply-area").classList.add("hidden");
-        document.getElementById("vk-reply-text").value = '';
-    }
-
