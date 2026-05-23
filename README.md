@@ -106,7 +106,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 23.05.2026 11:14:20*
+*Обновлено: 23.05.2026 14:40:00*
 
 | Файл | Статус |
 |------|--------|
@@ -146,19 +146,6 @@
 | `get_keys_fixed.py` | ❌ Без шапки |
 | `get_tg_keys.py` | ❌ Без шапки |
 | `handlers.py` | ✅ Redmi-шапка |
-| `new_debugger/bot.py` | ❌ Без шапки |
-| `new_debugger/debug_utils.py` | ❌ Без шапки |
-| `new_debugger/dialogue/activity_modes.py` | ✅ Redmi-шапка |
-| `new_debugger/dialogue/admin/__init__.py` | ❌ Без шапки |
-| `new_debugger/dialogue/admin/callbacks.py` | ✅ Redmi-шапка |
-| `new_debugger/dialogue/admin/menu.py` | ✅ Redmi-шапка |
-| `new_debugger/dialogue/shabbat_manager.py` | ✅ Redmi-шапка |
-| `new_debugger/handlers.py` | ✅ Redmi-шапка |
-| `new_debugger/services/vk_reader.py` | ❌ Без шапки |
-| `new_debugger/services/vk_uploader.py` | ✅ Redmi-шапка |
-| `new_debugger/services/web_server.py` | ❌ Без шапки |
-| `new_debugger/settings.py` | ❌ Без шапки |
-| `new_debugger/web_server.py` | ❌ Без шапки |
 | `ping_utils.py` | ❌ Без шапки |
 | `redmi_audit.py` | ✅ Redmi-шапка |
 | `services/__init__.py` | ❌ Без шапки |
