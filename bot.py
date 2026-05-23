@@ -1,8 +1,6 @@
 # ==========================================
 # Файл: bot.py
 # Задача: главный бот (Flask + Telegram)
-# Комментарий: добавлен временный маршрут /new для показа новой веб-морды
-#              из файла admin.html в корне репозитория
 # ==========================================
 
 print("[DEBUG] 0. Начало загрузки bot.py")
@@ -15,6 +13,7 @@ import threading
 import time
 import requests
 import json
+import asyncio
 from datetime import datetime
 from flask import Flask, request
 from pathlib import Path
@@ -70,7 +69,7 @@ if ENABLE_AUTOPOSTER:
 if ENABLE_CALLBACKS:
     from dialogue.callbacks import register_callback_handlers
 
-# ========== НОВЫЙ ИМПОРТ ДЛЯ БОЛЬШИХ ВИДЕО ==========
+# ========== ИМПОРТ ДЛЯ БОЛЬШИХ ВИДЕО ==========
 from big_video_uploader import send_big_video
 
 # Загрузка конфига
@@ -120,7 +119,6 @@ def ping():
 
 @flask_app.route('/new')
 def new_web_morda():
-    """Новая веб-морда из admin.html в корне"""
     base_path = Path(__file__).parent
     html_path = base_path / "admin.html"
     
@@ -208,10 +206,76 @@ def wait_for_agent():
 wait_for_agent()
 
 # ==========================================
+# Хранилище для кода подтверждения (временное)
+# ==========================================
+pending_code = {}
+
+def get_keys_thread(user_id):
+    """Запускает Telethon, ожидает код через pending_code"""
+    async def get_keys():
+        phone = os.environ.get("TG_PHONE")
+        if not phone:
+            bot.send_message(user_id, "❌ Переменная TG_PHONE не задана в Render")
+            return
+        
+        from telethon import TelegramClient
+        client = TelegramClient("temp_session", 12345, "temp")
+        
+        bot.send_message(user_id, "📱 Отправляю запрос кода в Telegram...")
+        await client.send_code_request(phone)
+        bot.send_message(user_id, "📱 Код отправлен в Telegram. Введи его командой /code 12345")
+        
+        # Ждём код (максимум 3 минуты)
+        for _ in range(36):
+            if user_id in pending_code:
+                code = pending_code.pop(user_id)
+                break
+            await asyncio.sleep(5)
+        else:
+            bot.send_message(user_id, "❌ Время ожидания кода истекло")
+            return
+        
+        try:
+            await client.sign_in(phone, code)
+            api_id = client.api_id
+            api_hash = client.api_hash
+            
+            with open("tg_keys.txt", "w") as f:
+                f.write(f"TG_API_ID={api_id}\n")
+                f.write(f"TG_API_HASH={api_hash}\n")
+            
+            bot.send_message(user_id, f"✅ Ключи сохранены в файл `tg_keys.txt` в корне репозитория. Скопируй их в переменные Render и удали TG_PHONE.")
+        except Exception as e:
+            bot.send_message(user_id, f"❌ Ошибка: {e}")
+        finally:
+            await client.disconnect()
+    
+    asyncio.run(get_keys())
+
+# ==========================================
 # Обработчики команд Telegram
 # ==========================================
 
-# ========== НОВАЯ КОМАНДА ДЛЯ БОЛЬШИХ ВИДЕО ==========
+# ========== КОМАНДА ДЛЯ ВВОДА КОДА ==========
+@bot.message_handler(commands=['code'])
+def enter_code(message):
+    user_id = message.from_user.id
+    if user_id != ADMIN_USER_ID:
+        bot.reply_to(message, "❌ Только для админа")
+        return
+    
+    code = message.text.replace("/code", "", 1).strip()
+    if not code:
+        bot.reply_to(message, "❌ Введи код: /code 12345")
+        return
+    
+    pending_code[user_id] = code
+    bot.reply_to(message, f"✅ Код {code} принят. Авторизация продолжается...")
+    
+    # Запускаем поток получения ключей (если ещё не запущен)
+    threading.Thread(target=get_keys_thread, args=(user_id,), daemon=True).start()
+
+# ========== КОМАНДА ДЛЯ БОЛЬШИХ ВИДЕО ==========
 @bot.message_handler(commands=['bigvideo'])
 def handle_big_video(message):
     try:
@@ -229,7 +293,6 @@ def handle_big_video(message):
         with open(temp_path, "wb") as f:
             f.write(downloaded)
         
-        import asyncio
         asyncio.run(send_big_video(temp_path, "Видео отправлено через user API"))
         
         os.remove(temp_path)
