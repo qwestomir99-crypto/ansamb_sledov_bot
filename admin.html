@@ -425,13 +425,188 @@
             el.innerHTML = '';
         }, 3000);
     }
-    
+        document.addEventListener("DOMContentLoaded", () => {
+        // Подключаем WebSocket для живой ленты сообщений
+        connectWebSocket();
+
+        // Запрашиваем актуальные данные (режим, цитаты) при загрузке
+        fetchState();
+    });
+
+    // ==========================================
+    // Функции API (AJAX/Fetch)
+    // ==========================================
+
+    async function setMode() {
+        const mode = document.getElementById("mode-select").value;
+        try {
+            const response = await fetch('/set_mode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ mode })
+            });
+            const data = await response.json();
+            document.getElementById("current-mode").innerText = data.mode;
+        } catch (error) {
+            console.error("Ошибка при смене режима:", error);
+        }
+    }
+
+    async function addQuote() {
+        const quoteText = document.getElementById("quote-text").value;
+        if (!quoteText.trim()) return alert("Текст цитаты пуст!");
+        
+        try {
+            const response = await fetch('/add_quote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ quote: quoteText })
+            });
+            const data = await response.json();
+            
+            // Очищаем поле и обновляем список цитат
+            document.getElementById("quote-text").value = '';
+            if (data.quotes) {
+                updateQuotesList(data.quotes);
+            }
+        } catch (error) {
+            console.error("Ошибка при добавлении цитаты:", error);
+        }
+    }
+
+    async function sendVkPost() {
+        const text = document.getElementById("vk-post-text").value;
+        const statusDiv = document.getElementById("vk-post-status");
+        statusDiv.innerText = "Отправка...";
+        statusDiv.className = "inline";
+
+        try {
+            const response = await fetch('/vk_post', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ text })
+            });
+            
+            if (response.ok) {
+                statusDiv.innerText = "Пост опубликован!";
+                statusDiv.className = "inline status-ok";
+                document.getElementById("vk-post-text").value = '';
+            } else {
+                statusDiv.innerText = "Ошибка отправки";
+                statusDiv.className = "inline status-error";
+            }
+        } catch (error) {
+            statusDiv.innerText = "Ошибка сети";
+            statusDiv.className = "inline status-error";
+        }
+    }
+
+    function updateQuotesList(quotes) {
+        const list = document.getElementById("quotes-list");
+        list.innerHTML = quotes.map(q => {
+            const truncated = q.length > 100 ? q.substring(0, 100) + '...' : q;
+            return `<li>${truncated}</li>`;
+        }).join('') || '<li>Нет цитат</li>';
+    }
+
+    async function fetchState() {
+        try {
+            const response = await fetch('/api/state');
+            const data = await response.json();
+            document.getElementById("current-mode").innerText = data.mode;
+            if (data.quotes) updateQuotesList(data.quotes);
+        } catch(e) { console.error(e); }
+    }
+
+    // ==========================================
+    // Функции WebSocket и работа с сообщениями
+    // ==========================================
+
+    function connectWebSocket() {
+        // Укажите правильный адрес, если WS-сервер висит на другом порту/домене
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${protocol}//${window.location.host}/ws/messages`);
+
+        ws.onopen = () => {
+            wsConnected = true;
+            console.log("WS соединение установлено");
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            appendMessage(data);
+        };
+
+        ws.onclose = () => {
+            wsConnected = false;
+            console.log("WS соединение закрыто. Переподключение через 5 сек...");
+            setTimeout(connectWebSocket, 5000);
+        };
+    }
+
+    function appendMessage(msg) {
+        const container = document.getElementById("vk-messages");
+        // Если это дежурная заглушка, очищаем её
+        if (container.querySelector("div[style*='color: #666']")) {
+            container.innerHTML = '';
+        }
+
+        const div = document.createElement('div');
+        div.className = `message-item ${msg.own ? 'own' : ''}`;
+        div.innerHTML = `<strong>${msg.sender || 'Неизвестный'}:</strong> ${msg.text} <br>
+                         <small>${msg.time || ''}</small>`;
+        
+        if (!msg.own) {
+            div.innerHTML += `<button onclick="openVkReply(${msg.peer_id}, '${msg.sender || ''}')" style="font-size:0.7rem; padding: 3px 6px; margin-top: 5px;">Ответить</button>`;
+        }
+
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function openVkReply(peerId, senderName) {
+        currentReplyPeer = peerId;
+        document.getElementById("vk-reply-area").classList.remove("hidden");
+        document.getElementById("vk-reply-text").placeholder = `Ответ для ${senderName}...`;
+    }
+
+    function closeVkReply() {
+        currentReplyPeer = null;
+        document.getElementById("vk-reply-area").classList.add("hidden");
+        document.getElementById("vk-reply-text").value = '';
+    }
+
+    async function sendVkReply() {
+        const text = document.getElementById("vk-reply-text").value;
+        if (!text.trim() || !currentReplyPeer) return;
+
+        try {
+            const response = await fetch('/vk_reply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ peer_id: currentReplyPeer, text: text })
+            });
+
+            if (response.ok) {
+                // Отобразим отправленное сообщение в чате
+                appendMessage({ own: true, sender: "Вы", text: text, time: "Только что" });
+                closeVkReply();
+            } else {
+                alert("Ошибка при отправке ответа.");
+            }
+        } catch (error) {
+            console.error("Ошибка сети при отправке ответа:", error);
+        }
+    }
+</script>
+
     function escapeHtml(text) {
         if (!text) return '';
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
+    
 </script>
 </body>
 </html>
