@@ -1,3 +1,13 @@
+# ==========================================
+# Файл: dialogue/exception_handler.py
+# Справка: README.md → Отладка / Ошибки
+# Задача: глобальный перехват необработанных исключений
+# Комментарий: логирует ошибки в error.log и дублирует в консоль.
+#              Устанавливается при старте бота через setup_exception_handler().
+# Зависит от: sys, traceback, datetime
+# Вызывается из: bot.py (при старте)
+# ==========================================
+
 import sys
 import traceback
 from datetime import datetime
