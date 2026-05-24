@@ -5,3 +5,4 @@ telethon
 gunicorn
 schedule
 python-dotenv
+pytz
