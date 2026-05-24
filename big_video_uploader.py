@@ -1,3 +1,13 @@
+# ==========================================
+# Файл: big_video_uploader.py
+# Справка: README.md → Автопостинг / Большие видео
+# Задача: отправка видео (>50 МБ) через пользовательский API (Telethon)
+# Комментарий: требует TG_API_ID и TG_API_HASH из переменных окружения.
+#              Работает через прокси (если задан PROXY_URL).
+#              Функция send_big_video вызывается из bot.py и autoposter.py.
+# Зависит от: telethon, os, asyncio
+# Вызывается из: bot.py (команда /bigvideo), services/autoposter.py (после 1 июня)
+# ==========================================
 import os
 import asyncio
 from telethon import TelegramClient
