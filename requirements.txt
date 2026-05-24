@@ -4,3 +4,7 @@ requests
 telethon
 gunicorn
 schedule
+flask-socketio
+gevent
+vk-api
+python-dotenv
