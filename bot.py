@@ -1,6 +1,10 @@
 # ==========================================
 # Файл: bot.py
-# Задача: главный бот (Flask + Telegram)
+# Задача: главный бот (Telegram-бот, команды, фоновые задачи)
+# Комментарий: запускается как background worker на Render
+#              Flask-сервер удалён, чтобы не конфликтовать с web-мордой
+# Зависит от: pytelegrambotapi, telethon, schedule, requests
+# Вызывается из: Render (worker service, start command: python bot.py)
 # ==========================================
 
 print("[DEBUG] 0. Начало загрузки bot.py")
@@ -13,10 +17,7 @@ import threading
 import time
 import requests
 import json
-import asyncio
 from datetime import datetime
-from flask import Flask, request
-from pathlib import Path
 
 # Настройки
 try:
@@ -69,9 +70,6 @@ if ENABLE_AUTOPOSTER:
 if ENABLE_CALLBACKS:
     from dialogue.callbacks import register_callback_handlers
 
-# ========== ИМПОРТ ДЛЯ БОЛЬШИХ ВИДЕО ==========
-from big_video_uploader import send_big_video
-
 # Загрузка конфига
 CONFIG_FILE = "config.json"
 def load_config():
@@ -96,65 +94,7 @@ silence_answers = ["👁️", "⏚"]
 os.chdir(os.path.dirname(sys.argv[0]))
 
 # ==========================================
-# Flask-сервер
-# ==========================================
-flask_app = Flask(__name__)
-
-@flask_app.route('/')
-def health():
-    if request.remote_addr == '127.0.0.1':
-        return "Pong", 200
-    return {"status": "tleem", "rhythm": "0.8 Hz", "version": "3.2"}, 200
-
-@flask_app.route('/token', methods=['GET'])
-def get_token():
-    secret = request.args.get('secret')
-    if secret != os.environ.get("TOKEN_SECRET", "tleem2026"):
-        return "Forbidden", 403
-    return TOKEN, 200
-
-@flask_app.route('/ping', methods=['GET'])
-def ping():
-    return "pong", 200
-
-@flask_app.route('/new')
-def new_web_morda():
-    base_path = Path(__file__).parent
-    html_path = base_path / "admin.html"
-    
-    if not html_path.exists():
-        return "Файл admin.html не найден в корне", 404
-    
-    html_content = html_path.read_text(encoding='utf-8')
-    html_content = html_content.replace("{{ mode }}", "🌙 тестовый режим (Flask)")
-    html_content = html_content.replace("{{ time }}", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    
-    return html_content
-
-def run_flask():
-    port = int(os.environ.get("PORT", 10000))
-    flask_app.run(host='0.0.0.0', port=port, debug=False)
-
-threading.Thread(target=run_flask, daemon=True).start()
-print("[BOT] 🔧 Flask-сервер запущен")
-
-# ==========================================
-# Очистка логов
-# ==========================================
-def clean_old_logs(days=7):
-    now = time.time()
-    for logfile in ['admin.log', 'error.log']:
-        if os.path.exists(logfile):
-            mtime = os.path.getmtime(logfile)
-            if now - mtime > days * 86400:
-                os.remove(logfile)
-                with open(logfile, 'w') as f:
-                    f.write('')
-clean_old_logs()
-threading.Thread(target=lambda: [time.sleep(86400) or clean_old_logs() for _ in range(999)], daemon=True).start()
-
-# ==========================================
-# Потоки модулей
+# ЗАПУСК ПОТОКОВ МОДУЛЕЙ
 # ==========================================
 if ENABLE_VK_READER:
     threading.Thread(target=vk_reader_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
@@ -185,127 +125,34 @@ if ENABLE_CALLBACKS:
     register_callback_handlers(bot, config)
 
 # ==========================================
-# Ожидание готовности агента
+# ОБРАБОТЧИКИ КОМАНД TELEGRAM
 # ==========================================
-def wait_for_agent():
-    agent_url = "https://agent-3kek.onrender.com/health"
-    print("[BOT] Ожидание готовности агента...")
-    for attempt in range(30):
-        try:
-            r = requests.get(agent_url, timeout=2)
-            if r.status_code == 200:
-                print("[BOT] ✅ Агент готов")
-                return True
-        except:
-            pass
-        print(f"[BOT] Ожидание агента, попытка {attempt+1}/30")
-        time.sleep(2)
-    print("[BOT] ⚠️ Агент не ответил, продолжаем без него")
-    return False
+@bot.message_handler(commands=['start'])
+def send_start(message):
+    bot.reply_to(message, "Сапёр аутентичности. Ритм 0,8 Гц. Для входа в протокол — #Тлеем.")
 
-wait_for_agent()
-
-# ==========================================
-# Хранилище для кода подтверждения (временное)
-# ==========================================
-pending_code = {}
-
-def get_keys_thread(user_id):
-    """Запускает Telethon, ожидает код через pending_code"""
-    async def get_keys():
-        phone = os.environ.get("TG_PHONE")
-        if not phone:
-            bot.send_message(user_id, "❌ Переменная TG_PHONE не задана в Render")
-            return
-        
-        from telethon import TelegramClient
-        client = TelegramClient("temp_session", 12345, "temp")
-        
-        bot.send_message(user_id, "📱 Отправляю запрос кода в Telegram...")
-        await client.send_code_request(phone)
-        bot.send_message(user_id, "📱 Код отправлен в Telegram. Введи его командой /code 12345")
-        
-        # Ждём код (максимум 3 минуты)
-        for _ in range(36):
-            if user_id in pending_code:
-                code = pending_code.pop(user_id)
-                break
-            await asyncio.sleep(5)
-        else:
-            bot.send_message(user_id, "❌ Время ожидания кода истекло")
-            return
-        
-        try:
-            await client.sign_in(phone, code)
-            api_id = client.api_id
-            api_hash = client.api_hash
-            
-            with open("tg_keys.txt", "w") as f:
-                f.write(f"TG_API_ID={api_id}\n")
-                f.write(f"TG_API_HASH={api_hash}\n")
-            
-            bot.send_message(user_id, f"✅ Ключи сохранены в файл `tg_keys.txt` в корне репозитория. Скопируй их в переменные Render и удали TG_PHONE.")
-        except Exception as e:
-            bot.send_message(user_id, f"❌ Ошибка: {e}")
-        finally:
-            await client.disconnect()
-    
-    asyncio.run(get_keys())
-
-# ==========================================
-# Обработчики команд Telegram
-# ==========================================
-
-# ========== КОМАНДА ДЛЯ ВВОДА КОДА ==========
-@bot.message_handler(commands=['code'])
-def enter_code(message):
-    user_id = message.from_user.id
-    if user_id != ADMIN_USER_ID:
-        bot.reply_to(message, "❌ Только для админа")
-        return
-    
-    code = message.text.replace("/code", "", 1).strip()
-    if not code:
-        bot.reply_to(message, "❌ Введи код: /code 12345")
-        return
-    
-    pending_code[user_id] = code
-    bot.reply_to(message, f"✅ Код {code} принят. Авторизация продолжается...")
-    
-    # Запускаем поток получения ключей (если ещё не запущен)
-    threading.Thread(target=get_keys_thread, args=(user_id,), daemon=True).start()
-
-# ========== КОМАНДА ДЛЯ БОЛЬШИХ ВИДЕО ==========
 @bot.message_handler(commands=['bigvideo'])
 def handle_big_video(message):
     try:
         if not message.reply_to_message or not message.reply_to_message.video:
             bot.reply_to(message, "❌ Ответь на видео командой /bigvideo")
             return
-        
         bot.reply_to(message, "⏳ Скачиваю и отправляю через user API...")
-        
         video = message.reply_to_message.video
         file_info = bot.get_file(video.file_id)
         downloaded = bot.download_file(file_info.file_path)
-        
         temp_path = f"/tmp/big_video_{video.file_id}.mp4"
         with open(temp_path, "wb") as f:
             f.write(downloaded)
-        
+        import asyncio
+        from big_video_uploader import send_big_video
         asyncio.run(send_big_video(temp_path, "Видео отправлено через user API"))
-        
         os.remove(temp_path)
         bot.reply_to(message, "✅ Видео отправлено через user API!")
-        
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка: {e}")
         import traceback
         traceback.print_exc()
-
-@bot.message_handler(commands=['start'])
-def send_start(message):
-    bot.reply_to(message, "Сапёр аутентичности. Ритм 0,8 Гц. Для входа в протокол — #Тлеем.")
 
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
@@ -412,7 +259,7 @@ def handle_message(message):
         bot.reply_to(message, random.choice(silence_answers))
 
 # ==========================================
-# Запуск бота
+# ЗАПУСК БОТА (без Flask)
 # ==========================================
 print("Бот запущен. Ритм 0,8 Гц стабилен. Ожидаем #Тлеем...")
 start_background_pinger(60)
