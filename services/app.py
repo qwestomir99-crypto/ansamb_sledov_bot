@@ -1,9 +1,9 @@
 # ==========================================
-# Файл: app.py
+# Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: веб-интерфейс для управления ботом, постинга в VK и ответов на сообщения
-# Комментарий: работает как отдельный web-сервис на Render (или в фоне с ботом)
-# Зависит от: flask, vk_api, python-dotenv
+# Комментарий: принимает сообщения из VK и Telegram, позволяет отвечать
+# Зависит от: flask, flask-socketio, vk_api, python-dotenv
 # Вызывается из: Render (web service, start command: gunicorn app:app)
 # ==========================================
 
@@ -11,7 +11,9 @@ import os
 import datetime
 from threading import Thread
 from flask import Flask, render_template_string, request, jsonify, session, redirect, url_for
+from flask_socketio import SocketIO, emit
 from functools import wraps
+import telebot
 
 # ==========================================
 # НАСТРОЙКИ
@@ -27,16 +29,22 @@ if not ADMIN_PASSWORD:
     raise ValueError("ADMIN_PASSWORD не задан в переменных окружения")
 
 SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "secret_traces_key_6")
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = SECRET_KEY
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SECURE'] = True
 
+socketio = SocketIO(app, cors_allowed_origins="*")
+bot = telebot.TeleBot(BOT_TOKEN) if BOT_TOKEN else None
+
+# Хранилище сообщений
+messages = []
+
 # ==========================================
-# ВНУТРЕННЕЕ СОСТОЯНИЕ (общее с ботом)
+# ВНУТРЕННЕЕ СОСТОЯНИЕ
 # ==========================================
-# Для простоты читаем из файлов, которые обновляет бот
 QUOTES_FILE = "dialogue/data/quotes.txt"
 MODE_FILE = "dialogue/data/mode.txt"
 
@@ -66,6 +74,25 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
+
+# ==========================================
+# WEBSOCKET СОБЫТИЯ
+# ==========================================
+@socketio.on('connect')
+def handle_connect():
+    print("[WS] Клиент подключён")
+    emit('connected', {'data': 'Connected'})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print("[WS] Клиент отключён")
+
+@socketio.on('new_message')
+def handle_new_message(data):
+    """Принимает сообщение из бота (Telegram или VK) и сохраняет"""
+    messages.append(data)
+    emit('message_updated', data, broadcast=True)
+    print(f"[WS] Новое сообщение от {data.get('source')}: {data.get('text', '')[:50]}")
 
 # ==========================================
 # МАРШРУТЫ
@@ -124,18 +151,34 @@ def index():
     <html>
     <head>
         <title>Ансамбль Следов 6 — веб-морда</title>
+        <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
         <style>
             body { background: #0a0a0a; color: #00ffcc; font-family: monospace; padding: 2rem; }
             .card { background: #111; border-left: 3px solid #00ffcc; padding: 1rem; margin: 1rem 0; border-radius: 8px; }
             button, input, textarea { background: #222; color: #00ffcc; border: 1px solid #00ffcc; padding: 6px 12px; border-radius: 4px; }
             button:hover { background: #00ffcc; color: #000; cursor: pointer; }
             a { color: #00ffcc; }
+            .message { border-bottom: 1px solid #333; padding: 8px; margin: 5px 0; }
+            .message.own { background: #1a3a3a; border-left: 2px solid #00ffcc; }
+            .messages { max-height: 400px; overflow-y: auto; margin-bottom: 20px; }
         </style>
     </head>
     <body>
         <h1>🔥 Ансамбль Следов 6</h1>
         <p>Ритм 0,8 Гц. Управление ботом из браузера. Время: {{ time }}</p>
         <p><a href="/logs/admin">📋 admin.log</a> | <a href="/logs/error">❌ error.log</a></p>
+        
+        <div class="card">
+            <h2>📨 Входящие сообщения</h2>
+            <div id="messages" class="messages">
+                <div style="color: #666;">Сообщения будут появляться здесь...</div>
+            </div>
+            <div id="reply-area" style="display: none;">
+                <textarea id="reply-text" rows="2" cols="50" placeholder="Ваш ответ..."></textarea>
+                <button onclick="sendReply()">📤 Отправить ответ</button>
+                <button onclick="closeReply()">❌ Отмена</button>
+            </div>
+        </div>
         
         <div class="card">
             <h2>🎬 Пост в VK</h2>
@@ -152,24 +195,91 @@ def index():
         </div>
         
         <script>
-        async function sendPost() {
-            const text = document.getElementById('post-text').value;
-            if (!text.trim()) return;
-            const status = document.getElementById('status');
-            status.innerText = '⏳ Отправка...';
-            const resp = await fetch('/vk_post', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: 'text=' + encodeURIComponent(text)
+            let socket = null;
+            let currentReply = null;
+            
+            document.addEventListener("DOMContentLoaded", () => {
+                connectWebSocket();
+                fetchState();
             });
-            const data = await resp.json();
-            if (data.status === 'ok') {
-                status.innerHTML = `✅ Опубликовано! <a href="${data.url}" target="_blank">Ссылка</a>`;
-                document.getElementById('post-text').value = '';
-            } else {
-                status.innerText = '❌ ' + data.error;
+            
+            function connectWebSocket() {
+                socket = io();
+                socket.on('message_updated', (data) => { appendMessage(data); });
+                socket.on('connected', () => { console.log('WebSocket connected'); });
             }
-        }
+            
+            function appendMessage(msg) {
+                const container = document.getElementById("messages");
+                if (container.querySelector("div[style*='color: #666']")) container.innerHTML = '';
+                const div = document.createElement('div');
+                div.className = `message ${msg.own ? 'own' : ''}`;
+                div.innerHTML = `<strong>${msg.source}: ${msg.sender || msg.username}:</strong> ${msg.text}<br><small>${msg.time}</small>`;
+                if (!msg.own) {
+                    div.innerHTML += `<br><button onclick="openReply(${msg.user_id || msg.peer_id}, '${msg.source}', '${msg.sender || msg.username}')" style="font-size:0.7rem; padding: 3px 6px; margin-top: 5px;">Ответить</button>`;
+                }
+                container.appendChild(div);
+                container.scrollTop = container.scrollHeight;
+            }
+            
+            function openReply(chatId, source, sender) {
+                currentReply = { chatId: chatId, source: source };
+                document.getElementById("reply-area").style.display = 'block';
+                document.getElementById("reply-text").placeholder = `Ответ для ${sender}...`;
+            }
+            
+            function closeReply() {
+                currentReply = null;
+                document.getElementById("reply-area").style.display = 'none';
+                document.getElementById("reply-text").value = '';
+            }
+            
+            async function sendReply() {
+                if (!currentReply) return;
+                const text = document.getElementById("reply-text").value;
+                if (!text.trim()) return;
+                
+                const response = await fetch('/send_reply', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({chat_id: currentReply.chatId, text: text, source: currentReply.source})
+                });
+                const data = await response.json();
+                if (data.status === 'ok') {
+                    appendMessage({source: 'admin', sender: 'admin', text: text, time: new Date().toLocaleTimeString(), own: true});
+                    closeReply();
+                } else {
+                    alert('Ошибка отправки: ' + data.error);
+                }
+            }
+            
+            async function sendPost() {
+                const text = document.getElementById("post-text").value;
+                if (!text.trim()) return;
+                const statusDiv = document.getElementById("status");
+                statusDiv.innerText = "⏳ Отправка...";
+                const resp = await fetch('/vk_post', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'text=' + encodeURIComponent(text)
+                });
+                const data = await resp.json();
+                if (data.status === 'ok') {
+                    statusDiv.innerHTML = `✅ Опубликовано! <a href="${data.url}" target="_blank">Ссылка</a>`;
+                    document.getElementById("post-text").value = '';
+                } else {
+                    statusDiv.innerText = '❌ ' + data.error;
+                }
+            }
+            
+            async function fetchState() {
+                const resp = await fetch('/api/state');
+                const data = await resp.json();
+                if (data.quotes) {
+                    const list = document.getElementById("quotes-list");
+                    list.innerHTML = data.quotes.map(q => `<li>${q.length > 100 ? q.substring(0,100)+'...' : q}</li>`).join('');
+                }
+            }
         </script>
     </body>
     </html>
@@ -198,6 +308,14 @@ def vk_post():
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
 
+@app.route('/api/state', methods=['GET'])
+@login_required
+def api_state():
+    return jsonify({
+        "mode": get_current_mode(),
+        "quotes": get_quotes()
+    })
+
 @app.route('/logs/<name>')
 @login_required
 def view_log(name):
@@ -207,9 +325,29 @@ def view_log(name):
     with open(log_file, 'r') as f:
         return f"<pre>{f.read()}</pre>"
 
+@app.route('/send_reply', methods=['POST'])
+def send_reply():
+    """Отправляет ответ в Telegram или VK"""
+    data = request.json
+    chat_id = data.get('chat_id')
+    text = data.get('text')
+    source = data.get('source')
+    
+    if source == 'telegram' and BOT_TOKEN:
+        try:
+            bot.send_message(chat_id, text)
+            return jsonify({"status": "ok"})
+        except Exception as e:
+            return jsonify({"status": "error", "error": str(e)})
+    elif source == 'vk':
+        # TODO: отправка в VK
+        return jsonify({"status": "error", "error": "VK replies not implemented yet"})
+    else:
+        return jsonify({"status": "error", "error": "Unknown source"})
+
 # ==========================================
-# ЗАПУСК (для gunicorn)
+# ЗАПУСК
 # ==========================================
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    socketio.run(app, host='0.0.0.0', port=port, debug=False)
