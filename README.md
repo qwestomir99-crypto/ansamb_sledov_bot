@@ -106,7 +106,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 24.05.2026 18:13:33*
+*Обновлено: 24.05.2026 18:14:28*
 
 | Файл | Статус |
 |------|--------|
@@ -114,37 +114,6 @@
 | `big_video_uploader.py` | ❌ Без шапки |
 | `bot.py` | ❌ Без шапки |
 | `debug_utils.py` | ❌ Без шапки |
-| `dialogue/__init__.py` | ❌ Без шапки |
-| `dialogue/activity_modes.py` | ✅ Redmi-шапка |
-| `dialogue/adaptive_modes.py` | ✅ Redmi-шапка |
-| `dialogue/admin/__init__.py` | ❌ Без шапки |
-| `dialogue/admin/auth.py` | ✅ Redmi-шапка |
-| `dialogue/admin/callbacks.py` | ❌ Без шапки |
-| `dialogue/admin/diagnostics.py` | ✅ Redmi-шапка |
-| `dialogue/admin/menu.py` | ❌ Без шапки |
-| `dialogue/admin/posts.py` | ✅ Redmi-шапка |
-| `dialogue/admin/quotes_admin.py` | ✅ Redmi-шапка |
-| `dialogue/admin_commands.py` | ✅ Redmi-шапка |
-| `dialogue/agent.py` | ❌ Без шапки |
-| `dialogue/button_map.py` | ✅ Redmi-шапка |
-| `dialogue/callbacks.py` | ✅ Redmi-шапка |
-| `dialogue/color_logger.py` | ❌ Без шапки |
-| `dialogue/dialogue/button_map.py` | ✅ Redmi-шапка |
-| `dialogue/exception_handler.py` | ❌ Без шапки |
-| `dialogue/handlers.py` | ✅ Redmi-шапка |
-| `dialogue/help_menu.py` | ✅ Redmi-шапка |
-| `dialogue/journalist.py` | ❌ Без шапки |
-| `dialogue/ping_modes.py` | ❌ Без шапки |
-| `dialogue/post_manager.py` | ❌ Без шапки |
-| `dialogue/publisher.py` | ✅ Redmi-шапка |
-| `dialogue/publisher_utils.py` | ❌ Без шапки |
-| `dialogue/quotes.py` | ✅ Redmi-шапка |
-| `dialogue/scheduler.py` | ❌ Без шапки |
-| `dialogue/setting.py` | ❌ Без шапки |
-| `dialogue/shabbat_manager.py` | ✅ Redmi-шапка |
-| `dialogue/user_settings.py` | ✅ Redmi-шапка |
-| `dialogue/vk_reader.py` | ✅ Redmi-шапка |
-| `dialogue/youtube_auto.py` | ❌ Без шапки |
 | `get_keys_fixed.py` | ❌ Без шапки |
 | `get_tg_keys.py` | ❌ Без шапки |
 | `handlers.py` | ✅ Redmi-шапка |
