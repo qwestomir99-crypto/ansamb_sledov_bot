@@ -1,16 +1,13 @@
 # ==========================================
 # Файл: bot.py
-# Задача: Telegram-бот (команды, админка, цитаты, публикации, агент)
-# Комментарий: запускается как worker на Render (или в потоке с веб-мордой)
-#              Не содержит Flask-сервера. Веб-морда — в services/app.py.
-# Зависит от: pytelegrambotapi, telethon, requests, schedule
-# Вызывается из: Render (worker) или из main.py
+# Задача: Telegram-бот
+# Комментарий: отправляет входящие сообщения в веб-морду через WebSocket
 # ==========================================
 
 print("[DEBUG] 0. Начало загрузки bot.py")
 
 # ==========================================
-# 1. ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК (все потоки)
+# 1. ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК
 # ==========================================
 import sys
 import threading
@@ -22,12 +19,10 @@ ERROR_LOG = "error.log"
 def global_exception_handler(exc_type, exc_value, exc_traceback):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     tb_lines = traceback.format_tb(exc_traceback)
-    
     with open(ERROR_LOG, "a", encoding="utf-8") as f:
         f.write(f"{timestamp} | {exc_type.__name__}: {exc_value}\n")
         f.write(''.join(tb_lines))
         f.write("\n" + "-"*50 + "\n")
-    
     print(f"[EXCEPTION] {exc_type.__name__}: {exc_value}")
 
 def thread_exception_handler(args):
@@ -45,6 +40,8 @@ import os
 import time
 import requests
 import json
+import asyncio
+import socketio
 from datetime import datetime
 
 # Настройки
@@ -114,6 +111,7 @@ VK_TOKEN = os.environ.get("VK_TOKEN")
 VK_OWNER_ID = os.environ.get("VK_OWNER_ID")
 PUBLISH_CHANNEL = os.environ.get("PUBLISH_CHANNEL", "@qwestomir")
 AGENT_URL = os.environ.get("AGENT_URL", "https://agent-3kek.onrender.com/ask")
+WEBSOCKET_URL = os.environ.get("WEBSOCKET_URL", "https://ansamb-sledov-bot-94wz.onrender.com")
 
 TG_CHAT_ID = config.get("telegram", {}).get("publish_channel", PUBLISH_CHANNEL)
 bot = telebot.TeleBot(TOKEN)
@@ -121,7 +119,28 @@ silence_answers = ["👁️", "⏚"]
 os.chdir(os.path.dirname(sys.argv[0]))
 
 # ==========================================
-# 4. ЗАПУСК ПОТОКОВ МОДУЛЕЙ
+# 4. WEBSOCKET КЛИЕНТ
+# ==========================================
+sio = socketio.AsyncClient()
+
+@sio.on('connect')
+def on_connect():
+    print("[WS] Подключено к веб-морде")
+
+@sio.on('disconnect')
+def on_disconnect():
+    print("[WS] Отключено от веб-морде")
+
+async def send_to_web_morda(event, data):
+    try:
+        await sio.connect(WEBSOCKET_URL)
+        await sio.emit(event, data)
+        await sio.disconnect()
+    except Exception as e:
+        print(f"[WS] Ошибка отправки: {e}")
+
+# ==========================================
+# 5. ЗАПУСК ПОТОКОВ МОДУЛЕЙ
 # ==========================================
 if ENABLE_VK_READER:
     threading.Thread(target=vk_reader_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
@@ -147,54 +166,38 @@ if ENABLE_CALLBACKS:
     register_callback_handlers(bot, config)
 
 # ==========================================
-# 5. ОЧИСТКА ЛОГОВ (по времени И по размеру)
+# 6. ОЧИСТКА ЛОГОВ
 # ==========================================
 def clean_old_logs(days=7, max_size_mb=1):
-    """
-    Очищает логи:
-    - удаляет файлы старше days дней
-    - обрезает файлы, превышающие max_size_mb мегабайт (оставляет последние 500 строк)
-    """
     now = time.time()
     max_size_bytes = max_size_mb * 1024 * 1024
-    
     for logfile in ['admin.log', 'error.log', 'debug.log']:
         if not os.path.exists(logfile):
             continue
-        
-        # === 1. Удаляем старые файлы ===
         mtime = os.path.getmtime(logfile)
         if now - mtime > days * 86400:
             os.remove(logfile)
-            # Создаём пустой файл заново (чтобы не было ошибки "файл не найден")
             with open(logfile, 'w') as f:
                 f.write('')
             print(f"[CLEANUP] {logfile} удалён (старше {days} дней)")
             continue
-        
-        # === 2. Обрезаем толстые файлы ===
         if os.path.getsize(logfile) > max_size_bytes:
             with open(logfile, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
-            # Оставляем последние 500 строк (достаточно для диагностики)
             lines_to_keep = lines[-500:] if len(lines) > 500 else lines
             with open(logfile, 'w', encoding='utf-8') as f:
                 f.writelines(lines_to_keep)
-            print(f"[CLEANUP] {logfile} обрезан (был >{max_size_mb} МБ, оставлено {len(lines_to_keep)} строк)")
+            print(f"[CLEANUP] {logfile} обрезан (был >{max_size_mb} МБ)")
 
-# Вызываем очистку при старте
 clean_old_logs()
-
-# Запускаем фоновый поток для ежедневной очистки
 def cleaner_loop():
     while True:
-        time.sleep(86400)  # раз в сутки
+        time.sleep(86400)
         clean_old_logs()
-
 threading.Thread(target=cleaner_loop, daemon=True).start()
 
 # ==========================================
-# 6. ОБРАБОТЧИКИ КОМАНД TELEGRAM
+# 7. ОБРАБОТЧИКИ КОМАНД TELEGRAM
 # ==========================================
 @bot.message_handler(commands=['start'])
 def send_start(message):
@@ -225,6 +228,16 @@ def handle_big_video(message):
 def handle_message(message):
     text = message.text.lower()
     debug_log("HANDLERS", f"Получена команда: {text[:50]}...")
+    
+    # === ОТПРАВКА В ВЕБ-МОРДУ ===
+    asyncio.run(send_to_web_morda('new_message', {
+        'source': 'telegram',
+        'user_id': message.from_user.id,
+        'username': message.from_user.username or message.from_user.first_name,
+        'text': message.text,
+        'time': datetime.now().strftime("%H:%M:%S")
+    }))
+    # === КОНЕЦ ===
 
     if text == "#":
         try:
@@ -307,7 +320,7 @@ def handle_message(message):
         bot.reply_to(message, random.choice(silence_answers))
 
 # ==========================================
-# 7. ЗАПУСК БОТА
+# 8. ЗАПУСК БОТА
 # ==========================================
 print("Бот запущен. Ритм 0,8 Гц стабилен.")
 start_background_pinger(60)
