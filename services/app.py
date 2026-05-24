@@ -2,9 +2,9 @@
 # Файл: app.py
 # Справка: README.md → Веб-морда
 # Задача: веб-интерфейс для управления ботом, постинга в VK и ответов на сообщения
-# Комментарий: работает независимо от bot.py, использует общие файлы и переменные окружения
-# Зависит от: flask, flask-socketio, vk_api, python-dotenv, flask_wtf
-# Вызывается из: Render (web service)
+# Комментарий: работает как отдельный web-сервис на Render
+# Зависит от: flask, flask-socketio, vk_api, python-dotenv, gunicorn
+# Вызывается из: Render (web service, start command: gunicorn app:app)
 # ==========================================
 
 import os
@@ -50,13 +50,13 @@ SESSION_LIFETIME_HOURS = 8
 app = Flask(__name__)
 app.config['SECRET_KEY'] = SECRET_KEY
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SECURE'] = True  # Только HTTPS
+app.config['SESSION_COOKIE_SECURE'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = datetime.timedelta(hours=SESSION_LIFETIME_HOURS)
 
-# CORS ограничен только для SocketIO
+# CORS ограничен для SocketIO
 socketio = SocketIO(app, async_mode='gevent', cors_allowed_origins=os.environ.get("APP_URL", ""))
 
-# Внутреннее состояние бота
+# Внутреннее состояние
 bot_state = {
     "mode": "день",
     "quotes": [
@@ -65,7 +65,6 @@ bot_state = {
     ]
 }
 
-# Глобальный объект VK API
 vk = None
 
 # =====================================================================
@@ -75,16 +74,14 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not session.get('authenticated'):
-            # Если запрос через AJAX (JSON API) — отдаём 401
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({"error": "Unauthorized"}), 401
-            # Иначе — перенаправляем на страницу входа
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
 # =====================================================================
-# ФУНКЦИИ VK API
+# VK API ФУНКЦИИ
 # =====================================================================
 def init_vk():
     global vk
@@ -96,7 +93,7 @@ def init_vk():
     return vk
 
 def start_vk_polling():
-    """Фоновый поток для получения сообщений из VK через LongPoll"""
+    """Фоновый поток для получения сообщений из VK"""
     if not VK_AVAILABLE:
         print("[VK Polling] VK API не доступен")
         return
@@ -124,7 +121,7 @@ def start_vk_polling():
         print(f"[VK Polling] Ошибка: {e}")
 
 # =====================================================================
-# HTML ШАБЛОН (с CSRF-защитой)
+# HTML ШАБЛОН
 # =====================================================================
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -133,7 +130,7 @@ HTML_TEMPLATE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ансамбль Следов 6 — веб-морда</title>
-    <script src="https://socket.io"></script>
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -160,7 +157,6 @@ HTML_TEMPLATE = """
             font-family: inherit;
         }
         button:hover { background: #00ffcc; color: #000; cursor: pointer; }
-        hr { border-color: #00ffcc33; }
         a { color: #00ffcc; }
         .message-item { border-bottom: 1px solid #333; padding: 8px; margin-bottom: 5px; }
         .message-item.own { background-color: #1a3a3a; border-left: 2px solid #00ffcc; }
@@ -178,7 +174,6 @@ HTML_TEMPLATE = """
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <h1>🔥 Ансамбль Следов 6</h1>
         <form method="post" action="/logout">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button type="submit" class="logout-btn">🚪 Выйти</button>
         </form>
     </div>
@@ -188,7 +183,6 @@ HTML_TEMPLATE = """
         <a href="/logs/error" target="_blank">❌ error.log</a>
     </p>
 
-    <!-- Блок управления режимом -->
     <div class="card">
         <h2>🤖 Текущий режим: <strong id="current-mode">{{ mode }}</strong></h2>
         <form onsubmit="return false">
@@ -202,11 +196,10 @@ HTML_TEMPLATE = """
         </form>
     </div>
 
-    <!-- Блок добавления цитаты -->
     <div class="card">
         <h2>📜 Добавить цитату</h2>
         <form onsubmit="return false">
-            <textarea name="quote" id="quote-text" rows="2" cols="50" placeholder="Текст цитаты..."></textarea><br>
+            <textarea id="quote-text" rows="2" cols="50" placeholder="Текст цитаты..."></textarea><br>
             <button type="button" onclick="addQuote()">➕ Добавить</button>
         </form>
         <details>
@@ -221,17 +214,15 @@ HTML_TEMPLATE = """
         </details>
     </div>
 
-    <!-- Блок поста в VK -->
     <div class="card">
         <h2>🎬 Пост в VK (текст)</h2>
         <form onsubmit="return false">
-            <textarea name="text" id="vk-post-text" rows="3" cols="50" placeholder="Текст поста..."></textarea><br>
+            <textarea id="vk-post-text" rows="3" cols="50" placeholder="Текст поста..."></textarea><br>
             <button type="button" onclick="sendVkPost()">📤 Отправить</button>
         </form>
         <div id="vk-post-status" class="inline"></div>
     </div>
 
-    <!-- Блок сообщений из VK -->
     <div class="card">
         <h2>💬 Входящие сообщения (VK)</h2>
         <div id="vk-messages">
@@ -254,29 +245,18 @@ HTML_TEMPLATE = """
         fetchState();
     });
 
-    function getCsrfToken() {
-        const token = document.querySelector('input[name="csrf_token"]');
-        return token ? token.value : '';
-    }
-
     async function setMode() {
         const mode = document.getElementById("mode-select").value;
         try {
             const response = await fetch('/set_mode', {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: new URLSearchParams({ mode, csrf_token: getCsrfToken() })
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ mode })
             });
-            if (response.status === 401) {
-                window.location.href = '/login';
-                return;
-            }
+            if (response.status === 401) { window.location.href = '/login'; return; }
             const data = await response.json();
             document.getElementById("current-mode").innerText = data.mode;
-        } catch (e) { console.error("Ошибка смены режима:", e); }
+        } catch (e) { console.error(e); }
     }
 
     async function addQuote() {
@@ -285,43 +265,28 @@ HTML_TEMPLATE = """
         try {
             const response = await fetch('/add_quote', {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: new URLSearchParams({ quote: quoteText, csrf_token: getCsrfToken() })
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ quote: quoteText })
             });
-            if (response.status === 401) {
-                window.location.href = '/login';
-                return;
-            }
+            if (response.status === 401) { window.location.href = '/login'; return; }
             const data = await response.json();
             document.getElementById("quote-text").value = '';
             if (data.quotes) updateQuotesList(data.quotes);
-        } catch (e) { console.error("Ошибка добавления цитаты:", e); }
+        } catch (e) { console.error(e); }
     }
 
     async function sendVkPost() {
         const text = document.getElementById("vk-post-text").value;
-        if (!text.trim()) {
-            alert("Текст поста не может быть пустым");
-            return;
-        }
+        if (!text.trim()) return alert("Текст поста не может быть пустым");
         const statusDiv = document.getElementById("vk-post-status");
         statusDiv.innerText = "⏳ Отправка...";
         try {
             const response = await fetch('/vk_post', {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: new URLSearchParams({ text, csrf_token: getCsrfToken() })
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ text })
             });
-            if (response.status === 401) {
-                window.location.href = '/login';
-                return;
-            }
+            if (response.status === 401) { window.location.href = '/login'; return; }
             const data = await response.json();
             if (data.status === "ok") {
                 statusDiv.innerHTML = `✅ Опубликовано! <a href="${data.url}" target="_blank">Ссылка на пост</a>`;
@@ -329,32 +294,22 @@ HTML_TEMPLATE = """
             } else {
                 statusDiv.innerText = `❌ Ошибка: ${data.error}`;
             }
-        } catch (e) {
-            statusDiv.innerText = "❌ Ошибка сети";
-        }
+        } catch (e) { statusDiv.innerText = "❌ Ошибка сети"; }
     }
 
     function updateQuotesList(quotes) {
         const list = document.getElementById("quotes-list");
-        list.innerHTML = quotes.map(q => {
-            const truncated = q.length > 100 ? q.substring(0, 100) + '...' : q;
-            return `<li>${truncated}</li>`;
-        }).join('') || '<li>Нет цитат</li>';
+        list.innerHTML = quotes.map(q => `<li>${q.length > 100 ? q.substring(0, 100) + '...' : q}</li>`).join('') || '<li>Нет цитат</li>';
     }
 
     async function fetchState() {
         try {
-            const response = await fetch('/api/state', {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            });
-            if (response.status === 401) {
-                window.location.href = '/login';
-                return;
-            }
+            const response = await fetch('/api/state');
+            if (response.status === 401) { window.location.href = '/login'; return; }
             const data = await response.json();
             document.getElementById("current-mode").innerText = data.mode;
             if (data.quotes) updateQuotesList(data.quotes);
-        } catch(e) { console.error("Ошибка получения состояния:", e); }
+        } catch(e) { console.error(e); }
     }
 
     function connectWebSocket() {
@@ -365,11 +320,9 @@ HTML_TEMPLATE = """
     function appendMessage(msg) {
         const container = document.getElementById("vk-messages");
         if (container.querySelector("div[style*='color: #666']")) container.innerHTML = '';
-
         const div = document.createElement('div');
         div.className = `message-item ${msg.own ? 'own' : ''}`;
         div.innerHTML = `<strong>${msg.sender}:</strong> ${msg.text} <br><small>${msg.time}</small>`;
-        
         if (!msg.own) {
             div.innerHTML += `<br><button onclick="openVkReply(${msg.peer_id}, '${msg.sender}')" style="font-size:0.7rem; padding: 3px 6px; margin-top: 5px;">Ответить</button>`;
         }
@@ -393,8 +346,6 @@ HTML_TEMPLATE = """
         if (!currentReplyPeer) return;
         const text = document.getElementById("vk-reply-text").value;
         if (!text.trim()) return;
-        
-        // Здесь будет реализация отправки ответа
         console.log("Отправка ответа", currentReplyPeer, text);
         closeVkReply();
     }
@@ -493,8 +444,11 @@ def index():
     return render_template_string(HTML_TEMPLATE, 
                                 mode=bot_state['mode'], 
                                 time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-                                quotes=bot_state['quotes'][-10:],
-                                csrf_token=secrets.token_hex(16))
+                                quotes=bot_state['quotes'][-10:])
+
+@app.route('/ping')
+def ping():
+    return {"status": "ok", "service": "web-morda"}, 200
 
 @app.route('/set_mode', methods=['POST'])
 @login_required
@@ -555,12 +509,16 @@ def view_log(name):
 @socketio.on('connect', namespace='/ws')
 def handle_connect():
     if not session.get('authenticated'):
-        return False  # Отключаем неавторизованные сокеты
+        return False
     emit('connected', {'data': 'Connected'})
 
 # =====================================================================
-# ЗАПУСК
+# ЗАПУСК (для gunicorn)
 # =====================================================================
+if __name__ != '__main__':
+    # Запускаем VK Polling в фоне при старте gunicorn
+    Thread(target=start_vk_polling, daemon=True).start()
+
 if __name__ == '__main__':
     Thread(target=start_vk_polling, daemon=True).start()
     port = int(os.environ.get("PORT", 10000))
