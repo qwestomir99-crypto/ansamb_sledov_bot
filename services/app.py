@@ -1,3 +1,12 @@
+# ==========================================
+# Файл: app.py
+# Справка: README.md → Веб-морда
+# Задача: веб-интерфейс для управления ботом, постинга в VK и ответов на сообщения
+# Комментарий: работает независимо от bot.py, использует общие файлы и переменные окружения
+# Зависит от: flask, flask-socketio, vk_api, python-dotenv
+# Вызывается из: Render (web service)
+# ==========================================
+
 import os
 import datetime
 from threading import Thread
@@ -130,7 +139,7 @@ HTML_TEMPLATE = """
         </details>
     </div>
 
-    <!-- Блок поста в VK -->
+    <!-- Блок поста в VK (текст) -->
     <div class="card">
         <h2>🎬 Пост в VK (текст)</h2>
         <form method="post" action="/vk_post" onsubmit="return false">
@@ -194,30 +203,30 @@ HTML_TEMPLATE = """
         } catch (e) { console.error("Ошибка добавления цитаты:", e); }
     }
 
-    // API: Публикация записи на стену сообщества
+    // API: Публикация записи на стену сообщества (ОБНОВЛЕНО: подробный ответ)
     async function sendVkPost() {
         const text = document.getElementById("vk-post-text").value;
+        if (!text.trim()) {
+            alert("Текст поста не может быть пустым");
+            return;
+        }
         const statusDiv = document.getElementById("vk-post-status");
-        statusDiv.innerText = "Отправка...";
-        statusDiv.className = "inline";
-
+        statusDiv.innerText = "⏳ Отправка...";
         try {
             const response = await fetch('/vk_post', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: new URLSearchParams({ text })
             });
-            if (response.ok) {
-                statusDiv.innerText = "Пост опубликован!";
-                statusDiv.className = "inline status-ok";
+            const data = await response.json();
+            if (data.status === "ok") {
+                statusDiv.innerHTML = `✅ Опубликовано! <a href="${data.url}" target="_blank">Ссылка на пост</a>`;
                 document.getElementById("vk-post-text").value = '';
             } else {
-                statusDiv.innerText = "Ошибка отправки";
-                statusDiv.className = "inline status-error";
+                statusDiv.innerText = `❌ Ошибка: ${data.error}`;
             }
         } catch (e) {
-            statusDiv.innerText = "Ошибка сети";
-            statusDiv.className = "inline status-error";
+            statusDiv.innerText = "❌ Ошибка сети";
         }
     }
 
@@ -262,3 +271,147 @@ HTML_TEMPLATE = """
         container.scrollTop = container.scrollHeight;
     }
 
+    function openVkReply(peerId, sender) {
+        currentReplyPeer = peerId;
+        document.getElementById("vk-reply-area").classList.remove("hidden");
+        document.getElementById("vk-reply-text").placeholder = `Ответ для ${sender}...`;
+    }
+
+    function closeVkReply() {
+        currentReplyPeer = null;
+        document.getElementById("vk-reply-area").classList.add("hidden");
+        document.getElementById("vk-reply-text").value = '';
+    }
+
+    async function sendVkReply() {
+        if (!currentReplyPeer) return;
+        const text = document.getElementById("vk-reply-text").value;
+        if (!text.trim()) return;
+        
+        // Здесь нужно будет реализовать отправку ответа через бэкенд
+        console.log("Отправка ответа", currentReplyPeer, text);
+        closeVkReply();
+    }
+</script>
+</body>
+</html>
+"""
+
+# =====================================================================
+# ИНИЦИАЛИЗАЦИЯ VK (как при отправке сообщения)
+# =====================================================================
+def init_vk():
+    global vk
+    if not VK_AVAILABLE:
+        return None
+    if VK_TOKEN:
+        session = vk_api.VkApi(token=VK_TOKEN)
+        vk = session.get_api()
+    return vk
+
+# =====================================================================
+# ЗАПУСК ПОЛЛИНГА СООБЩЕНИЙ (через Long Poll)
+# =====================================================================
+def start_vk_polling():
+    global vk
+    if not VK_AVAILABLE:
+        print("[VK Polling] VK API не доступен")
+        return
+    if not VK_TOKEN or not VK_GROUP_ID:
+        print("[VK Polling] VK_TOKEN или VK_GROUP_ID не заданы")
+        return
+    try:
+        session = vk_api.VkApi(token=VK_TOKEN)
+        longpoll = VkBotLongPoll(session, VK_GROUP_ID)
+        for event in longpoll.listen():
+            if event.type == VkBotEventType.MESSAGE_NEW:
+                msg = event.object.message
+                peer_id = msg['peer_id']
+                from_id = msg['from_id']
+                text = msg.get('text', '')
+                
+                # Отправляем сообщение через WebSocket
+                socketio.emit('message', {
+                    'peer_id': peer_id,
+                    'sender': f"user_{from_id}",
+                    'text': text,
+                    'time': datetime.datetime.now().strftime("%H:%M:%S"),
+                    'own': False
+                }, namespace='/ws/messages')
+    except Exception as e:
+        print(f"[VK Polling] Ошибка: {e}")
+
+# =====================================================================
+# FLASK МАРШРУТЫ (ОБНОВЛЕНЫ)
+# =====================================================================
+@app.route('/')
+def index():
+    return render_template_string(HTML_TEMPLATE, mode=bot_state['mode'], time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), quotes=bot_state['quotes'][-10:])
+
+@app.route('/set_mode', methods=['POST'])
+def set_mode():
+    new_mode = request.form.get('mode', 'день')
+    bot_state['mode'] = new_mode
+    return jsonify({"mode": new_mode})
+
+@app.route('/add_quote', methods=['POST'])
+def add_quote():
+    new_quote = request.form.get('quote', '').strip()
+    if new_quote:
+        bot_state['quotes'].append(new_quote)
+        if len(bot_state['quotes']) > 100:
+            bot_state['quotes'] = bot_state['quotes'][-100:]
+    return jsonify({"quotes": bot_state['quotes'][-10:]})
+
+@app.route('/vk_post', methods=['POST'])
+def vk_post():
+    """
+    ОБНОВЛЕНО: публикация поста на стену сообщества VK с разбором ошибок и возвратом ссылки.
+    """
+    global vk
+    text = request.form.get('text', '').strip()
+    if not text:
+        return jsonify({"status": "error", "error": "Текст поста пуст"}), 400
+    if not VK_TOKEN or not VK_GROUP_ID:
+        return jsonify({"status": "error", "error": "VK_TOKEN или VK_GROUP_ID не заданы в переменных окружения"}), 500
+    try:
+        if vk is None:
+            init_vk()
+        # Публикуем запись
+        post = vk.wall.post(owner_id=-VK_GROUP_ID, message=text, from_group=1)
+        post_id = post.get('post_id')
+        if not post_id:
+            return jsonify({"status": "error", "error": "VK API не вернул post_id"}), 500
+        post_url = f"https://vk.com/wall-{abs(VK_GROUP_ID)}_{post_id}"
+        return jsonify({"status": "ok", "post_id": post_id, "url": post_url}), 200
+    except Exception as e:
+        # Возвращаем текст ошибки для отладки
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+@app.route('/api/state', methods=['GET'])
+def api_state():
+    return jsonify({
+        "mode": bot_state['mode'],
+        "quotes": bot_state['quotes'][-10:]
+    })
+
+@app.route('/logs/<name>')
+def view_log(name):
+    """
+    Просмотр логов (admin.log, error.log) через веб-морду.
+    """
+    log_file = f"{name}.log"
+    if not os.path.exists(log_file):
+        return f"Лог-файл {log_file} не найден", 404
+    with open(log_file, 'r', encoding='utf-8') as f:
+        content = f.read()
+    return f"<pre>{content}</pre>"
+
+# =====================================================================
+# ЗАПУСК
+# =====================================================================
+if __name__ == '__main__':
+    # Запускаем поток для Long Polling VK сообщений
+    Thread(target=start_vk_polling, daemon=True).start()
+    port = int(os.environ.get("PORT", 10000))
+    socketio.run(app, host='0.0.0.0', port=port, debug=False)
