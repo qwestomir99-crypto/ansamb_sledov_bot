@@ -1,8 +1,9 @@
 # ==========================================
 # Файл: services/autoposter.py
 # Справка: README.md → Автопостинг YouTube
-# Задача: публикация случайных видео с YouTube в VK с превью
-# Комментарий: видео отправляется как attachment, чтобы VK показывал обложку
+# Задача: публикация случайного видео из плейлиста в VK с превью
+# Комментарий: видео отправляется как attachment, чтобы VK показывал обложку.
+#              Использует dialogue.youtube_auto для получения видео.
 # Зависит от: requests, os, random, json
 # Вызывается из: bot.py (отдельный поток)
 # ==========================================
@@ -13,56 +14,8 @@ import json
 import requests
 from debug_utils import debug_log
 
-def get_random_video_from_channel():
-    """Получает случайное видео с канала через YouTube API"""
-    api_key = os.environ.get("YOUTUBE_API_KEY")
-    channel_id = os.environ.get("YOUTUBE_CHANNEL_ID")
-    
-    if not api_key:
-        debug_log("AUTOPOSTER", "YOUTUBE_API_KEY не настроен", "ERROR")
-        return None
-    
-    if not channel_id:
-        debug_log("AUTOPOSTER", "YOUTUBE_CHANNEL_ID не настроен", "ERROR")
-        return None
-    
-    url = "https://www.googleapis.com/youtube/v3/search"
-    params = {
-        "part": "snippet",
-        "channelId": channel_id,
-        "maxResults": 50,
-        "order": "date",
-        "type": "video",
-        "key": api_key
-    }
-    
-    try:
-        r = requests.get(url, params=params, timeout=15)
-        data = r.json()
-        
-        if "error" in data:
-            debug_log("AUTOPOSTER", f"API ошибка: {data['error']['message']}", "ERROR")
-            return None
-        
-        items = data.get("items", [])
-        if not items:
-            debug_log("AUTOPOSTER", "Видео не найдены", "WARNING")
-            return None
-        
-        item = random.choice(items)
-        
-        video = {
-            "id": item["id"]["videoId"],
-            "title": item["snippet"]["title"],
-            "published_at": item["snippet"]["publishedAt"],
-            "url": f"https://youtu.be/{item['id']['videoId']}"
-        }
-        debug_log("AUTOPOSTER", f"🎲 Выбрано случайное видео: {video['title']} (ID: {video['id']})")
-        return video
-        
-    except Exception as e:
-        debug_log("AUTOPOSTER", f"Ошибка запроса: {e}", "ERROR")
-        return None
+# Импортируем модуль для работы с плейлистом
+from dialogue.youtube_auto import get_random_video
 
 def get_random_quote():
     """Берёт случайную цитату из файла"""
@@ -121,8 +74,8 @@ def post_to_vk_with_preview(message, video_url, access_token, owner_id):
         return False, str(e)
 
 def check_and_publish():
-    """Публикует случайное видео с YouTube в VK с превью"""
-    debug_log("AUTOPOSTER", "=== НАЧАЛО ПУБЛИКАЦИИ СЛУЧАЙНОГО ВИДЕО ===")
+    """Публикует случайное видео из плейлиста в VK с превью"""
+    debug_log("AUTOPOSTER", "=== НАЧАЛО ПУБЛИКАЦИИ СЛУЧАЙНОГО ВИДЕО ИЗ ПЛЕЙЛИСТА ===")
     
     try:
         from dialogue.adaptive_modes import should_adaptive_publish
@@ -132,14 +85,15 @@ def check_and_publish():
     except ImportError:
         debug_log("AUTOPOSTER", "adaptive_modes не найден, продолжаем без проверки", "WARNING")
     
-    video = get_random_video_from_channel()
+    # Используем модуль youtube_auto для получения случайного видео из плейлиста
+    video = get_random_video()
     if not video:
-        debug_log("AUTOPOSTER", "Не удалось получить видео с канала", "WARNING")
+        debug_log("AUTOPOSTER", "Не удалось получить видео из плейлиста", "WARNING")
         return False
     
     quote = get_random_quote()
     
-    post_text = f"📜 *{quote}*\n\n🎬 *СЛУЧАЙНОЕ ВИДЕО С КАНАЛА*\n{video['title']}"
+    post_text = f"📜 *{quote}*\n\n🎬 *СЛУЧАЙНОЕ ВИДЕО ИЗ ПЛЕЙЛИСТА*\n{video['title']}"
     
     vk_token = os.environ.get("VK_TOKEN")
     vk_owner_id = os.environ.get("VK_OWNER_ID")
@@ -147,7 +101,7 @@ def check_and_publish():
     success, error = post_to_vk_with_preview(post_text, video['url'], vk_token, vk_owner_id)
     
     if success:
-        debug_log("AUTOPOSTER", "✅ Случайное видео успешно опубликовано в VK с превью!")
+        debug_log("AUTOPOSTER", "✅ Случайное видео из плейлиста успешно опубликовано в VK с превью!")
         return True
     else:
         debug_log("AUTOPOSTER", f"❌ Ошибка публикации: {error}", "ERROR")
@@ -155,7 +109,7 @@ def check_and_publish():
 
 def start_autoposter(config=None, vk_token=None, vk_owner_id=None):
     """Заглушка для обратной совместимости"""
-    debug_log("AUTOPOSTER", "Автопостинг YouTube (случайные видео) настроен. Проверка выполняется отдельным потоком.")
+    debug_log("AUTOPOSTER", "Автопостинг YouTube (случайные видео из плейлиста) настроен. Проверка выполняется отдельным потоком.")
     
     if config and config.get("autoposter", {}).get("test_on_start", False):
         check_and_publish()
