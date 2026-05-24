@@ -1,9 +1,10 @@
 # ==========================================
-# Файл: new_debugger/dialogue/shabbat_manager.py
+# Файл: dialogue/shabbat_manager.py
 # Справка: README.md → Управление Шаббатом
 # Задача: определяет, сейчас ли Шаббат (для Москвы)
-# Комментарий: Использует Hebcal API, координаты Москвы
-# Зависит от: requests, json, datetime
+# Комментарий: использует Hebcal API, координаты Москвы.
+#              Если API недоступен — возвращает False (режим покоя не активируется).
+# Зависит от: requests, json, datetime, pytz
 # Вызывается из: activity_modes.py
 # ==========================================
 
@@ -11,10 +12,14 @@ import os
 import json
 import requests
 from datetime import datetime
+import pytz
 from debug_utils import debug_log
 
 CONFIG_FILE = "config.json"
 SHABBAT_CACHE_FILE = "dialogue/data/shabbat_cache.json"
+
+# Часовой пояс Москвы
+MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 
 # Координаты Москвы (по умолчанию)
 MOSCOW_LAT = 55.7558
@@ -45,7 +50,7 @@ def fetch_shabbat_times(lat, lon):
         "lat": lat,
         "lng": lon,
         "tzid": "Europe/Moscow",
-        "dt": datetime.now().strftime("%Y-%m-%d")
+        "dt": datetime.now(MOSCOW_TZ).strftime("%Y-%m-%d")
     }
     
     try:
@@ -55,6 +60,9 @@ def fetch_shabbat_times(lat, lon):
             times = data.get('times', {})
             shabbat_start = datetime.fromisoformat(times.get('sunset', '').replace('Z', '+00:00'))
             shabbat_end = datetime.fromisoformat(times.get('tzeit', '').replace('Z', '+00:00'))
+            # Преобразуем в московский часовой пояс (на случай, если API вернул UTC)
+            shabbat_start = shabbat_start.astimezone(MOSCOW_TZ)
+            shabbat_end = shabbat_end.astimezone(MOSCOW_TZ)
             debug_log("SHABBAT", f"Шаббат: {shabbat_start} → {shabbat_end}")
             return shabbat_start, shabbat_end
         else:
@@ -69,7 +77,12 @@ def load_cached_times():
         try:
             with open(SHABBAT_CACHE_FILE, "r") as f:
                 data = json.load(f)
-                return datetime.fromisoformat(data['start']), datetime.fromisoformat(data['end'])
+                start = datetime.fromisoformat(data['start'])
+                end = datetime.fromisoformat(data['end'])
+                # Приводим к московскому часовому поясу
+                start = start.astimezone(MOSCOW_TZ) if start.tzinfo else MOSCOW_TZ.localize(start)
+                end = end.astimezone(MOSCOW_TZ) if end.tzinfo else MOSCOW_TZ.localize(end)
+                return start, end
         except:
             pass
     return None, None
@@ -83,21 +96,25 @@ def save_cached_times(start, end):
         debug_log("SHABBAT", f"Ошибка сохранения кэша: {e}", "ERROR")
 
 def is_shabbat():
-    """Возвращает True, если сейчас Шаббат"""
+    """
+    Возвращает True, если сейчас Шаббат (по Москве).
+    Если API не ответил — возвращает False (безопасный режим: не блокируем работу).
+    """
     lat, lon = get_coordinates()
-    now = datetime.now()
+    now_moscow = datetime.now(MOSCOW_TZ)
     
     start, end = load_cached_times()
-    if start and end and start.date() == now.date():
-        return start <= now <= end
+    if start and end and start.date() == now_moscow.date():
+        return start <= now_moscow <= end
     
     # Кэш устарел — обновляем
     start, end = fetch_shabbat_times(lat, lon)
     if start and end:
         save_cached_times(start, end)
-        return start <= now <= end
+        return start <= now_moscow <= end
     
-    debug_log("SHABBAT", "Не удалось получить время Шаббата", "WARNING")
+    # API не ответил — безопасный режим: Шаббат не активируем
+    debug_log("SHABBAT", "Не удалось получить время Шаббата, режим покоя ОТКЛЮЧЁН (safe mode)", "WARNING")
     return False
 
 if __name__ == "__main__":
