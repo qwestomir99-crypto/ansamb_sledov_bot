@@ -10,6 +10,8 @@
 import os
 import random
 import json
+import threading
+import time
 from datetime import datetime
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -18,7 +20,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 # ИМПОРТ МОДУЛЕЙ ПРОЕКТА
 # ==========================================
 from dialogue.button_map import get_admin_menu_keyboard, get_user_menu_keyboard, get_text, get_callback
-from dialogue.publisher import publish_post
+from dialogue.publisher import add_publication
 from dialogue.quotes import get_quotes_list, add_quote, set_quotes_interval, get_quotes_interval
 from debug_utils import debug_log
 from ping_utils import ping_self
@@ -35,6 +37,26 @@ def load_config():
 config = load_config()
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "tleem2026")
 ADMIN_USER_ID = int(os.environ.get("ADMIN_USER_ID", 0))
+
+# ==========================================
+# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# ==========================================
+def safe_delete(message, delay=3):
+    """Безопасно удаляет сообщение с задержкой"""
+    def _delete():
+        time.sleep(delay)
+        try:
+            bot = telebot.TeleBot(os.environ.get("BOT_TOKEN"))
+            bot.delete_message(message.chat.id, message.message_id)
+        except:
+            pass
+    threading.Thread(target=_delete, daemon=True).start()
+
+def send_report(bot, chat_id, text, delete_after=5):
+    """Отправляет отчёт и удаляет его через delete_after секунд"""
+    msg = bot.send_message(chat_id, text)
+    if delete_after > 0:
+        safe_delete(msg, delete_after)
 
 # ==========================================
 # АВТОРИЗАЦИЯ
@@ -84,6 +106,7 @@ def handle_admin_command(message, bot):
     # Если уже авторизован — показываем меню
     if is_admin_authorized(user_id):
         bot.reply_to(message, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
+        safe_delete(message, 3)
         return
     
     # Если команда содержит пароль (формат: "#админ пароль")
@@ -93,13 +116,15 @@ def handle_admin_command(message, bot):
         if authorize_admin(user_id, password):
             bot.reply_to(message, "✅ Авторизация успешна! Добро пожаловать в админ-панель.",
                         reply_markup=get_admin_menu())
+            safe_delete(message, 3)
         else:
-            bot.reply_to(message, "❌ Неверный пароль. Доступ запрещён.")
+            msg = bot.reply_to(message, "❌ Неверный пароль. Доступ запрещён.")
+            safe_delete(message, 3)
+            safe_delete(msg, 5)
         return
     
     # Если пароль не передан — запрашиваем
     bot.reply_to(message, "🔐 Введите пароль для входа в админ-панель:\n(или #админ пароль)")
-    # Ждём следующий ввод (обрабатывается в handle_message)
 
 # ==========================================
 # ОБРАБОТЧИКИ КНОПОК (вызываются из callbacks.py)
@@ -124,53 +149,59 @@ def show_add_post_ui(call, bot):
         "Или /cancel для отмены.",
         parse_mode='Markdown'
     )
-    # Сохраняем состояние, что пользователь в режиме добавления поста
-    # (обычно через словарь user_states)
+    # Удаляем сообщение с кнопкой
+    safe_delete(call.message, 1)
+    # Регистрируем следующий шаг
     bot.register_next_step_handler(msg, process_post_text, bot)
 
 def process_post_text(message, bot):
     """Обрабатывает текст поста и запрашивает теги."""
     if message.text == "/cancel":
-        bot.reply_to(message, "❌ Добавление поста отменено.", reply_markup=get_admin_menu())
+        msg = bot.reply_to(message, "❌ Добавление поста отменено.", reply_markup=get_admin_menu())
+        safe_delete(message, 3)
+        safe_delete(msg, 5)
         return
     
     # Сохраняем текст поста в временное хранилище
     user_id = message.from_user.id
-    temp_posts[user_id] = {"text": message.text}
+    if not hasattr(process_post_text, "temp_posts"):
+        process_post_text.temp_posts = {}
+    process_post_text.temp_posts[user_id] = {"text": message.text}
     
-    bot.send_message(
+    msg = bot.send_message(
         message.chat.id,
         "🏷️ Введите теги через пробел (например: #тлеем #ансамбль)\n"
         "Или /skip для пропуска"
     )
-    bot.register_next_step_handler(message, process_post_tags, bot, user_id)
+    bot.register_next_step_handler(msg, process_post_tags, bot, user_id)
+    safe_delete(message, 2)
 
 def process_post_tags(message, bot, user_id):
     """Обрабатывает теги и создаёт пост."""
     if message.text == "/skip":
         tags = []
     elif message.text == "/cancel":
-        bot.reply_to(message, "❌ Добавление поста отменено.", reply_markup=get_admin_menu())
+        msg = bot.reply_to(message, "❌ Добавление поста отменено.", reply_markup=get_admin_menu())
+        safe_delete(message, 3)
+        safe_delete(msg, 5)
         return
     else:
         tags = message.text.split()
     
-    # Создаём пост
-    post_data = temp_posts.get(user_id, {})
+    post_data = process_post_text.temp_posts.get(user_id, {})
     text = post_data.get("text", "")
     
     # Сохраняем в post_pool.json
-    from dialogue.publisher import save_post_to_pool
-    success = save_post_to_pool(text, tags, author_id=user_id)
+    from dialogue.post_manager import add_post_to_pool
+    success = add_post_to_pool(text, tags, author_id=user_id)
     
     if success:
-        bot.reply_to(message, "✅ Пост добавлен в пул публикаций!", reply_markup=get_admin_menu())
+        msg = bot.reply_to(message, "✅ Пост добавлен в пул публикаций!", reply_markup=get_admin_menu())
     else:
-        bot.reply_to(message, "❌ Ошибка при сохранении поста.", reply_markup=get_admin_menu())
+        msg = bot.reply_to(message, "❌ Ошибка при сохранении поста.", reply_markup=get_admin_menu())
     
-    # Очищаем временные данные
-    if user_id in temp_posts:
-        del temp_posts[user_id]
+    safe_delete(message, 3)
+    safe_delete(msg, 5)
 
 def show_vk_post_ui(call, bot):
     """Показывает интерфейс для отправки поста в VK."""
@@ -182,29 +213,77 @@ def show_vk_post_ui(call, bot):
         "Или /cancel для отмены.",
         parse_mode='Markdown'
     )
-    # Ждём следующий шаг (обрабатывается в bot.py)
+    safe_delete(call.message, 1)
     bot.register_next_step_handler(msg, process_vk_post, bot)
 
 def process_vk_post(message, bot):
-    """Обрабатывает текст/файл и отправляет в VK."""
+    """Обрабатывает текст/файл и отправляет в VK с отчётом."""
     if message.text == "/cancel":
-        bot.reply_to(message, "❌ Отправка в VK отменена.", reply_markup=get_admin_menu())
+        msg = bot.reply_to(message, "❌ Отправка в VK отменена.", reply_markup=get_admin_menu())
+        safe_delete(message, 3)
+        safe_delete(msg, 5)
         return
     
-    # Если есть файл (фото/видео/документ)
+    vk_token = os.environ.get("VK_TOKEN")
+    vk_owner_id = os.environ.get("VK_OWNER_ID")
+    
+    if not vk_token or not vk_owner_id:
+        report = "❌ VK_TOKEN или VK_OWNER_ID не заданы в переменных окружения"
+        msg = bot.reply_to(message, report)
+        safe_delete(message, 3)
+        safe_delete(msg, 10)
+        return
+    
+    # Если есть файл
     if message.photo or message.video or message.document:
-        # Логика загрузки медиа в VK (используем VK_TOKEN)
-        bot.reply_to(message, "⏳ Отправляю в VK...")
-        # Здесь должен быть вызов vk_uploader.upload_media()
-        bot.reply_to(message, "✅ Пост отправлен в VK!", reply_markup=get_admin_menu())
+        msg = bot.reply_to(message, "⏳ Отправляю в VK...")
+        safe_delete(message, 2)
+        
+        # Определяем тип файла
+        if message.photo:
+            file_id = message.photo[-1].file_id
+            file_info = bot.get_file(file_id)
+            downloaded = bot.download_file(file_info.file_path)
+            temp_path = f"/tmp/vk_photo_{file_id}.jpg"
+            with open(temp_path, "wb") as f:
+                f.write(downloaded)
+        elif message.video:
+            file_id = message.video.file_id
+            file_info = bot.get_file(file_id)
+            downloaded = bot.download_file(file_info.file_path)
+            temp_path = f"/tmp/vk_video_{file_id}.mp4"
+            with open(temp_path, "wb") as f:
+                f.write(downloaded)
+        else:
+            temp_path = None
+        
+        # Отправляем в VK
+        from services.vk_uploader import post_to_vk_with_media
+        success, url = post_to_vk_with_media(message.caption or "", vk_token, vk_owner_id, temp_path)
+        
+        if success:
+            report = f"✅ Пост опубликован в VK!\n{url}"
+        else:
+            report = f"❌ Ошибка VK: {url}"
+        
+        final_msg = bot.reply_to(message, report)
+        safe_delete(final_msg, 10)
+        
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
     else:
         # Только текст
         from dialogue.vk_uploader import post_to_vk
-        success, post_url = post_to_vk(message.text)
+        success, url = post_to_vk(message.text, vk_token, vk_owner_id)
+        
         if success:
-            bot.reply_to(message, f"✅ Пост опубликован в VK!\n{post_url}", reply_markup=get_admin_menu())
+            report = f"✅ Пост опубликован в VK!\n{url}"
         else:
-            bot.reply_to(message, f"❌ Ошибка при публикации: {post_url}", reply_markup=get_admin_menu())
+            report = f"❌ Ошибка VK: {url}"
+        
+        msg = bot.reply_to(message, report)
+        safe_delete(message, 3)
+        safe_delete(msg, 10)
 
 def show_quotes_panel(call, bot):
     """Показывает панель управления цитатами."""
@@ -242,7 +321,6 @@ def list_quotes(call, bot):
         )
         return
     
-    # Показываем последние 20 цитат
     text = "📖 *Последние 20 цитат:*\n\n"
     for i, q in enumerate(quotes[-20:], 1):
         text += f"{i}. {q[:80]}{'...' if len(q) > 80 else ''}\n"
@@ -267,19 +345,25 @@ def add_quote_ui(call, bot):
         "Или /cancel для отмены.",
         parse_mode='Markdown'
     )
+    safe_delete(call.message, 1)
     bot.register_next_step_handler(msg, process_new_quote, bot)
 
 def process_new_quote(message, bot):
     """Обрабатывает новую цитату и сохраняет её."""
     if message.text == "/cancel":
-        bot.reply_to(message, "❌ Добавление цитаты отменено.", reply_markup=get_admin_menu())
+        msg = bot.reply_to(message, "❌ Добавление цитаты отменено.", reply_markup=get_admin_menu())
+        safe_delete(message, 3)
+        safe_delete(msg, 5)
         return
     
     quote = message.text.strip()
     if add_quote(quote):
-        bot.reply_to(message, "✅ Цитата добавлена в базу!", reply_markup=get_admin_menu())
+        msg = bot.reply_to(message, "✅ Цитата добавлена в базу!", reply_markup=get_admin_menu())
     else:
-        bot.reply_to(message, "❌ Ошибка при сохранении цитаты.", reply_markup=get_admin_menu())
+        msg = bot.reply_to(message, "❌ Ошибка при сохранении цитаты.", reply_markup=get_admin_menu())
+    
+    safe_delete(message, 3)
+    safe_delete(msg, 5)
 
 def set_quote_interval_ui(call, bot):
     """Показывает интерфейс для изменения интервала цитат."""
@@ -290,12 +374,15 @@ def set_quote_interval_ui(call, bot):
         "Или /cancel для отмены.",
         parse_mode='Markdown'
     )
+    safe_delete(call.message, 1)
     bot.register_next_step_handler(msg, process_quote_interval, bot)
 
 def process_quote_interval(message, bot):
     """Устанавливает новый интервал цитат."""
     if message.text == "/cancel":
-        bot.reply_to(message, "❌ Изменение интервала отменено.", reply_markup=get_admin_menu())
+        msg = bot.reply_to(message, "❌ Изменение интервала отменено.", reply_markup=get_admin_menu())
+        safe_delete(message, 3)
+        safe_delete(msg, 5)
         return
     
     try:
@@ -303,9 +390,12 @@ def process_quote_interval(message, bot):
         if interval < 5 or interval > 720:
             raise ValueError
         set_quotes_interval(interval)
-        bot.reply_to(message, f"✅ Интервал цитат установлен на {interval} минут.", reply_markup=get_admin_menu())
+        msg = bot.reply_to(message, f"✅ Интервал цитат установлен на {interval} минут.", reply_markup=get_admin_menu())
     except ValueError:
-        bot.reply_to(message, "❌ Ошибка: введите число от 5 до 720.", reply_markup=get_admin_menu())
+        msg = bot.reply_to(message, "❌ Ошибка: введите число от 5 до 720.", reply_markup=get_admin_menu())
+    
+    safe_delete(message, 3)
+    safe_delete(msg, 5)
 
 def show_diagnostics(call, bot):
     """Показывает панель диагностики."""
@@ -331,17 +421,3 @@ def admin_logout(call, bot):
         message_id=call.message.message_id
     )
     bot.answer_callback_query(call.id)
-
-# ==========================================
-# ВРЕМЕННЫЕ ХРАНИЛИЩА
-# ==========================================
-temp_posts = {}  # user_id -> {text, tags, file}
-
-# ==========================================
-# ИНИЦИАЛИЗАЦИЯ (для совместимости)
-# ==========================================
-def register_admin_handlers(bot):
-    """Регистрирует обработчики команд (вызывается из bot.py)."""
-    # Обработчики уже зарегистрированы через handle_message
-    # Эта функция оставлена для совместимости со старым кодом
-    pass
