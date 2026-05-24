@@ -1,214 +1,147 @@
 # ==========================================
-# Модуль: dialogue/youtube_auto.py
-# Задача: работа с YouTube API (получение видео, проверка новых)
+# Файл: dialogue/youtube_auto.py
+# Справка: README.md → YouTube автопостинг
+# Задача: выбор случайного видео из плейлиста
+# Комментарий: кэширует список видео на час, не гоняется за новинками.
+#              Возвращает случайное видео (id, title, url).
+# Зависит от: requests, json, os, time, random
+# Вызывается из: services/autoposter.py (check_and_publish)
 # ==========================================
 
 import os
-import requests
 import json
+import random
+import time
+import requests
+
+CACHE_FILE = "dialogue/data/youtube_playlist_cache.json"
+CACHE_TTL = 3600  # 1 час
 
 def log(msg, level="INFO"):
-    print(f"[YOUTUBE_AUTO] {level}: {msg}")
+    print(f"[YOUTUBE_RANDOM] {level}: {msg}")
 
 def get_youtube_api_key():
-    """Получает API ключ из переменных окружения"""
     api_key = os.environ.get("YOUTUBE_API_KEY")
     if not api_key:
         log("YOUTUBE_API_KEY не задан", "ERROR")
     return api_key
 
-def get_youtube_channel_id():
-    """Получает ID канала из переменных окружения"""
-    channel_id = os.environ.get("YOUTUBE_CHANNEL_ID")
-    if not channel_id:
-        log("YOUTUBE_CHANNEL_ID не задан", "ERROR")
-    return channel_id
+def get_youtube_playlist_id():
+    playlist_id = os.environ.get("YOUTUBE_PLAYLIST_ID")
+    if not playlist_id:
+        log("YOUTUBE_PLAYLIST_ID не задан", "ERROR")
+    return playlist_id
 
-def get_latest_video(channel_id=None, api_key=None, max_results=1):
-    """
-    Получает последние видео с канала.
+def fetch_playlist_items(playlist_id, api_key):
+    """Загружает все видео из плейлиста через YouTube API"""
+    items = []
+    next_page_token = None
     
-    Args:
-        channel_id: ID канала YouTube
-        api_key: API ключ YouTube
-        max_results: количество видео (по умолчанию 1)
-    
-    Returns:
-        list: список видео [{"id": "...", "title": "...", "published_at": "..."}, ...]
-    """
-    if not channel_id:
-        channel_id = get_youtube_channel_id()
-    if not api_key:
-        api_key = get_youtube_api_key()
-    
-    if not channel_id or not api_key:
-        return []
-    
-    url = "https://www.googleapis.com/youtube/v3/search"
-    params = {
-        "part": "snippet",
-        "channelId": channel_id,
-        "maxResults": max_results,
-        "order": "date",
-        "type": "video",
-        "key": api_key
-    }
-    
-    try:
-        r = requests.get(url, params=params, timeout=15)
-        data = r.json()
+    while True:
+        url = "https://www.googleapis.com/youtube/v3/playlistItems"
+        params = {
+            "part": "snippet",
+            "playlistId": playlist_id,
+            "maxResults": 50,
+            "key": api_key
+        }
+        if next_page_token:
+            params["pageToken"] = next_page_token
         
-        if "error" in data:
-            log(f"API ошибка: {data['error']['message']}", "ERROR")
-            return []
-        
-        videos = []
-        for item in data.get("items", []):
-            videos.append({
-                "id": item["id"]["videoId"],
-                "title": item["snippet"]["title"],
-                "description": item["snippet"]["description"],
-                "published_at": item["snippet"]["publishedAt"],
-                "url": f"https://youtu.be/{item['id']['videoId']}"
-            })
-        
-        log(f"Получено {len(videos)} видео")
-        return videos
-    except Exception as e:
-        log(f"Ошибка запроса: {e}", "ERROR")
-        return []
-
-def get_video_by_id(video_id, api_key=None):
-    """
-    Получает информацию о конкретном видео по ID.
-    
-    Args:
-        video_id: ID видео YouTube
-        api_key: API ключ YouTube
-    
-    Returns:
-        dict: информация о видео или None
-    """
-    if not api_key:
-        api_key = get_youtube_api_key()
-    
-    if not api_key:
-        return None
-    
-    url = "https://www.googleapis.com/youtube/v3/videos"
-    params = {
-        "part": "snippet,statistics",
-        "id": video_id,
-        "key": api_key
-    }
-    
-    try:
-        r = requests.get(url, params=params, timeout=15)
-        data = r.json()
-        
-        if "error" in data:
-            log(f"API ошибка: {data['error']['message']}", "ERROR")
-            return None
-        
-        if data.get("items"):
-            item = data["items"][0]
-            return {
-                "id": video_id,
-                "title": item["snippet"]["title"],
-                "description": item["snippet"]["description"],
-                "views": item["statistics"].get("viewCount", 0),
-                "likes": item["statistics"].get("likeCount", 0),
-                "url": f"https://youtu.be/{video_id}"
-            }
-        
-        return None
-    except Exception as e:
-        log(f"Ошибка запроса: {e}", "ERROR")
-        return None
-
-def get_last_published_video_id():
-    """
-    Возвращает ID последнего опубликованного видео из кэша.
-    Кэш хранится в файле.
-    """
-    cache_file = "dialogue/data/last_youtube_video.json"
-    
-    if os.path.exists(cache_file):
         try:
-            with open(cache_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return data.get("last_video_id")
+            r = requests.get(url, params=params, timeout=15)
+            data = r.json()
+            
+            if "error" in data:
+                log(f"API ошибка: {data['error']['message']}", "ERROR")
+                break
+            
+            for item in data.get("items", []):
+                snippet = item["snippet"]
+                video_id = snippet["resourceId"]["videoId"]
+                items.append({
+                    "id": video_id,
+                    "title": snippet["title"],
+                    "url": f"https://youtu.be/{video_id}"
+                })
+            
+            next_page_token = data.get("nextPageToken")
+            if not next_page_token:
+                break
+                
         except Exception as e:
-            log(f"Ошибка чтения кэша: {e}", "ERROR")
+            log(f"Ошибка запроса: {e}", "ERROR")
+            break
     
-    return None
+    log(f"Загружено {len(items)} видео из плейлиста")
+    return items
 
-def save_last_published_video_id(video_id):
-    """
-    Сохраняет ID последнего опубликованного видео в кэш.
-    """
-    cache_file = "dialogue/data/last_youtube_video.json"
-    
-    os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+def load_cached_playlist():
+    """Загружает кэш плейлиста, если он не устарел"""
+    if not os.path.exists(CACHE_FILE):
+        return None
     
     try:
-        with open(cache_file, "w", encoding="utf-8") as f:
+        with open(CACHE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        if time.time() - data.get("timestamp", 0) < CACHE_TTL:
+            log(f"Загружено из кэша: {len(data['items'])} видео")
+            return data["items"]
+        else:
+            log("Кэш устарел")
+            return None
+    except Exception as e:
+        log(f"Ошибка чтения кэша: {e}", "ERROR")
+        return None
+
+def save_cached_playlist(items):
+    """Сохраняет плейлист в кэш"""
+    os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
+    try:
+        with open(CACHE_FILE, "w", encoding="utf-8") as f:
             json.dump({
-                "last_video_id": video_id,
-                "updated_at": __import__('time').time()
+                "timestamp": time.time(),
+                "items": items
             }, f, indent=2)
-        log(f"Сохранён ID видео: {video_id}")
+        log(f"Сохранено {len(items)} видео в кэш")
     except Exception as e:
         log(f"Ошибка сохранения кэша: {e}", "ERROR")
 
-def has_new_video():
+def get_random_video():
     """
-    Проверяет, есть ли новое видео на канале.
-    
-    Returns:
-        dict: новое видео или None, если новых нет
+    Возвращает случайное видео из плейлиста.
+    Кэширует список на CACHE_TTL секунд.
     """
-    videos = get_latest_video(max_results=1)
+    api_key = get_youtube_api_key()
+    playlist_id = get_youtube_playlist_id()
     
-    if not videos:
-        log("Не удалось получить видео с канала", "WARNING")
+    if not api_key or not playlist_id:
         return None
     
-    latest = videos[0]
-    last_id = get_last_published_video_id()
+    # Пытаемся загрузить из кэша
+    items = load_cached_playlist()
     
-    if last_id and last_id == latest["id"]:
-        log(f"Новых видео нет. Последнее: {latest['title']}")
+    if items is None:
+        items = fetch_playlist_items(playlist_id, api_key)
+        if items:
+            save_cached_playlist(items)
+        else:
+            return None
+    
+    if not items:
+        log("Плейлист пуст", "WARNING")
         return None
     
-    log(f"🔥 НОВОЕ ВИДЕО: {latest['title']}")
-    return latest
-
-def reset_cache():
-    """
-    Сбрасывает кэш (принудительно обновит все видео при следующей проверке)
-    """
-    cache_file = "dialogue/data/last_youtube_video.json"
-    if os.path.exists(cache_file):
-        os.remove(cache_file)
-        log("Кэш сброшен")
-        return True
-    return False
+    video = random.choice(items)
+    log(f"Выбрано случайное видео: {video['title']}")
+    return video
 
 # Для самостоятельного тестирования
 if __name__ == "__main__":
-    print("=== ТЕСТ YOUTUBE AUTO ===")
-    print(f"API Key: {get_youtube_api_key()[:10]}..." if get_youtube_api_key() else "API Key: None")
-    print(f"Channel ID: {get_youtube_channel_id()}")
-    
-    videos = get_latest_video(max_results=3)
-    print(f"\nПоследние видео:")
-    for v in videos:
-        print(f"  - {v['title']} ({v['id']})")
-    
-    print(f"\nПоследнее опубликованное ID: {get_last_published_video_id()}")
-    new = has_new_video()
-    if new:
-        print(f"🔥 Есть новое видео: {new['title']}")
+    print("=== ТЕСТ YOUTUBE RANDOM ===")
+    video = get_random_video()
+    if video:
+        print(f"🎬 Случайное видео: {video['title']}\n🔗 {video['url']}")
     else:
-        print("Новых видео нет")
+        print("❌ Не удалось получить видео")
