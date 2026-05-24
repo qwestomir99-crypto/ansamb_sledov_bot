@@ -2,26 +2,52 @@
 # Файл: bot.py
 # Задача: Telegram-бот (команды, админка, цитаты, публикации, агент)
 # Комментарий: запускается как worker на Render (или в потоке с веб-мордой)
-#              Не содержит Flask-сервера.
+#              Не содержит Flask-сервера. Веб-морда — в services/app.py.
 # Зависит от: pytelegrambotapi, telethon, requests, schedule
 # Вызывается из: Render (worker) или из main.py
 # ==========================================
 
 print("[DEBUG] 0. Начало загрузки bot.py")
 
+# ==========================================
+# 1. ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК (все потоки)
+# ==========================================
+import sys
+import threading
+import traceback
+from datetime import datetime
+
+ERROR_LOG = "error.log"
+
+def global_exception_handler(exc_type, exc_value, exc_traceback):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    tb_lines = traceback.format_tb(exc_traceback)
+    
+    with open(ERROR_LOG, "a", encoding="utf-8") as f:
+        f.write(f"{timestamp} | {exc_type.__name__}: {exc_value}\n")
+        f.write(''.join(tb_lines))
+        f.write("\n" + "-"*50 + "\n")
+    
+    print(f"[EXCEPTION] {exc_type.__name__}: {exc_value}")
+
+def thread_exception_handler(args):
+    global_exception_handler(args.exc_type, args.exc_value, args.exc_traceback)
+
+sys.excepthook = global_exception_handler
+threading.excepthook = thread_exception_handler
+
+# ==========================================
+# 2. ИМПОРТЫ
+# ==========================================
 import telebot
 import random
 import os
-import sys
-import threading
 import time
 import requests
 import json
 from datetime import datetime
 
-# ==========================================
-# НАСТРОЙКИ
-# ==========================================
+# Настройки
 try:
     from settings import *
     print("[DEBUG] Настройки загружены из settings.py")
@@ -43,9 +69,7 @@ except ImportError:
 if DEBUG_IMPORTS:
     print(f"[DEBUG] Настройки: VK_READER={ENABLE_VK_READER}, JOURNALIST={ENABLE_JOURNALIST}")
 
-# ==========================================
-# ИМПОРТ МОДУЛЕЙ БОТА
-# ==========================================
+# Внутренние модули
 from ping_utils import ping_self, start_background_pinger
 from services.agent_pinger import start_agent_pinger
 from dialogue.agent import ask_agent
@@ -72,7 +96,7 @@ if ENABLE_CALLBACKS:
     from dialogue.callbacks import register_callback_handlers
 
 # ==========================================
-# КОНФИГ И ТОКЕНЫ
+# 3. КОНФИГ И ТОКЕНЫ
 # ==========================================
 CONFIG_FILE = "config.json"
 def load_config():
@@ -97,7 +121,7 @@ silence_answers = ["👁️", "⏚"]
 os.chdir(os.path.dirname(sys.argv[0]))
 
 # ==========================================
-# ЗАПУСК ПОТОКОВ МОДУЛЕЙ
+# 4. ЗАПУСК ПОТОКОВ МОДУЛЕЙ
 # ==========================================
 if ENABLE_VK_READER:
     threading.Thread(target=vk_reader_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
@@ -123,7 +147,7 @@ if ENABLE_CALLBACKS:
     register_callback_handlers(bot, config)
 
 # ==========================================
-# ОБРАБОТЧИКИ КОМАНД TELEGRAM
+# 5. ОБРАБОТЧИКИ КОМАНД TELEGRAM
 # ==========================================
 @bot.message_handler(commands=['start'])
 def send_start(message):
@@ -236,7 +260,7 @@ def handle_message(message):
         bot.reply_to(message, random.choice(silence_answers))
 
 # ==========================================
-# ЗАПУСК БОТА
+# 6. ЗАПУСК БОТА
 # ==========================================
 print("Бот запущен. Ритм 0,8 Гц стабилен.")
 start_background_pinger(60)
