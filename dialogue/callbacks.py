@@ -3,10 +3,13 @@
 # Справка: README.md → Обработчики кнопок
 # Задача: обработка нажатий на инлайн-кнопки (callback_data)
 # Комментарий: использует button_map.py для единого управления callback'ами
+#              Добавлены отчёты и автоудаление сообщений
 # Зависит от: telebot, button_map, admin_commands, quotes, publisher
 # Вызывается из: bot.py (регистрация через register_callback_handlers)
 # ==========================================
 
+import time
+import threading
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -19,8 +22,27 @@ from dialogue.admin_commands import (
     show_quotes_panel, list_quotes, add_quote_ui, set_quote_interval_ui,
     show_diagnostics, admin_logout
 )
-from dialogue.user_settings import set_user_mood, get_moods_keyboard
 from debug_utils import debug_log
+
+# ==========================================
+# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# ==========================================
+def safe_delete(message, delay=3):
+    """Безопасно удаляет сообщение с задержкой"""
+    def _delete():
+        time.sleep(delay)
+        try:
+            bot = telebot.TeleBot(os.environ.get("BOT_TOKEN"))
+            bot.delete_message(message.chat.id, message.message_id)
+        except:
+            pass
+    threading.Thread(target=_delete, daemon=True).start()
+
+def send_report(bot, chat_id, text, delete_after=5):
+    """Отправляет отчёт и удаляет его через delete_after секунд"""
+    msg = bot.send_message(chat_id, text)
+    if delete_after > 0:
+        safe_delete(msg, delete_after)
 
 # ==========================================
 # ОСНОВНАЯ ФУНКЦИЯ РЕГИСТРАЦИИ
@@ -39,31 +61,38 @@ def register_callback_handlers(bot, config):
     def callback_manage_bot(call):
         debug_log("CALLBACK", f"Админ-панель от {call.from_user.id}")
         show_admin_panel(call, bot)
+        bot.answer_callback_query(call.id)
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("add_post"))
     def callback_add_post(call):
         debug_log("CALLBACK", f"Добавление поста от {call.from_user.id}")
         show_add_post_ui(call, bot)
+        bot.answer_callback_query(call.id)
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("vk_post"))
     def callback_vk_post(call):
         debug_log("CALLBACK", f"Пост в VK от {call.from_user.id}")
         show_vk_post_ui(call, bot)
+        bot.answer_callback_query(call.id)
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("manage_quotes"))
     def callback_manage_quotes(call):
         debug_log("CALLBACK", f"Управление цитатами от {call.from_user.id}")
         show_quotes_panel(call, bot)
+        bot.answer_callback_query(call.id)
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("diagnostics"))
     def callback_diagnostics(call):
         debug_log("CALLBACK", f"Диагностика от {call.from_user.id}")
         show_diagnostics(call, bot)
+        bot.answer_callback_query(call.id)
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("logout"))
     def callback_logout(call):
         debug_log("CALLBACK", f"Выход админа {call.from_user.id}")
         admin_logout(call, bot)
+        send_report(bot, call.message.chat.id, "👋 Вы вышли из админ-панели", 5)
+        bot.answer_callback_query(call.id)
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("back_to_admin"))
     def callback_back_to_admin(call):
@@ -87,6 +116,7 @@ def register_callback_handlers(bot, config):
             reply_markup=get_admin_menu_keyboard()
         )
         bot.answer_callback_query(call.id)
+        safe_delete(call.message, 5)
     
     # ==========================================
     # 2. КНОПКИ УПРАВЛЕНИЯ ЦИТАТАМИ
@@ -96,16 +126,20 @@ def register_callback_handlers(bot, config):
     def callback_list_quotes(call):
         debug_log("CALLBACK", f"Список цитат от {call.from_user.id}")
         list_quotes(call, bot)
+        bot.answer_callback_query(call.id)
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("add_quote"))
     def callback_add_quote(call):
         debug_log("CALLBACK", f"Добавление цитаты от {call.from_user.id}")
         add_quote_ui(call, bot)
+        bot.answer_callback_query(call.id)
+        send_report(bot, call.message.chat.id, "📜 Отправьте текст цитаты", 10)
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("set_quote_interval"))
     def callback_set_quote_interval(call):
         debug_log("CALLBACK", f"Изменение интервала цитат от {call.from_user.id}")
         set_quote_interval_ui(call, bot)
+        bot.answer_callback_query(call.id)
     
     # ==========================================
     # 3. КНОПКИ РЕЖИМОВ (утро/день/вечер/ночь)
@@ -116,7 +150,8 @@ def register_callback_handlers(bot, config):
         debug_log("CALLBACK", f"Режим 'Утро' от {call.from_user.id}")
         from dialogue.activity_modes import set_mode
         set_mode("утро")
-        bot.answer_callback_query(call.id, "🌅 Режим 'Утро' активирован")
+        send_report(bot, call.message.chat.id, "🌅 Режим 'Утро' активирован", 5)
+        bot.answer_callback_query(call.id)
         show_admin_panel(call, bot)
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("set_mode_day"))
@@ -124,7 +159,8 @@ def register_callback_handlers(bot, config):
         debug_log("CALLBACK", f"Режим 'День' от {call.from_user.id}")
         from dialogue.activity_modes import set_mode
         set_mode("день")
-        bot.answer_callback_query(call.id, "☀️ Режим 'День' активирован")
+        send_report(bot, call.message.chat.id, "☀️ Режим 'День' активирован", 5)
+        bot.answer_callback_query(call.id)
         show_admin_panel(call, bot)
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("set_mode_evening"))
@@ -132,7 +168,8 @@ def register_callback_handlers(bot, config):
         debug_log("CALLBACK", f"Режим 'Вечер' от {call.from_user.id}")
         from dialogue.activity_modes import set_mode
         set_mode("вечер")
-        bot.answer_callback_query(call.id, "🌙 Режим 'Вечер' активирован")
+        send_report(bot, call.message.chat.id, "🌙 Режим 'Вечер' активирован", 5)
+        bot.answer_callback_query(call.id)
         show_admin_panel(call, bot)
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("set_mode_night"))
@@ -140,7 +177,8 @@ def register_callback_handlers(bot, config):
         debug_log("CALLBACK", f"Режим 'Ночь' от {call.from_user.id}")
         from dialogue.activity_modes import set_mode
         set_mode("ночь")
-        bot.answer_callback_query(call.id, "🌌 Режим 'Ночь' активирован")
+        send_report(bot, call.message.chat.id, "🌌 Режим 'Ночь' активирован", 5)
+        bot.answer_callback_query(call.id)
         show_admin_panel(call, bot)
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("toggle_ping"))
@@ -148,7 +186,8 @@ def register_callback_handlers(bot, config):
         debug_log("CALLBACK", f"Переключение пинга от {call.from_user.id}")
         from ping_utils import toggle_ping
         new_state = toggle_ping()
-        bot.answer_callback_query(call.id, f"🔄 Пинг {'включён' if new_state else 'выключён'}")
+        send_report(bot, call.message.chat.id, f"🔄 Пинг {'включён' if new_state else 'выключён'}", 5)
+        bot.answer_callback_query(call.id)
         show_admin_panel(call, bot)
     
     # ==========================================
@@ -160,18 +199,23 @@ def register_callback_handlers(bot, config):
         debug_log("CALLBACK", f"Просмотр admin.log от {call.from_user.id}")
         from dialogue.admin.diagnostics import view_log
         view_log(call, bot, "admin")
+        bot.answer_callback_query(call.id)
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("view_error_log"))
     def callback_view_error_log(call):
         debug_log("CALLBACK", f"Просмотр error.log от {call.from_user.id}")
         from dialogue.admin.diagnostics import view_log
         view_log(call, bot, "error")
+        bot.answer_callback_query(call.id)
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("clear_logs"))
     def callback_clear_logs(call):
         debug_log("CALLBACK", f"Очистка логов от {call.from_user.id}")
         from dialogue.admin.diagnostics import clear_logs
         clear_logs(call, bot)
+        send_report(bot, call.message.chat.id, "🧹 Логи очищены", 5)
+        bot.answer_callback_query(call.id)
+        show_admin_panel(call, bot)
     
     # ==========================================
     # 5. ПОЛЬЗОВАТЕЛЬСКИЕ КНОПКИ
@@ -195,6 +239,7 @@ def register_callback_handlers(bot, config):
             parse_mode='Markdown'
         )
         bot.answer_callback_query(call.id)
+        safe_delete(call.message, 10)
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("user_tleem"))
     def callback_user_tleem(call):
@@ -207,6 +252,7 @@ def register_callback_handlers(bot, config):
             message_id=call.message.message_id
         )
         bot.answer_callback_query(call.id)
+        safe_delete(call.message, 10)
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("user_fix"))
     def callback_user_fix(call):
@@ -217,6 +263,7 @@ def register_callback_handlers(bot, config):
             message_id=call.message.message_id
         )
         bot.answer_callback_query(call.id)
+        safe_delete(call.message, 10)
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("user_flash"))
     def callback_user_flash(call):
@@ -227,6 +274,7 @@ def register_callback_handlers(bot, config):
             message_id=call.message.message_id
         )
         bot.answer_callback_query(call.id)
+        safe_delete(call.message, 10)
     
     # ==========================================
     # 6. КНОПКИ НАСТРОЕНИЯ (из user_settings)
@@ -236,13 +284,16 @@ def register_callback_handlers(bot, config):
     def callback_set_mood(call):
         mood_id = call.data.replace("set_mood_", "")
         debug_log("CALLBACK", f"Установка настроения {mood_id} от {call.from_user.id}")
+        from dialogue.user_settings import set_user_mood
         set_user_mood(call.from_user.id, mood_id)
         bot.edit_message_text(
-            f"✅ Настроение изменено.",
+            "✅ Настроение изменено.",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id
         )
+        send_report(bot, call.message.chat.id, f"✅ Настроение обновлено", 5)
         bot.answer_callback_query(call.id)
+        safe_delete(call.message, 5)
     
     @bot.callback_query_handler(func=lambda call: call.data == "close_mood_menu")
     def callback_close_mood(call):
@@ -257,7 +308,9 @@ def register_callback_handlers(bot, config):
     @bot.callback_query_handler(func=lambda call: True)
     def callback_unknown(call):
         debug_log("CALLBACK", f"Неизвестный callback: {call.data} от {call.from_user.id}")
-        bot.answer_callback_query(call.id, "⚠️ Кнопка не активна или устарела")
+        send_report(bot, call.message.chat.id, "⚠️ Кнопка не активна или устарела", 5)
+        bot.answer_callback_query(call.id, "⚠️ Кнопка не активна")
+        safe_delete(call.message, 5)
     
     debug_log("CALLBACKS", "✅ Все обработчики кнопок зарегистрированы")
 
