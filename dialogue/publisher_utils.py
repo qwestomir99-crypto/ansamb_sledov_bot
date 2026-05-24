@@ -1,6 +1,10 @@
 # ==========================================
-# Модуль: dialogue/publisher_utils.py
+# Файл: dialogue/publisher_utils.py
+# Справка: README.md → Публикатор / Утилиты
 # Задача: отправка постов в Telegram и VK с поддержкой медиа
+# Комментарий: использует utils.escape_markdown для безопасной отправки текста
+# Зависит от: requests, os, random, json, utils
+# Вызывается из: publisher.py
 # ==========================================
 
 import requests
@@ -9,6 +13,7 @@ import random
 import json
 import time
 from datetime import datetime
+from utils import escape_markdown
 
 CONFIG_FILE = "config.json"
 QUOTES_FILE = "dialogue/data/quotes.txt"
@@ -29,22 +34,16 @@ def get_random_quote():
     return random.choice(quotes) if quotes else "Ритм 0,8 Гц стабилен. Сеть тлеет."
 
 def load_vk_posts():
-    """Загружает сохранённые посты VK из файла"""
     if not os.path.exists(VK_POSTS_FILE):
         return []
     with open(VK_POSTS_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
 def get_random_own_post_from_vk():
-    """
-    Берёт случайный свой пост из VK с медиа.
-    Возвращает dict с post_id, text, attachments
-    """
     posts = load_vk_posts()
     if not posts:
         return None
     
-    # Фильтруем посты с медиа
     posts_with_media = [p for p in posts if p.get("attachments") or p.get("text")]
     if not posts_with_media:
         posts_with_media = posts
@@ -117,17 +116,13 @@ def upload_photo_to_vk(upload_url, file_path, vk_token):
         return None
 
 def post_to_vk(message, tags, access_token, owner_id, file_path=None, auto_quote=True, auto_tags=True, repost_from=None):
-    """
-    Отправляет пост в VK.
-    Если repost_from указан, прикрепляет медиа из старого поста.
-    """
+    """Отправляет пост в VK с экранированием для MarkdownV2."""
     print(f"[VK] post_to_vk вызван: message={message[:50]}..., repost_from={repost_from}")
     
     if not access_token or not owner_id:
         print("[VK] Нет токена или owner_id")
         return False, "❌ Ошибка авторизации VK. Проверь токен."
     
-    # Добавляем цитату
     if auto_quote and message and len(message) < 500:
         quote = get_random_quote()
         message = f"{message}\n\n📜 {quote}"
@@ -147,10 +142,10 @@ def post_to_vk(message, tags, access_token, owner_id, file_path=None, auto_quote
         "from_group": 1
     }
     
-    # Если есть репост из своего поста — прикрепляем его медиа
+    # Репост
     if repost_from and repost_from.get("attachments"):
         attachments = []
-        for att in repost_from["attachments"][:5]:  # максимум 5 вложений
+        for att in repost_from["attachments"][:5]:
             if att.get("type") == "photo":
                 photo = att.get("photo", {})
                 if photo.get("owner_id") and photo.get("id"):
@@ -163,7 +158,7 @@ def post_to_vk(message, tags, access_token, owner_id, file_path=None, auto_quote
             params['attachments'] = ",".join(attachments)
             print(f"[VK] Прикреплены вложения из репоста: {len(attachments)}")
     
-    # Если есть прямой файл — загружаем его
+    # Прямой файл
     elif file_path and os.path.exists(file_path):
         print(f"[VK] Файл найден: {file_path}")
         ext = os.path.splitext(file_path)[1].lower()
@@ -197,6 +192,7 @@ def post_to_vk(message, tags, access_token, owner_id, file_path=None, auto_quote
         return False, f"❌ Ошибка сети: {e}"
 
 def post_to_telegram(bot, chat_id, message, file_path=None, tags=None, auto_quote=True, auto_tags=True):
+    """Отправляет пост в Telegram с экранированием caption."""
     if auto_quote and message and len(message) < 500:
         quote = get_random_quote()
         message = f"{message}\n\n📜 {quote}"
@@ -210,30 +206,39 @@ def post_to_telegram(bot, chat_id, message, file_path=None, tags=None, auto_quot
     elif tags and not message:
         full_message = tags
     
+    # Экранируем caption для Telegram
+    safe_caption = escape_markdown(full_message) if full_message else None
+    
     try:
         if file_path and os.path.exists(file_path):
             ext = os.path.splitext(file_path)[1].lower()
             if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
                 with open(file_path, 'rb') as f:
-                    if full_message:
-                        bot.send_photo(chat_id, f, caption=full_message, parse_mode='Markdown')
+                    if safe_caption:
+                        bot.send_photo(chat_id, f, caption=safe_caption, parse_mode='MarkdownV2')
                     else:
                         bot.send_photo(chat_id, f)
             elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
                 with open(file_path, 'rb') as f:
-                    if full_message:
-                        bot.send_video(chat_id, f, caption=full_message, parse_mode='Markdown')
+                    if safe_caption:
+                        bot.send_video(chat_id, f, caption=safe_caption, parse_mode='MarkdownV2')
                     else:
                         bot.send_video(chat_id, f)
+            elif ext in ['.mp3', '.m4a', '.wav']:
+                with open(file_path, 'rb') as f:
+                    if safe_caption:
+                        bot.send_audio(chat_id, f, caption=safe_caption, parse_mode='MarkdownV2')
+                    else:
+                        bot.send_audio(chat_id, f)
             else:
                 with open(file_path, 'rb') as f:
-                    if full_message:
-                        bot.send_document(chat_id, f, caption=full_message, parse_mode='Markdown')
+                    if safe_caption:
+                        bot.send_document(chat_id, f, caption=safe_caption, parse_mode='MarkdownV2')
                     else:
                         bot.send_document(chat_id, f)
         else:
-            if full_message:
-                bot.send_message(chat_id, full_message, parse_mode='Markdown')
+            if safe_caption:
+                bot.send_message(chat_id, safe_caption, parse_mode='MarkdownV2')
             else:
                 print(f"[PUBLISHER] Нет текста и файла для публикации в {chat_id}")
                 return False
