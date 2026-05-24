@@ -106,7 +106,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 24.05.2026 20:59:57*
+*Обновлено: 24.05.2026 21:30:04*
 
 | Файл | Статус |
 |------|--------|
@@ -130,16 +130,16 @@
 | `dialogue/button_map.py` | ✅ Redmi-шапка |
 | `dialogue/callbacks.py` | ✅ Redmi-шапка |
 | `dialogue/color_logger.py` | ✅ Redmi-шапка |
-| `dialogue/exception_handler.py` | ❌ Без шапки |
+| `dialogue/exception_handler.py` | ✅ Redmi-шапка |
 | `dialogue/handlers.py` | ✅ Redmi-шапка |
 | `dialogue/help_menu.py` | ✅ Redmi-шапка |
-| `dialogue/journalist.py` | ❌ Без шапки |
-| `dialogue/ping_modes.py` | ❌ Без шапки |
-| `dialogue/post_manager.py` | ❌ Без шапки |
+| `dialogue/journalist.py` | ✅ Redmi-шапка |
+| `dialogue/ping_modes.py` | ✅ Redmi-шапка |
+| `dialogue/post_manager.py` | ✅ Redmi-шапка |
 | `dialogue/publisher.py` | ✅ Redmi-шапка |
 | `dialogue/publisher_utils.py` | ❌ Без шапки |
 | `dialogue/quotes.py` | ✅ Redmi-шапка |
-| `dialogue/scheduler.py` | ❌ Без шапки |
+| `dialogue/scheduler.py` | ✅ Redmi-шапка |
 | `dialogue/setting.py` | ❌ Без шапки |
 | `dialogue/shabbat_manager.py` | ✅ Redmi-шапка |
 | `dialogue/user_settings.py` | ✅ Redmi-шапка |
@@ -155,7 +155,7 @@
 | `services/app.py` | ✅ Redmi-шапка |
 | `services/autoposter.py` | ✅ Redmi-шапка |
 | `services/dialogue/exception_handler.py` | ✅ Redmi-шапка |
-| `services/photo_reader.py` | ❌ Без шапки |
+| `services/photo_reader.py` | ✅ Redmi-шапка |
 | `services/vk_reader.py` | ❌ Без шапки |
 | `services/vk_uploader.py` | ✅ Redmi-шапка |
 | `services/web.py` | ✅ Redmi-шапка |
