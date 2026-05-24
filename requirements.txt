@@ -1,7 +1,5 @@
 pytelegrambotapi
 flask
-flask-socketio
-gevent
 requests
 telethon
 gunicorn
