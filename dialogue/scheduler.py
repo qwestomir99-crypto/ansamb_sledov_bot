@@ -1,16 +1,29 @@
+# ==========================================
+# Файл: dialogue/scheduler.py
+# Справка: README.md → Планировщик / Полуночный ритуал
+# Задача: отправка мантры в полночь по московскому времени
+# Комментарий: проверяет время раз в минуту, отправляет ритуал не чаще раза в день
+# Зависит от: time, json, datetime, pytz
+# Вызывается из: bot.py (отдельный поток, если ENABLE_SCHEDULER = True)
+# ==========================================
+
 import time
 import json
 import os
 from datetime import datetime
+import pytz
 
 CONFIG_FILE = "config.json"
+
+# Часовой пояс для ритуалов — Москва
+RITUAL_TIMEZONE = pytz.timezone('Europe/Moscow')
 
 def load_config():
     with open(CONFIG_FILE, "r") as f:
         return json.load(f)
 
 def save_last_ritual_date(date_str):
-    """Сохраняет дату последнего ритуала"""
+    """Сохраняет дату последнего ритуала (по московскому времени)"""
     config = load_config()
     if "ritual" not in config:
         config["ritual"] = {}
@@ -47,11 +60,15 @@ def send_midnight_ritual(bot, tg_chat_id):
         print(f"[SCHEDULER] Ошибка ритуала: {e}")
 
 def check_midnight_ritual(bot, tg_chat_id):
-    """Проверяет, нужно ли отправить ритуал"""
-    now = datetime.now()
-    # Проверяем, что время 00:00
-    if now.hour == 0 and now.minute == 0:
-        today_str = now.strftime("%Y-%m-%d")
+    """
+    Проверяет, нужно ли отправить ритуал.
+    Ориентируется на московское время (Europe/Moscow).
+    """
+    now_moscow = datetime.now(RITUAL_TIMEZONE)
+    
+    # Проверяем, что сейчас 00:00 по Москве
+    if now_moscow.hour == 0 and now_moscow.minute == 0:
+        today_str = now_moscow.strftime("%Y-%m-%d")
         last_ritual = load_last_ritual_date()
         if last_ritual != today_str:
             send_midnight_ritual(bot, tg_chat_id)
@@ -66,7 +83,7 @@ def scheduler_loop(bot, tg_chat_id):
     
     while True:
         try:
-            # Полуночный ритуал
+            # Полуночный ритуал (по Москве)
             check_midnight_ritual(bot, tg_chat_id)
             
             # Здесь можно добавить другие задачи:
