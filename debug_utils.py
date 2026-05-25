@@ -2,9 +2,10 @@
 # Файл: debug_utils.py
 # Справка: README.md → Отладка / Дебаггер
 # Задача: единая система логирования для всех модулей
-# Комментарий: поддерживает отправку отчётов в Telegram и веб-морду
-# Зависит от: logging, os, datetime, telebot (опционально)
-# Вызывается из: bot.py, app.py, agent.py, services/*.py
+# Комментарий: ротация логов (1 МБ, 1 бэкап), отправка отчётов в Telegram и веб-морду
+#              Поддерживает логирование из bot.py, app.py, agent.py, services/*.py, dialogue/*.py
+# Зависит от: logging, os, datetime, traceback
+# Вызывается из: bot.py, app.py, agent.py, services/*.py, dialogue/*.py
 # ==========================================
 
 import logging
@@ -18,7 +19,7 @@ from logging.handlers import RotatingFileHandler
 # 1. НАСТРОЙКА ЛОГГЕРА
 # ==========================================
 
-# Глобальный логгер
+# Глобальный логгер Ансамбля
 debug_logger = logging.getLogger("AnsamblDebug")
 debug_logger.setLevel(logging.DEBUG)
 
@@ -99,11 +100,11 @@ def get_logs(limit=100):
         str: текст лога
     """
     try:
-        # Пытаемся прочитать основной лог
         if os.path.exists(log_file):
             with open(log_file, "r", encoding="utf-8") as f:
                 lines = f.readlines()
-                return ''.join(lines[-limit:])
+                # Возвращаем последние limit строк
+                return ''.join(lines[-limit:]) if lines else "Лог-файл пуст"
         else:
             return "Лог-файл не найден"
     except Exception as e:
@@ -111,7 +112,10 @@ def get_logs(limit=100):
 
 def get_logs_as_dict(limit=100):
     """
-    Возвращает последние N строк лога в виде списка словарей (для JSON API).
+    Возвращает последние N строк лога в виде списка словарей (для JSON API веб-морды).
+    
+    Returns:
+        list: [{"timestamp": "...", "level": "...", "module": "...", "message": "..."}, ...]
     """
     try:
         if not os.path.exists(log_file):
@@ -122,8 +126,11 @@ def get_logs_as_dict(limit=100):
         
         logs = []
         for line in lines:
+            line = line.strip()
+            if not line:
+                continue
             # Парсим строку лога (формат: 2025-05-25 12:34:56 | INFO | MODULE | message)
-            parts = line.strip().split(" | ", 3)
+            parts = line.split(" | ", 3)
             if len(parts) >= 4:
                 logs.append({
                     "timestamp": parts[0],
@@ -132,18 +139,19 @@ def get_logs_as_dict(limit=100):
                     "message": parts[3]
                 })
             else:
+                # fallback для нестандартных строк
                 logs.append({
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "level": "INFO",
                     "module": "unknown",
-                    "message": line.strip()
+                    "message": line
                 })
         return logs
     except Exception as e:
         return [{"level": "ERROR", "message": f"Ошибка парсинга логов: {e}"}]
 
 # ==========================================
-# 6. ОТПРАВКА ОТЧЁТОВ (опционально, через бота)
+# 6. ОТПРАВКА ОТЧЁТОВ В TELEGRAM
 # ==========================================
 
 def send_debug_report(bot, chat_id, limit=100):
@@ -156,36 +164,33 @@ def send_debug_report(bot, chat_id, limit=100):
         limit: количество строк лога
     """
     logs = get_logs(limit)
-    if not logs or logs == "Лог-файл не найден":
+    if not logs or logs == "Лог-файл не найден" or logs == "Лог-файл пуст":
         bot.send_message(chat_id, "📭 Лог-файл пуст или не найден.")
         return
     
-    # Разбиваем на части (Telegram ограничение 4096 символов)
+    # Telegram ограничение на длину сообщения — 4096 символов
     max_len = 4000
-    for i in range(0, len(logs), max_len):
-        part = logs[i:i+max_len]
-        bot.send_message(chat_id, f"```\n{part}\n```", parse_mode='Markdown')
+    if len(logs) <= max_len:
+        bot.send_message(chat_id, f"```\n{logs}\n```", parse_mode='Markdown')
+    else:
+        # Разбиваем на части
+        for i in range(0, len(logs), max_len):
+            part = logs[i:i+max_len]
+            bot.send_message(chat_id, f"```\n{part}\n```", parse_mode='Markdown')
 
 # ==========================================
-# 7. ОЧИСТКА СТАРЫХ ЛОГОВ (вызывается при старте)
-# ==========================================
-
-def clean_old_logs():
-    """
-    Очищает старые логи (вызывается при старте бота).
-    Оставляет только текущий debug.log и один бэкап.
-    """
-    # RotatingFileHandler сам управляет ротацией
-    # Эта функция для ручной очистки, если нужно
-    pass
-
-# ==========================================
-# 8. ТЕСТОВЫЙ ЗАПУСК
+# 7. ТЕСТОВЫЙ ЗАПУСК
 # ==========================================
 if __name__ == "__main__":
+    print("=== ТЕСТ ДЕБАГГЕРА ===\n")
     debug_log("TEST", "Дебаггер загружен", "INFO")
     debug_log("TEST", "Тестовое сообщение", "DEBUG")
     debug_log("TEST", "Тестовое предупреждение", "WARNING")
     debug_log("TEST", "Тестовая ошибка", "ERROR")
+    
     print("\n=== Последние 10 строк лога ===")
     print(get_logs(10))
+    
+    print("\n=== Логи в формате JSON ===")
+    import json
+    print(json.dumps(get_logs_as_dict(5), indent=2, ensure_ascii=False))
