@@ -3,6 +3,7 @@
 # Справка: README.md → Веб-морда
 # Задача: единый веб-интерфейс для VK, Telegram и YouTube (прокси)
 # Комментарий: тема оформления задаётся переменной WEB_THEME
+#              Добавлен дебаггер (логи, отчёты)
 # Зависит от: flask, flask-socketio, vk_api, telebot, yt-dlp, python-dotenv
 # Вызывается из: Render (web service, start command: gunicorn app:app)
 # ==========================================
@@ -34,6 +35,7 @@ if not ADMIN_PASSWORD:
 SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "secret_traces_key_6")
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 THEME_CSS = os.environ.get("WEB_THEME", "macos.css")
+ADMIN_USER_ID = int(os.environ.get("ADMIN_USER_ID", 0))
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = SECRET_KEY
@@ -42,9 +44,24 @@ app.config['SESSION_COOKIE_SECURE'] = True
 
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+# Telegram бот для отправки ответов
 bot = telebot.TeleBot(BOT_TOKEN) if BOT_TOKEN else None
+
+# Хранилище сообщений (в памяти)
 messages = []
 
+# ==========================================
+# ДЕБАГГЕР
+# ==========================================
+from debug_utils import debug_log, get_logs_as_dict, send_debug_report
+
+def log_web(level, message):
+    """Логирование из веб-морды"""
+    debug_log("WEB_MORDA", message, level)
+
+# ==========================================
+# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# ==========================================
 QUOTES_FILE = "dialogue/data/quotes.txt"
 
 def get_quotes():
@@ -64,6 +81,9 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
+# ==========================================
+# СТАТИЧЕСКИЕ ФАЙЛЫ
+# ==========================================
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     return send_from_directory('static', filename)
@@ -95,12 +115,13 @@ def get_youtube_info(url):
                 'duration': info.get('duration', 0)
             }
     except Exception as e:
-        print(f"[YOUTUBE] Ошибка: {e}")
+        log_web("ERROR", f"YouTube ошибка: {e}")
         return None
 
 @app.route('/youtube')
 @login_required
 def youtube_page():
+    log_web("INFO", "Страница YouTube загружена")
     return render_template('youtube.html', theme=THEME_CSS)
 
 @app.route('/youtube_search', methods=['GET'])
@@ -127,9 +148,10 @@ def youtube_search():
                 'views_short': item.get('viewCount', '0'),
                 'duration': item.get('lengthSeconds', 0)
             })
+        log_web("INFO", f"YouTube поиск: {query} -> {len(videos)} видео")
         return jsonify(videos[:20])
     except Exception as e:
-        print(f"[YOUTUBE_SEARCH] Ошибка: {e}")
+        log_web("ERROR", f"YouTube поиск ошибка: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/youtube_info', methods=['POST'])
@@ -149,7 +171,7 @@ def youtube_info():
             'duration': info['duration']
         })
     except Exception as e:
-        print(f"[YOUTUBE_INFO] Ошибка: {e}")
+        log_web("ERROR", f"YouTube info ошибка: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/youtube_stream')
@@ -170,10 +192,10 @@ def youtube_stream():
                     if chunk:
                         yield chunk
             except Exception as e:
-                print(f"[YOUTUBE_STREAM] Ошибка: {e}")
+                log_web("ERROR", f"YouTube stream ошибка: {e}")
         return Response(generate(), content_type='video/mp4')
     except Exception as e:
-        print(f"[YOUTUBE_STREAM] Ошибка: {e}")
+        log_web("ERROR", f"YouTube stream ошибка: {e}")
         return f"Ошибка потока: {e}", 500
 
 # ==========================================
@@ -181,19 +203,19 @@ def youtube_stream():
 # ==========================================
 @socketio.on('connect')
 def handle_connect():
-    print("[WS] Клиент подключён")
+    log_web("INFO", "WebSocket клиент подключён")
     emit('message_history', messages[-50:])
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    print("[WS] Клиент отключён")
+    log_web("INFO", "WebSocket клиент отключён")
 
 @socketio.on('new_message')
 def handle_new_message(data):
     data['timestamp'] = datetime.datetime.now().isoformat()
     messages.append(data)
     emit('message_updated', data, broadcast=True)
-    print(f"[WS] {data.get('source')}: {data.get('text', '')[:50]}")
+    log_web("INFO", f"Новое сообщение от {data.get('source')}: {data.get('text', '')[:50]}")
 
 # ==========================================
 # ОСНОВНЫЕ МАРШРУТЫ
@@ -207,19 +229,23 @@ def login():
             session.clear()
             session['authenticated'] = True
             session.permanent = True
+            log_web("INFO", "Админ авторизован")
             return redirect(url_for('index'))
         else:
             error = 'Неверный пароль'
+            log_web("WARNING", "Неудачная попытка входа")
     return render_template('login.html', error=error)
 
 @app.route('/logout', methods=['POST'])
 def logout():
     session.clear()
+    log_web("INFO", "Админ вышел")
     return redirect(url_for('login'))
 
 @app.route('/')
 @login_required
 def index():
+    log_web("INFO", "Главная страница загружена")
     return render_template('admin.html', 
         time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
         quotes=get_quotes(),
@@ -245,8 +271,10 @@ def vk_post():
         post = vk.wall.post(owner_id=-VK_GROUP_ID, message=text, from_group=1)
         post_id = post.get('post_id')
         post_url = f"https://vk.com/wall-{abs(VK_GROUP_ID)}_{post_id}"
+        log_web("INFO", f"Пост в VK опубликован: {post_url}")
         return jsonify({"status": "ok", "post_id": post_id, "url": post_url}), 200
     except Exception as e:
+        log_web("ERROR", f"VK post ошибка: {e}")
         return jsonify({"status": "error", "error": str(e)}), 500
 
 @app.route('/api/state', methods=['GET'])
@@ -280,8 +308,10 @@ def send_reply():
                 'timestamp': datetime.datetime.now().isoformat(),
                 'own': True
             })
+            log_web("INFO", f"Ответ отправлен в Telegram: {text[:50]}")
             return jsonify({"status": "ok"})
         except Exception as e:
+            log_web("ERROR", f"Ошибка отправки ответа: {e}")
             return jsonify({"status": "error", "error": str(e)})
     elif source == 'vk':
         return jsonify({"status": "error", "error": "VK replies not implemented"})
@@ -289,8 +319,36 @@ def send_reply():
         return jsonify({"status": "error", "error": "Unknown source"})
 
 # ==========================================
+# ДЕБАГГЕР API (для веб-морды)
+# ==========================================
+@app.route('/api/debug/logs', methods=['GET'])
+@login_required
+def api_debug_logs():
+    """Возвращает последние логи в JSON для веб-морды"""
+    limit = request.args.get('limit', 100, type=int)
+    logs = get_logs_as_dict(limit)
+    log_web("INFO", f"Запрошены логи (limit={limit})")
+    return jsonify({"logs": logs, "count": len(logs)})
+
+@app.route('/api/debug/send', methods=['POST'])
+@login_required
+def api_debug_send():
+    """Отправляет отчёт с логами в Telegram"""
+    try:
+        if bot and ADMIN_USER_ID:
+            send_debug_report(bot, ADMIN_USER_ID, 100)
+            log_web("INFO", "Отчёт с логами отправлен в Telegram")
+            return jsonify({"status": "ok", "message": "Отчёт отправлен"})
+        else:
+            return jsonify({"status": "error", "message": "Бот не настроен"})
+    except Exception as e:
+        log_web("ERROR", f"Ошибка отправки отчёта: {e}")
+        return jsonify({"status": "error", "message": str(e)})
+
+# ==========================================
 # ЗАПУСК
 # ==========================================
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
+    log_web("INFO", f"Запуск веб-морды на порту {port}")
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
