@@ -1,6 +1,10 @@
 /* ==========================================
-   Тема: macOS (светлая, воздушная)
-   Используется в веб-морде через переменную WEB_THEME
+   Файл: static/css/macos.css
+   Справка: README.md → Веб-морда / Тема
+   Задача: светлая тема оформления в стиле macOS
+   Комментарий: используется веб-мордой (admin.html, youtube.html, login.html)
+   Зависит от: переменные CSS
+   Вызывается из: templates/*.html (через переменную THEME_CSS)
    ========================================== */
 
 :root {
@@ -12,8 +16,8 @@
     --accent: #007aff;
     --accent-hover: #005fc5;
     --shadow: 0 8px 20px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.02);
-    --error: #ff3b30;
     --success: #34c759;
+    --error: #ff3b30;
     --warning: #ff9500;
 }
 
@@ -32,11 +36,13 @@ body {
 }
 
 .container {
-    max-width: 1100px;
+    max-width: 1200px;
     margin: 0 auto;
 }
 
-/* Карточки — как на macOS */
+/* ==========================================
+   КАРТОЧКИ (как на macOS)
+   ========================================== */
 .card {
     background: var(--card-bg);
     backdrop-filter: blur(10px);
@@ -47,18 +53,22 @@ body {
     border: 1px solid var(--border);
     transition: transform 0.2s, box-shadow 0.2s;
 }
+
 .card:hover {
     transform: translateY(-2px);
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
 }
 
-/* Заголовки */
+/* ==========================================
+   ЗАГОЛОВКИ
+   ========================================== */
 h1 {
     font-weight: 600;
     letter-spacing: -0.02em;
     font-size: 1.8rem;
     margin-bottom: 0.25rem;
 }
+
 h2 {
     font-weight: 600;
     letter-spacing: -0.02em;
@@ -66,7 +76,9 @@ h2 {
     margin-bottom: 0.75rem;
 }
 
-/* Кнопки, инпуты, селекты, текстовые поля */
+/* ==========================================
+   КНОПКИ, ИНПУТЫ, СЕЛЕКТЫ
+   ========================================== */
 button, input, textarea, select {
     background: #fff;
     color: var(--text);
@@ -77,6 +89,7 @@ button, input, textarea, select {
     font-size: 0.9rem;
     transition: all 0.2s ease;
 }
+
 button {
     background: var(--accent);
     color: white;
@@ -84,26 +97,32 @@ button {
     font-weight: 500;
     cursor: pointer;
 }
+
 button:hover {
     background: var(--accent-hover);
     transform: scale(0.98);
 }
+
 input:focus, textarea:focus, select:focus {
     outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
 }
+
 textarea {
     width: 100%;
     resize: vertical;
 }
 
-/* Сообщения (VK / Telegram / Админ) */
+/* ==========================================
+   СООБЩЕНИЯ (VK / TELEGRAM / АДМИН)
+   ========================================== */
 .messages {
     max-height: 400px;
     overflow-y: auto;
     margin-bottom: 1rem;
 }
+
 .message {
     background: white;
     border-radius: 16px;
@@ -113,94 +132,89 @@ textarea {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
     transition: 0.1s;
 }
+
 .message.own {
     background: var(--accent);
     color: white;
     border: none;
 }
+
 .message-telegram {
     border-left: 4px solid #26a5e4;
 }
+
 .message-vk {
     border-left: 4px solid #4c75a3;
 }
+
 .message small {
     font-size: 0.7rem;
     opacity: 0.7;
 }
 
-/* Ссылки */
+.message-actions button {
+    font-size: 0.7rem;
+    padding: 4px 10px;
+    margin-right: 8px;
+    background: var(--border);
+    color: var(--text);
+}
+
+.message-actions button:hover {
+    background: var(--accent);
+    color: white;
+    transform: none;
+}
+
+/* ==========================================
+   ССЫЛКИ
+   ========================================== */
 a {
     color: var(--accent);
     text-decoration: none;
 }
+
 a:hover {
     text-decoration: underline;
 }
 
-/* Поле поиска (YouTube) */
-.search-row {
+/* ==========================================
+   ГРУППЫ КНОПОК
+   ========================================== */
+.button-group {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
-    margin-bottom: 1.5rem;
+    margin-top: 0.5rem;
 }
-.search-row input {
+
+.button-group button {
     flex: 1;
+    min-width: 80px;
 }
 
-/* Сетка видео (каталог) */
-.video-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 1rem;
-}
-.video-card {
-    background: white;
-    border-radius: 16px;
-    padding: 1rem;
-    cursor: pointer;
-    transition: 0.2s;
-    border: 1px solid var(--border);
-}
-.video-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 20px rgba(0, 0, 0, 0.1);
-}
-.video-title {
-    font-weight: 600;
-    margin-bottom: 6px;
-}
-.video-channel {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
+/* ==========================================
+   СТАТУСЫ
+   ========================================== */
+.status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    background: var(--accent);
+    color: white;
 }
 
-/* Прокси-плеер */
-video {
-    width: 100%;
-    max-width: 800px;
-    border-radius: 20px;
-    margin-top: 1rem;
-    box-shadow: var(--shadow);
-}
-
-/* Скрытые блоки */
+/* ==========================================
+   СКРЫТЫЕ БЛОКИ
+   ========================================== */
 .hidden {
     display: none;
 }
 
-/* Статусы (ok / error) */
-.status-ok {
-    color: var(--success);
-}
-.status-error {
-    color: var(--error);
-}
-.status-warning {
-    color: var(--warning);
-}
-
-/* Логи (pre) */
+/* ==========================================
+   ЛОГИ (PRE)
+   ========================================== */
 pre {
     background: #f0f0f0;
     padding: 0.5rem;
@@ -210,13 +224,53 @@ pre {
     border: 1px solid var(--border);
 }
 
-/* Кнопка выхода */
-.logout-btn {
-    background: transparent;
-    color: var(--text);
-    border: 1px solid var(--border);
+/* ==========================================
+   ДЕБАГГЕР
+   ========================================== */
+#debug-report {
+    margin-top: 1rem;
+    font-size: 0.8rem;
+    max-height: 300px;
+    overflow-y: auto;
 }
-.logout-btn:hover {
-    background: rgba(0, 0, 0, 0.05);
-    transform: none;
-  }
+
+#debug-report details {
+    background: #f8f8fa;
+    border-radius: 12px;
+    padding: 0.5rem;
+}
+
+/* ==========================================
+   АДАПТИВНОСТЬ
+   ========================================== */
+@media (max-width: 768px) {
+    body {
+        padding: 1rem;
+    }
+    
+    .container {
+        max-width: 100%;
+    }
+    
+    .button-group button {
+        min-width: 60px;
+        padding: 6px 12px;
+    }
+    
+    .message-actions button {
+        padding: 2px 6px;
+        font-size: 0.65rem;
+    }
+}
+
+/* ==========================================
+   АНИМАЦИИ
+   ========================================== */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.card, .message, .video-card {
+    animation: fadeIn 0.3s ease;
+}
