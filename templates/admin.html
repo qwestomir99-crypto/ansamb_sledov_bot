@@ -4,92 +4,139 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ансамбль Следов 6 — веб-морда</title>
+    <!-- Favicon: частота сети 0,8 Гц -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='10' y='65' font-family='monospace' font-size='50' fill='%2300ffcc'%3E0.8%3C/text%3E%3C/svg%3E">
+    <!-- Тема оформления (переменная из app.py) -->
+    <link rel="stylesheet" href="/static/css/{{ theme }}">
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <style>
-        * { box-sizing: border-box; }
-        body { background: #0a0a0a; color: #00ffcc; font-family: 'Courier New', monospace; padding: 1rem; margin: 0; }
-        .container { max-width: 900px; margin: 0 auto; }
-        .card { background: #111; border-left: 3px solid #00ffcc; padding: 1rem; margin: 1rem 0; border-radius: 8px; }
-        button, input, textarea, select { background: #222; color: #00ffcc; border: 1px solid #00ffcc; padding: 6px 12px; border-radius: 4px; font-family: inherit; }
-        button:hover { background: #00ffcc; color: #000; cursor: pointer; }
-        a { color: #00ffcc; }
-        .message { border-bottom: 1px solid #333; padding: 8px; margin: 5px 0; }
-        .message.own { background: #1a3a3a; border-left: 2px solid #00ffcc; }
-        .message-telegram { border-left: 2px solid #26a5e4; }
-        .message-vk { border-left: 2px solid #4c75a3; }
-        .messages { max-height: 400px; overflow-y: auto; margin-bottom: 20px; }
-        .source-tag { font-size: 0.7rem; margin-left: 8px; padding: 2px 6px; border-radius: 4px; }
-        .source-telegram { background: #26a5e4; color: #000; }
-        .source-vk { background: #4c75a3; color: #fff; }
-        .hidden { display: none; }
-        .inline { display: inline-block; margin-left: 10px; }
-        .status-ok { color: #0f0; }
-        .status-error { color: #f00; }
+        /* Дополнительные стили, которых нет в теме */
+        .message {
+            border-bottom: 1px solid var(--border);
+            padding: 8px;
+            margin: 5px 0;
+        }
+        .message.own {
+            background: var(--accent);
+            color: white;
+            border: none;
+        }
+        .message-telegram {
+            border-left: 4px solid #26a5e4;
+        }
+        .message-vk {
+            border-left: 4px solid #4c75a3;
+        }
+        .messages {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        .source-tag {
+            font-size: 0.7rem;
+            margin-left: 8px;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .source-telegram {
+            background: #26a5e4;
+            color: #000;
+        }
+        .source-vk {
+            background: #4c75a3;
+            color: #fff;
+        }
+        .hidden {
+            display: none;
+        }
+        .search-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .search-row input {
+            flex: 1;
+        }
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 1rem;
+        }
+        .video-card {
+            background: white;
+            border-radius: 16px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: 0.2s;
+            border: 1px solid var(--border);
+        }
+        .video-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.1);
+        }
+        .video-title {
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .video-channel {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        video {
+            width: 100%;
+            max-width: 800px;
+            border-radius: 20px;
+            margin-top: 1rem;
+            box-shadow: var(--shadow);
+        }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>🔥 Ансамбль Следов 6</h1>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1>🔥 Ансамбль Следов 6</h1>
+        <form method="post" action="/logout">
+            <button type="submit" style="background: transparent; border: 1px solid var(--border);">🚪 Выйти</button>
+        </form>
+    </div>
     <p>Ритм 0,8 Гц. Управление ботом из браузера. Время: {{ time }}</p>
     <p>
-        <a href="/logs/admin" target="_blank">📋 admin.log</a> |
-        <a href="/logs/error" target="_blank">❌ error.log</a>
+        <a href="/logs/admin">📋 admin.log</a> |
+        <a href="/logs/error">❌ error.log</a> |
+        <a href="/youtube">🎬 YouTube без VPN</a>
     </p>
 
-    <!-- Блок управления режимом -->
+    <!-- Блок сообщений -->
     <div class="card">
-        <h2>🤖 Текущий режим: <strong id="current-mode">{{ mode }}</strong></h2>
-        <form onsubmit="return false">
-            <select name="mode" id="mode-select">
-                <option value="утро">🌅 Утро</option>
-                <option value="день">☀️ День</option>
-                <option value="вечер">🌙 Вечер</option>
-                <option value="ночь">🌌 Ночь</option>
-            </select>
-            <button type="button" onclick="setMode()">Сменить режим</button>
-        </form>
+        <h2>📨 Входящие сообщения (VK + Telegram)</h2>
+        <div id="messages" class="messages">
+            <div style="color: var(--text-secondary);">Загрузка...</div>
+        </div>
+        <div id="reply-area" class="hidden" style="margin-top: 1rem;">
+            <textarea id="reply-text" rows="2" cols="50" placeholder="Ваш ответ..." style="width: 100%; margin-bottom: 0.5rem;"></textarea>
+            <button onclick="sendReply()">📤 Отправить ответ</button>
+            <button onclick="closeReply()" style="background: transparent; border: 1px solid var(--border);">❌ Отмена</button>
+        </div>
     </div>
 
-    <!-- Блок добавления цитаты -->
-    <div class="card">
-        <h2>📜 Добавить цитату</h2>
-        <form onsubmit="return false">
-            <textarea id="quote-text" rows="2" cols="50" placeholder="Текст цитаты..."></textarea><br>
-            <button type="button" onclick="addQuote()">➕ Добавить</button>
-        </form>
-        <details>
-            <summary>📖 Последние цитаты (10)</summary>
-            <ul id="quotes-list">
-                {% for q in quotes %}
-                    <li>{{ q[:100] }}{% if q|length > 100 %}...{% endif %}</li>
-                {% else %}
-                    <li>Нет цитат</li>
-                {% endfor %}
-            </ul>
-        </details>
-    </div>
-
-    <!-- Блок поста в VK -->
+    <!-- Пост в VK -->
     <div class="card">
         <h2>🎬 Пост в VK (текст)</h2>
-        <form onsubmit="return false">
-            <textarea id="vk-post-text" rows="3" cols="50" placeholder="Текст поста..."></textarea><br>
-            <button type="button" onclick="sendVkPost()">📤 Отправить</button>
-        </form>
-        <div id="vk-post-status" class="inline"></div>
+        <textarea id="post-text" rows="3" cols="50" placeholder="Текст поста..."></textarea><br>
+        <button onclick="sendPost()">Отправить</button>
+        <span id="post-status" style="margin-left: 10px;"></span>
     </div>
 
-    <!-- Блок сообщений (VK + Telegram) -->
+    <!-- Цитаты -->
     <div class="card">
-        <h2>💬 Входящие сообщения (VK + Telegram)</h2>
-        <div id="messages" class="messages">
-            <div style="color: #666;">Загрузка...</div>
-        </div>
-        <div id="reply-area" class="hidden">
-            <textarea id="reply-text" rows="2" cols="50" placeholder="Ваш ответ..."></textarea>
-            <button onclick="sendReply()">📤 Отправить ответ</button>
-            <button onclick="closeReply()">❌ Отмена</button>
-        </div>
+        <h2>📜 Цитаты (последние 10)</h2>
+        <ul id="quotes-list">
+            {% for q in quotes %}
+                <li>{{ q[:100] }}{% if q|length > 100 %}...{% endif %}</li>
+            {% else %}
+                <li>Нет цитат</li>
+            {% endfor %}
+        </ul>
     </div>
 </div>
 
@@ -109,7 +156,7 @@
             container.innerHTML = '';
             msgs.forEach(msg => appendMessage(msg));
             if (msgs.length === 0) {
-                container.innerHTML = '<div style="color: #666;">Нет сообщений</div>';
+                container.innerHTML = '<div style="color: var(--text-secondary);">Нет сообщений</div>';
             }
         });
         socket.on('message_updated', (msg) => {
@@ -120,12 +167,14 @@
     
     function appendMessage(msg) {
         const container = document.getElementById('messages');
-        if (container.innerHTML === '<div style="color: #666;">Загрузка...</div>' || 
-            container.innerHTML === '<div style="color: #666;">Нет сообщений</div>') {
+        if (container.innerHTML === '<div style="color: var(--text-secondary);">Загрузка...</div>' || 
+            container.innerHTML === '<div style="color: var(--text-secondary);">Нет сообщений</div>') {
             container.innerHTML = '';
         }
         const div = document.createElement('div');
-        const sourceClass = msg.source === 'telegram' ? 'message-telegram' : (msg.source === 'admin' ? '' : 'message-vk');
+        let sourceClass = '';
+        if (msg.source === 'telegram') sourceClass = 'message-telegram';
+        else if (msg.source === 'vk') sourceClass = 'message-vk';
         div.className = `message ${sourceClass} ${msg.own ? 'own' : ''}`;
         const sourceName = msg.source === 'telegram' ? '📱 Telegram' : (msg.source === 'admin' ? '🤖 Админ' : '📘 VK');
         const sender = msg.sender || msg.username || 'unknown';
@@ -141,7 +190,7 @@
         if (!msg.own && msg.source !== 'admin') {
             const chatId = msg.chat_id || msg.user_id;
             if (chatId) {
-                div.innerHTML += `<br><button onclick="openReply('${chatId}', '${msg.source}', '${escapeHtml(sender)}')" style="font-size:0.7rem; padding: 3px 6px;">Ответить</button>`;
+                div.innerHTML += `<br><button onclick="openReply('${chatId}', '${msg.source}', '${escapeHtml(sender)}')" style="font-size:0.7rem; padding: 3px 6px; margin-top: 5px;">Ответить</button>`;
             }
         }
         container.prepend(div);
@@ -179,7 +228,7 @@
             appendMessage({
                 source: 'admin',
                 text: text,
-                timestamp: new Date().toISOstring(),
+                timestamp: new Date().toISOString(),
                 own: true
             });
             closeReply();
@@ -188,84 +237,43 @@
         }
     }
     
-    // ==========================================
-    // Управление режимом
-    // ==========================================
-    async function setMode() {
-        const mode = document.getElementById('mode-select').value;
-        try {
-            const response = await fetch('/set_mode', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: new URLSearchParams({ mode })
-            });
-            const data = await response.json();
-            document.getElementById('current-mode').innerText = data.mode;
-        } catch (e) { console.error("Ошибка смены режима:", e); }
-    }
-    
-    // ==========================================
-    // Добавление цитаты
-    // ==========================================
-    async function addQuote() {
-        const quoteText = document.getElementById('quote-text').value.trim();
-        if (!quoteText) return alert("Текст цитаты пуст!");
-        try {
-            const response = await fetch('/add_quote', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: new URLSearchParams({ quote: quoteText })
-            });
-            const data = await response.json();
-            document.getElementById('quote-text').value = '';
-            if (data.quotes) updateQuotesList(data.quotes);
-        } catch (e) { console.error(e); }
-    }
-    
-    function updateQuotesList(quotes) {
-        const list = document.getElementById('quotes-list');
-        list.innerHTML = quotes.map(q => `<li>${escapeHtml(q)}</li>`).join('') || '<li>Нет цитат</li>';
-    }
-    
-    // ==========================================
-    // Пост в VK
-    // ==========================================
-    async function sendVkPost() {
-        const text = document.getElementById('vk-post-text').value.trim();
-        if (!text) return alert("Текст поста не может быть пустым");
-        const statusDiv = document.getElementById('vk-post-status');
-        statusDiv.innerText = "⏳ Отправка...";
+    async function sendPost() {
+        const text = document.getElementById('post-text').value.trim();
+        if (!text) return;
+        const statusSpan = document.getElementById('post-status');
+        statusSpan.innerText = '⏳ Отправка...';
         try {
             const response = await fetch('/vk_post', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: new URLSearchParams({ text })
+                body: 'text=' + encodeURIComponent(text)
             });
             const data = await response.json();
             if (data.status === 'ok') {
-                statusDiv.innerHTML = `✅ Опубликовано! <a href="${data.url}" target="_blank">Ссылка</a>`;
-                document.getElementById('vk-post-text').value = '';
+                statusSpan.innerHTML = `✅ Опубликовано! <a href="${data.url}" target="_blank">Ссылка</a>`;
+                document.getElementById('post-text').value = '';
             } else {
-                statusDiv.innerText = `❌ Ошибка: ${data.error}`;
+                statusSpan.innerText = '❌ ' + data.error;
             }
-        } catch (e) { statusDiv.innerText = "❌ Ошибка сети"; }
+        } catch (e) {
+            statusSpan.innerText = '❌ Ошибка сети';
+        }
+        setTimeout(() => { statusSpan.innerText = ''; }, 5000);
     }
     
-    // ==========================================
-    // Состояние
-    // ==========================================
     async function fetchState() {
         try {
             const response = await fetch('/api/state');
             const data = await response.json();
-            document.getElementById('current-mode').innerText = data.mode;
-            if (data.quotes) updateQuotesList(data.quotes);
-        } catch(e) { console.error(e); }
+            if (data.quotes) {
+                const list = document.getElementById('quotes-list');
+                list.innerHTML = data.quotes.map(q => `<li>${escapeHtml(q)}</li>`).join('');
+            }
+        } catch(e) {
+            console.error('Ошибка загрузки состояния:', e);
+        }
     }
     
-    // ==========================================
-    // Вспомогательные функции
-    // ==========================================
     function escapeHtml(text) {
         if (!text) return '';
         const div = document.createElement('div');
