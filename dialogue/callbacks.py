@@ -3,7 +3,7 @@
 # Справка: README.md → Обработчики кнопок
 # Задача: обработка нажатий на инлайн-кнопки (callback_data)
 # Комментарий: использует button_map.py для единого управления callback'ами
-#              Добавлены обработчики для «Настроение», «Начать диалог», «Назад»
+#              Добавлены обработчики для «Настроение», «Диалог», «Назад», «Вход в админку»
 # Зависит от: telebot, button_map, admin_commands, quotes, publisher
 # Вызывается из: bot.py (регистрация через register_callback_handlers)
 # ==========================================
@@ -20,7 +20,8 @@ from dialogue.button_map import get_callback, get_text, get_admin_menu_keyboard
 from dialogue.admin_commands import (
     show_admin_panel, show_add_post_ui, show_vk_post_ui,
     show_quotes_panel, list_quotes, add_quote_ui, set_quote_interval_ui,
-    show_diagnostics, admin_logout, show_mood_menu, show_dialog_ui
+    show_diagnostics, admin_logout, show_mood_menu, show_dialog_ui,
+    handle_admin_command
 )
 from debug_utils import debug_log
 
@@ -212,7 +213,7 @@ def register_callback_handlers(bot, config):
         show_admin_panel(call, bot)
     
     # ==========================================
-    # 5. ПОЛЬЗОВАТЕЛЬСКИЕ КНОПКИ
+    # 5. ПОЛЬЗОВАТЕЛЬСКИЕ КНОПКИ (гостевое меню)
     # ==========================================
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("user_help"))
@@ -226,7 +227,8 @@ def register_callback_handlers(bot, config):
             "• `#тлеем` — цитата\n"
             "• `#фиксируем` — подтверждение ритма\n"
             "• `#вспышка` — импульс\n"
-            "• `#дышим` — пинг бота",
+            "• `#дышим` — пинг бота\n\n"
+            "Также доступны кнопки в меню.",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             parse_mode='Markdown'
@@ -270,7 +272,7 @@ def register_callback_handlers(bot, config):
         safe_delete(call.message, 10)
     
     # ==========================================
-    # 6. НОВЫЕ КНОПКИ: НАСТРОЕНИЕ И ДИАЛОГ
+    # 6. НОВЫЕ КНОПКИ: НАСТРОЕНИЕ, ДИАЛОГ, ВХОД В АДМИНКУ
     # ==========================================
     
     @bot.callback_query_handler(func=lambda call: call.data == get_callback("mood"))
@@ -285,6 +287,21 @@ def register_callback_handlers(bot, config):
         show_dialog_ui(call, bot)
         bot.answer_callback_query(call.id)
     
+    @bot.callback_query_handler(func=lambda call: call.data == get_callback("admin_login"))
+    def callback_admin_login(call):
+        """Вход в админ-панель из гостевого меню"""
+        debug_log("CALLBACK", f"Запрос входа в админку от {call.from_user.id}")
+        # Создаём имитацию сообщения для handle_admin_command
+        class FakeMessage:
+            def __init__(self, user_id, chat_id):
+                self.from_user = type('obj', (object,), {'id': user_id})()
+                self.chat = type('obj', (object,), {'id': chat_id})()
+                self.text = "#админ"
+        fake_msg = FakeMessage(call.from_user.id, call.message.chat.id)
+        handle_admin_command(fake_msg, bot)
+        bot.answer_callback_query(call.id)
+        safe_delete(call.message, 1)
+    
     # ==========================================
     # 7. КНОПКИ НАСТРОЕНИЯ (mood_artist, mood_admin и т.д.)
     # ==========================================
@@ -294,22 +311,21 @@ def register_callback_handlers(bot, config):
         mood = call.data.replace("mood_", "")
         debug_log("CALLBACK", f"Установка настроения {mood} от {call.from_user.id}")
         
-        # Здесь нужно сохранить настроение в user_settings
-        # Пока просто подтверждение
-        mood_names = {
-            "artist": "Художник",
-            "admin": "Администратор",
-            "poet": "Поэт",
-            "engineer": "Инженер"
-        }
-        mood_name = mood_names.get(mood, mood)
-        
-        bot.edit_message_text(
-            f"✅ Настроение изменено на «{mood_name}».\n\n"
-            f"Теперь ответы агента будут в этом стиле.",
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id
-        )
+        from dialogue.user_settings import set_user_mood, get_mood_info
+        if set_user_mood(call.from_user.id, mood):
+            mood_info = get_mood_info(mood)
+            bot.edit_message_text(
+                f"✅ Настроение изменено на «{mood_info['name']}».\n\n"
+                f"{mood_info['emoji']} {mood_info['description']}",
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id
+            )
+        else:
+            bot.edit_message_text(
+                "❌ Не удалось изменить настроение.",
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id
+            )
         bot.answer_callback_query(call.id)
         safe_delete(call.message, 5)
     
