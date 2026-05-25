@@ -1,7 +1,7 @@
 # ==========================================
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
-# Задача: админ-меню, кнопки, управление цитатами, постинг в VK
+# Задача: админ-меню, кнопки, управление цитатами, постинг в VK (с поддержкой нескольких файлов)
 # Комментарий: использует button_map.py для единого управления кнопками
 # Зависит от: telebot, button_map, publisher, quotes, diagnostics
 # Вызывается из: bot.py (handle_message), callbacks.py
@@ -12,7 +12,6 @@ import random
 import json
 import threading
 import time
-from datetime import datetime
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -57,6 +56,15 @@ def send_report(bot, chat_id, text, delete_after=5):
     msg = bot.send_message(chat_id, text)
     if delete_after > 0:
         safe_delete(msg, delete_after)
+
+def download_file(bot, file_id, suffix=""):
+    """Скачивает файл из Telegram во временную папку"""
+    file_info = bot.get_file(file_id)
+    downloaded = bot.download_file(file_info.file_path)
+    temp_path = f"/tmp/telegram_file_{file_id}_{suffix}"
+    with open(temp_path, "wb") as f:
+        f.write(downloaded)
+    return temp_path
 
 # ==========================================
 # АВТОРИЗАЦИЯ
@@ -103,27 +111,23 @@ def handle_admin_command(message, bot):
     user_id = message.from_user.id
     text = message.text.lower()
     
-    # Если уже авторизован — показываем меню
     if is_admin_authorized(user_id):
         bot.reply_to(message, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
         safe_delete(message, 3)
         return
     
-    # Если команда содержит пароль (формат: "#админ пароль")
     parts = text.split(maxsplit=1)
     if len(parts) > 1:
         password = parts[1]
         if authorize_admin(user_id, password):
-            bot.reply_to(message, "✅ Авторизация успешна! Добро пожаловать в админ-панель.",
-                        reply_markup=get_admin_menu())
+            bot.reply_to(message, "✅ Авторизация успешна!", reply_markup=get_admin_menu())
             safe_delete(message, 3)
         else:
-            msg = bot.reply_to(message, "❌ Неверный пароль. Доступ запрещён.")
+            msg = bot.reply_to(message, "❌ Неверный пароль.")
             safe_delete(message, 3)
             safe_delete(msg, 5)
         return
     
-    # Если пароль не передан — запрашиваем
     bot.reply_to(message, "🔐 Введите пароль для входа в админ-панель:\n(или #админ пароль)")
 
 # ==========================================
@@ -149,9 +153,7 @@ def show_add_post_ui(call, bot):
         "Или /cancel для отмены.",
         parse_mode='Markdown'
     )
-    # Удаляем сообщение с кнопкой
     safe_delete(call.message, 1)
-    # Регистрируем следующий шаг
     bot.register_next_step_handler(msg, process_post_text, bot)
 
 def process_post_text(message, bot):
@@ -162,18 +164,16 @@ def process_post_text(message, bot):
         safe_delete(msg, 5)
         return
     
-    # Сохраняем текст поста в временное хранилище
-    user_id = message.from_user.id
     if not hasattr(process_post_text, "temp_posts"):
         process_post_text.temp_posts = {}
-    process_post_text.temp_posts[user_id] = {"text": message.text}
+    process_post_text.temp_posts[message.from_user.id] = {"text": message.text}
     
     msg = bot.send_message(
         message.chat.id,
         "🏷️ Введите теги через пробел (например: #тлеем #ансамбль)\n"
         "Или /skip для пропуска"
     )
-    bot.register_next_step_handler(msg, process_post_tags, bot, user_id)
+    bot.register_next_step_handler(msg, process_post_tags, bot, message.from_user.id)
     safe_delete(message, 2)
 
 def process_post_tags(message, bot, user_id):
@@ -188,10 +188,9 @@ def process_post_tags(message, bot, user_id):
     else:
         tags = message.text.split()
     
-    post_data = process_post_text.temp_posts.get(user_id, {})
+    post_data = getattr(process_post_text, "temp_posts", {}).get(user_id, {})
     text = post_data.get("text", "")
     
-    # Сохраняем в post_pool.json
     from dialogue.post_manager import add_post_to_pool
     success = add_post_to_pool(text, tags, author_id=user_id)
     
@@ -204,12 +203,12 @@ def process_post_tags(message, bot, user_id):
     safe_delete(msg, 5)
 
 def show_vk_post_ui(call, bot):
-    """Показывает интерфейс для отправки поста в VK."""
+    """Показывает интерфейс для отправки поста в VK с поддержкой нескольких файлов."""
     msg = bot.send_message(
         call.message.chat.id,
         "🎬 *Пост в VK*\n\n"
         "Пришлите текст поста (можно с Markdown).\n"
-        "Можно также добавить фото или видео (одним файлом).\n"
+        "Можно добавить несколько фото, видео или документов.\n"
         "Или /cancel для отмены.",
         parse_mode='Markdown'
     )
@@ -217,7 +216,7 @@ def show_vk_post_ui(call, bot):
     bot.register_next_step_handler(msg, process_vk_post, bot)
 
 def process_vk_post(message, bot):
-    """Обрабатывает текст/файл и отправляет в VK с отчётом."""
+    """Обрабатывает текст/файлы и отправляет в VK с поддержкой нескольких вложений."""
     if message.text == "/cancel":
         msg = bot.reply_to(message, "❌ Отправка в VK отменена.", reply_markup=get_admin_menu())
         safe_delete(message, 3)
@@ -228,62 +227,52 @@ def process_vk_post(message, bot):
     vk_owner_id = os.environ.get("VK_OWNER_ID")
     
     if not vk_token or not vk_owner_id:
-        report = "❌ VK_TOKEN или VK_OWNER_ID не заданы в переменных окружения"
+        report = "❌ VK_TOKEN или VK_OWNER_ID не заданы"
         msg = bot.reply_to(message, report)
         safe_delete(message, 3)
         safe_delete(msg, 10)
         return
     
-    # Если есть файл
-    if message.photo or message.video or message.document:
-        msg = bot.reply_to(message, "⏳ Отправляю в VK...")
-        safe_delete(message, 2)
-        
-        # Определяем тип файла
-        if message.photo:
-            file_id = message.photo[-1].file_id
-            file_info = bot.get_file(file_id)
-            downloaded = bot.download_file(file_info.file_path)
-            temp_path = f"/tmp/vk_photo_{file_id}.jpg"
-            with open(temp_path, "wb") as f:
-                f.write(downloaded)
-        elif message.video:
-            file_id = message.video.file_id
-            file_info = bot.get_file(file_id)
-            downloaded = bot.download_file(file_info.file_path)
-            temp_path = f"/tmp/vk_video_{file_id}.mp4"
-            with open(temp_path, "wb") as f:
-                f.write(downloaded)
-        else:
-            temp_path = None
-        
-        # Отправляем в VK
-        from services.vk_uploader import post_to_vk_with_media
-        success, url = post_to_vk_with_media(message.caption or "", vk_token, vk_owner_id, temp_path)
-        
-        if success:
-            report = f"✅ Пост опубликован в VK!\n{url}"
-        else:
-            report = f"❌ Ошибка VK: {url}"
-        
-        final_msg = bot.reply_to(message, report)
-        safe_delete(final_msg, 10)
-        
-        if temp_path and os.path.exists(temp_path):
-            os.remove(temp_path)
+    file_paths = []
+    
+    # Собираем все фото
+    if hasattr(message, 'photo') and message.photo:
+        for photo in message.photo:
+            temp_path = download_file(bot, photo.file_id, f"vk_photo_{photo.file_id}.jpg")
+            file_paths.append(temp_path)
+    
+    # Видео
+    if hasattr(message, 'video') and message.video:
+        temp_path = download_file(bot, message.video.file_id, f"vk_video_{message.video.file_id}.mp4")
+        file_paths.append(temp_path)
+    
+    # Документы
+    if hasattr(message, 'document') and message.document:
+        temp_path = download_file(bot, message.document.file_id, f"vk_doc_{message.document.file_id}")
+        file_paths.append(temp_path)
+    
+    caption = message.caption or ""
+    
+    # Отправляем в VK
+    from dialogue.publisher_utils import post_to_vk
+    success, result = post_to_vk(caption, "", vk_token, vk_owner_id, file_paths if file_paths else None)
+    
+    if success:
+        report = f"✅ Пост опубликован в VK!\n{result}"
     else:
-        # Только текст
-        from dialogue.vk_uploader import post_to_vk
-        success, url = post_to_vk(message.text, vk_token, vk_owner_id)
-        
-        if success:
-            report = f"✅ Пост опубликован в VK!\n{url}"
-        else:
-            report = f"❌ Ошибка VK: {url}"
-        
-        msg = bot.reply_to(message, report)
-        safe_delete(message, 3)
-        safe_delete(msg, 10)
+        report = f"❌ Ошибка VK: {result}"
+    
+    msg = bot.reply_to(message, report)
+    safe_delete(message, 3)
+    safe_delete(msg, 10)
+    
+    # Чистим временные файлы
+    for fp in file_paths:
+        if os.path.exists(fp):
+            try:
+                os.remove(fp)
+            except:
+                pass
 
 def show_quotes_panel(call, bot):
     """Показывает панель управления цитатами."""
@@ -421,3 +410,9 @@ def admin_logout(call, bot):
         message_id=call.message.message_id
     )
     bot.answer_callback_query(call.id)
+
+# ==========================================
+# ВРЕМЕННОЕ ХРАНИЛИЩЕ
+# ==========================================
+if not hasattr(process_post_text, "temp_posts"):
+    process_post_text.temp_posts = {}
