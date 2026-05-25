@@ -1,9 +1,9 @@
 # ==========================================
 # Файл: services/app.py
-# Справка: README.md → Веб-морда
-# Задача: единый веб-интерфейс для VK и Telegram
+# Справка: README.md → Веб-морда + YouTube прокси
+# Задача: единый веб-интерфейс для VK, Telegram и YouTube (без VPN)
 # Комментарий: показывает сообщения из обоих источников, позволяет отвечать
-# Зависит от: flask, flask-socketio, vk_api, telebot, python-dotenv
+# Зависит от: flask, flask-socketio, vk_api, telebot, yt-dlp, python-dotenv
 # Вызывается из: Render (web service, start command: gunicorn app:app)
 # ==========================================
 
@@ -11,11 +11,12 @@ import os
 import json
 import datetime
 from threading import Thread
-from flask import Flask, render_template_string, request, jsonify, session, redirect, url_for
+from flask import Flask, render_template_string, request, jsonify, session, redirect, url_for, Response
 from flask_socketio import SocketIO, emit
 from functools import wraps
 import telebot
 import requests
+import yt_dlp
 
 # ==========================================
 # НАСТРОЙКИ
@@ -69,13 +70,156 @@ def login_required(f):
     return decorated
 
 # ==========================================
+# YOUTUBE ПРОКСИ
+# ==========================================
+def get_youtube_info(url):
+    """
+    Получает информацию о видео: ссылку на видеофайл (720p) и название.
+    """
+    ydl_opts = {
+        'format': 'best[height<=720]',  # 720p или ниже
+        'quiet': True,
+        'no_warnings': True,
+        'extract_flat': False
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            video_url = None
+            # Ищем лучший формат с видео и аудио (mp4)
+            for fmt in info.get('formats', []):
+                if fmt.get('height') and fmt['height'] <= 720 and fmt.get('ext') == 'mp4':
+                    if 'acodec' in fmt and fmt['acodec'] != 'none':
+                        video_url = fmt['url']
+                        break
+            if not video_url:
+                # Fallback: берём любой формат
+                video_url = info.get('url') or info['formats'][0]['url']
+            return {
+                'title': info.get('title', 'YouTube видео'),
+                'video_url': video_url,
+                'duration': info.get('duration', 0)
+            }
+    except Exception as e:
+        print(f"[YOUTUBE] Ошибка: {e}")
+        return None
+
+@app.route('/youtube')
+@login_required
+def youtube_page():
+    """Страница с YouTube-плеером"""
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>YouTube через Ансамбль — веб-морда</title>
+        <style>
+            body { background: #0a0a0a; color: #00ffcc; font-family: monospace; padding: 2rem; }
+            .container { max-width: 900px; margin: 0 auto; }
+            .card { background: #111; border-left: 3px solid #00ffcc; padding: 1rem; margin: 1rem 0; border-radius: 8px; }
+            input, button { background: #222; color: #00ffcc; border: 1px solid #00ffcc; padding: 8px 12px; border-radius: 4px; }
+            button:hover { background: #00ffcc; color: #000; cursor: pointer; }
+            video { width: 100%; max-width: 800px; margin-top: 20px; border: 1px solid #00ffcc; }
+            a { color: #00ffcc; }
+            .info { margin-top: 10px; font-size: 0.8rem; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🎬 YouTube через Ансамбль</h1>
+            <p>Смотри видео без VPN. Наш сервер работает прокси.</p>
+            <div class="card">
+                <form onsubmit="return false;">
+                    <input type="text" id="youtube-url" placeholder="https://youtu.be/... или https://youtube.com/watch?v=..." size="60">
+                    <button onclick="loadVideo()">▶️ Смотреть</button>
+                </form>
+                <div id="video-container"></div>
+            </div>
+            <p><a href="/">← Назад в веб-морду</a></p>
+        </div>
+        <script>
+        async function loadVideo() {
+            const url = document.getElementById('youtube-url').value.trim();
+            if (!url) return;
+            const container = document.getElementById('video-container');
+            container.innerHTML = '<div style="color:#ff0;">⏳ Загрузка видео...</div>';
+            try {
+                const resp = await fetch('/youtube_info', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url: url})
+                });
+                const data = await resp.json();
+                if (data.error) {
+                    container.innerHTML = `<div style="color:#f00;">❌ ${data.error}</div>`;
+                    return;
+                }
+                container.innerHTML = `
+                    <video controls autoplay>
+                        <source src="${data.stream_url}" type="video/mp4">
+                        Ваш браузер не поддерживает видео.
+                    </video>
+                    <div class="info">🎵 ${data.title} | Длительность: ${Math.floor(data.duration/60)}:${(data.duration%60).toString().padStart(2,'0')}</div>
+                `;
+            } catch(e) {
+                container.innerHTML = '<div style="color:#f00;">❌ Ошибка загрузки</div>';
+            }
+        }
+        </script>
+    </body>
+    </html>
+    ''')
+
+@app.route('/youtube_info', methods=['POST'])
+@login_required
+def youtube_info():
+    """Возвращает информацию о видео и ссылку на поток"""
+    data = request.json
+    url = data.get('url', '').strip()
+    if not url:
+        return jsonify({'error': 'URL не указан'}), 400
+    
+    info = get_youtube_info(url)
+    if not info:
+        return jsonify({'error': 'Не удалось загрузить видео'}), 500
+    
+    return jsonify({
+        'title': info['title'],
+        'stream_url': f"/youtube_stream?url={request.host_url}{url}",
+        'duration': info['duration']
+    })
+
+@app.route('/youtube_stream')
+@login_required
+def youtube_stream():
+    """Проксирует видеофайл YouTube"""
+    url = request.args.get('url')
+    if not url:
+        return "URL не указан", 400
+    
+    info = get_youtube_info(url)
+    if not info or not info.get('video_url'):
+        return "Не удалось получить видео", 500
+    
+    # Скачиваем и отдаём потоком
+    def generate():
+        try:
+            r = requests.get(info['video_url'], stream=True, timeout=30)
+            for chunk in r.iter_content(chunk_size=8192):
+                if chunk:
+                    yield chunk
+        except Exception as e:
+            print(f"[STREAM] Ошибка: {e}")
+    
+    return Response(generate(), content_type='video/mp4')
+
+# ==========================================
 # WEBSOCKET СОБЫТИЯ
 # ==========================================
 @socketio.on('connect')
 def handle_connect():
     print("[WS] Клиент подключён")
-    # Отправляем историю новому клиенту
-    emit('message_history', messages[-50:])  # последние 50 сообщений
+    emit('message_history', messages[-50:])
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -83,14 +227,13 @@ def handle_disconnect():
 
 @socketio.on('new_message')
 def handle_new_message(data):
-    """Принимает сообщение от бота (Telegram или VK)"""
     data['timestamp'] = datetime.datetime.now().isoformat()
     messages.append(data)
     emit('message_updated', data, broadcast=True)
     print(f"[WS] {data.get('source')}: {data.get('text', '')[:50]}")
 
 # ==========================================
-# МАРШРУТЫ
+# ОСНОВНЫЕ МАРШРУТЫ (авторизация, админка, логи)
 # ==========================================
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -170,7 +313,11 @@ def index():
         <div class="container">
             <h1>🔥 Ансамбль Следов 6</h1>
             <p>Ритм 0,8 Гц. Управление ботом из браузера. Время: {{ time }}</p>
-            <p><a href="/logs/admin">📋 admin.log</a> | <a href="/logs/error">❌ error.log</a></p>
+            <p>
+                <a href="/logs/admin">📋 admin.log</a> |
+                <a href="/logs/error">❌ error.log</a> |
+                <a href="/youtube">🎬 YouTube без VPN</a>
+            </p>
             
             <div class="card">
                 <h2>📨 Входящие сообщения (VK + Telegram)</h2>
@@ -231,21 +378,24 @@ def index():
                     container.innerHTML = '';
                 }
                 const div = document.createElement('div');
-                const sourceClass = msg.source === 'telegram' ? 'message-telegram' : 'message-vk';
+                const sourceClass = msg.source === 'telegram' ? 'message-telegram' : (msg.source === 'admin' ? '' : 'message-vk');
                 div.className = `message ${sourceClass} ${msg.own ? 'own' : ''}`;
-                const sourceName = msg.source === 'telegram' ? '📱 Telegram' : '📘 VK';
+                const sourceName = msg.source === 'telegram' ? '📱 Telegram' : (msg.source === 'admin' ? '🤖 Админ' : '📘 VK');
                 const sender = msg.sender || msg.username || 'unknown';
-                const time = new Date(msg.timestamp).toLocaleTimeString();
+                const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
                 div.innerHTML = `
                     <div>
-                        <strong>${sourceName} | ${sender}</strong>
-                        <span class="source-tag source-${msg.source}">${msg.source}</span>
+                        <strong>${sourceName} | ${escapeHtml(sender)}</strong>
+                        <span class="source-tag source-${msg.source === 'telegram' ? 'telegram' : (msg.source === 'admin' ? 'admin' : 'vk')}">${msg.source}</span>
                     </div>
                     <div>${escapeHtml(msg.text || '')}</div>
                     <small>${time}</small>
                 `;
                 if (!msg.own && msg.source !== 'admin') {
-                    div.innerHTML += `<br><button onclick="openReply('${msg.chat_id || msg.user_id}', '${msg.source}', '${sender}')" style="font-size:0.7rem; padding: 3px 6px;">Ответить</button>`;
+                    const chatId = msg.chat_id || msg.user_id;
+                    if (chatId) {
+                        div.innerHTML += `<br><button onclick="openReply('${chatId}', '${msg.source}', '${escapeHtml(sender)}')" style="font-size:0.7rem; padding: 3px 6px;">Ответить</button>`;
+                    }
                 }
                 container.prepend(div);
             }
@@ -336,7 +486,7 @@ def index():
 # ==========================================
 @app.route('/ping')
 def ping():
-    return {"status": "ok", "service": "web-morda"}, 200
+    return {"status": "ok", "service": "web-morda + youtube proxy"}, 200
 
 @app.route('/vk_post', methods=['POST'])
 @login_required
@@ -375,7 +525,6 @@ def view_log(name):
 
 @app.route('/send_reply', methods=['POST'])
 def send_reply():
-    """Отправляет ответ в Telegram или VK"""
     data = request.json
     chat_id = data.get('chat_id')
     text = data.get('text')
@@ -384,7 +533,6 @@ def send_reply():
     if source == 'telegram' and bot:
         try:
             bot.send_message(chat_id, text)
-            # Добавляем в историю
             socketio.emit('message_updated', {
                 'source': 'admin',
                 'text': text,
@@ -395,7 +543,6 @@ def send_reply():
         except Exception as e:
             return jsonify({"status": "error", "error": str(e)})
     elif source == 'vk':
-        # TODO: отправка в VK
         return jsonify({"status": "error", "error": "VK replies not implemented"})
     else:
         return jsonify({"status": "error", "error": "Unknown source"})
