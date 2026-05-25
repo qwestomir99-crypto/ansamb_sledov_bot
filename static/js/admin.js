@@ -21,7 +21,10 @@ document.addEventListener("DOMContentLoaded", () => {
     connectSocket();
     fetchState();
     fetchMood();
-    setInterval(fetchState, 60000); // обновляем цитаты каждую минуту
+    setInterval(() => {
+        fetchState();
+        fetchMood();
+    }, 60000); // обновляем каждую минуту
 });
 
 // ==========================================
@@ -31,14 +34,19 @@ function connectSocket() {
     socket = io();
     socket.on('message_history', (msgs) => {
         const container = document.getElementById('messages');
+        if (!container) return;
         container.innerHTML = '';
-        msgs.forEach(msg => appendMessage(msg));
-        if (msgs.length === 0) {
+        if (msgs && msgs.length) {
+            msgs.forEach(msg => appendMessage(msg));
+        } else {
             container.innerHTML = '<div style="color: var(--text-secondary);">Нет сообщений</div>';
         }
     });
-    socket.on('message_updated', (msg) => { appendMessage(msg); });
+    socket.on('message_updated', (msg) => {
+        if (msg) appendMessage(msg);
+    });
     socket.on('connect', () => console.log('Socket connected'));
+    socket.on('disconnect', () => console.log('Socket disconnected'));
 }
 
 // ==========================================
@@ -46,6 +54,8 @@ function connectSocket() {
 // ==========================================
 function appendMessage(msg) {
     const container = document.getElementById('messages');
+    if (!container) return;
+    
     if (container.innerHTML === '<div style="color: var(--text-secondary);">Загрузка...</div>' || 
         container.innerHTML === '<div style="color: var(--text-secondary);">Нет сообщений</div>') {
         container.innerHTML = '';
@@ -61,15 +71,16 @@ function appendMessage(msg) {
     const sender = msg.sender || msg.username || 'unknown';
     const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
     
-    let postId = msg.post_id || msg.chat_id || msg.user_id || '';
+    const chatId = msg.chat_id || msg.user_id || '';
+    const postId = msg.post_id || '';
     
     div.innerHTML = `
-        <div><strong>${sourceName} | ${escapeHtml(sender)}</strong></div>
+        <div><strong>${escapeHtml(sourceName)} | ${escapeHtml(sender)}</strong></div>
         <div>${escapeHtml(msg.text || '')}</div>
-        <small>${time}</small>
+        <small>${escapeHtml(time)}</small>
         <div class="message-actions" style="margin-top: 8px;">
-            <button onclick="openReply('${postId}', '${msg.source}', '${escapeHtml(sender)}')">💬 Ответить</button>
-            <button onclick="openComment('${postId}', '${msg.source}')">✏️ Комментировать</button>
+            <button onclick="openReply('${escapeHtml(String(chatId))}', '${msg.source}', '${escapeHtml(sender)}')">💬 Ответить</button>
+            <button onclick="openComment('${escapeHtml(String(postId || chatId))}', '${msg.source}')">✏️ Комментировать</button>
         </div>
     `;
     container.prepend(div);
@@ -80,25 +91,29 @@ function appendMessage(msg) {
 // ==========================================
 function openReply(chatId, source, sender) {
     currentReply = { chatId: chatId, source: source };
-    document.getElementById('reply-area').classList.remove('hidden');
-    document.getElementById('reply-text').placeholder = `Ответ для ${sender}...`;
-    document.getElementById('reply-text').focus();
+    const replyArea = document.getElementById('reply-area');
+    const replyText = document.getElementById('reply-text');
+    if (replyArea) replyArea.classList.remove('hidden');
+    if (replyText) replyText.placeholder = `Ответ для ${sender}...`;
+    if (replyText) replyText.focus();
 }
 
 function closeReply() {
     currentReply = null;
-    document.getElementById('reply-area').classList.add('hidden');
-    document.getElementById('reply-text').value = '';
+    const replyArea = document.getElementById('reply-area');
+    const replyText = document.getElementById('reply-text');
+    if (replyArea) replyArea.classList.add('hidden');
+    if (replyText) replyText.value = '';
 }
 
 async function sendReply() {
     if (!currentReply) return;
-    const text = document.getElementById('reply-text').value.trim();
+    const text = document.getElementById('reply-text')?.value.trim();
     if (!text) return;
     
     const response = await fetch('/send_reply', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             chat_id: currentReply.chatId,
             text: text,
@@ -115,7 +130,7 @@ async function sendReply() {
         });
         closeReply();
     } else {
-        alert('Ошибка: ' + data.error);
+        alert('Ошибка: ' + (data.error || 'неизвестная'));
     }
 }
 
@@ -124,30 +139,40 @@ async function sendReply() {
 // ==========================================
 function openComment(postId, platform) {
     currentComment = { postId: postId, platform: platform };
-    document.getElementById('comment-area').classList.remove('hidden');
-    document.getElementById('comment-text').placeholder = `Комментарий к посту ${postId}...`;
-    document.getElementById('comment-text').focus();
+    const commentArea = document.getElementById('comment-area');
+    const commentText = document.getElementById('comment-text');
+    if (commentArea) commentArea.classList.remove('hidden');
+    if (commentText) commentText.placeholder = `Комментарий к посту ${postId}...`;
+    if (commentText) commentText.focus();
 }
 
 function closeComment() {
     currentComment = null;
-    document.getElementById('comment-area').classList.add('hidden');
-    document.getElementById('comment-text').value = '';
+    const commentArea = document.getElementById('comment-area');
+    const commentText = document.getElementById('comment-text');
+    if (commentArea) commentArea.classList.add('hidden');
+    if (commentText) commentText.value = '';
 }
 
 async function sendComment() {
     if (!currentComment) return;
-    const text = document.getElementById('comment-text').value.trim();
+    const text = document.getElementById('comment-text')?.value.trim();
     if (!text) return;
     
     let url = '/api/comment';
+    if (currentComment.platform === 'vk') {
+        url = '/api/vk/comment';
+    } else if (currentComment.platform === 'telegram') {
+        url = '/api/tg/comment';
+    }
+    
     const response = await fetch(url, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             post_id: currentComment.postId,
             text: text,
-            platform: currentComment.platform
+            chat_id: currentComment.postId
         })
     });
     const data = await response.json();
@@ -160,7 +185,7 @@ async function sendComment() {
         });
         closeComment();
     } else {
-        alert('Ошибка: ' + data.error);
+        alert('Ошибка: ' + (data.error || 'неизвестная'));
     }
 }
 
@@ -173,14 +198,22 @@ async function createPost(platform) {
     
     const response = await fetch('/api/create_post', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ platform: platform, text: text })
     });
     const data = await response.json();
     if (data.status === 'ok') {
         alert('✅ Опубликовано!');
+        if (data.url) {
+            appendMessage({
+                source: 'admin',
+                text: `📢 Пост: ${text}<br><a href="${data.url}" target="_blank">Ссылка</a>`,
+                timestamp: new Date().toISOString(),
+                own: true
+            });
+        }
     } else {
-        alert('❌ Ошибка: ' + data.error);
+        alert('❌ Ошибка: ' + (data.error || 'неизвестная'));
     }
 }
 
@@ -190,22 +223,32 @@ async function createPost(platform) {
 async function setMode(mode) {
     const response = await fetch('/api/set_mode', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: mode })
     });
     const data = await response.json();
     if (data.status === 'ok') {
-        document.getElementById('current-mode').innerText = mode;
+        const modeSpan = document.getElementById('current-mode');
+        if (modeSpan) modeSpan.innerText = mode;
     }
 }
 
 async function fetchState() {
-    const response = await fetch('/api/state');
-    const data = await response.json();
-    if (data.mode) document.getElementById('current-mode').innerText = data.mode;
-    if (data.quotes) {
-        const list = document.getElementById('quotes-list');
-        list.innerHTML = data.quotes.map(q => `<li>${escapeHtml(q)}</li>`).join('');
+    try {
+        const response = await fetch('/api/state');
+        const data = await response.json();
+        if (data.mode) {
+            const modeSpan = document.getElementById('current-mode');
+            if (modeSpan) modeSpan.innerText = data.mode;
+        }
+        if (data.quotes && data.quotes.length) {
+            const quotesList = document.getElementById('quotes-list');
+            if (quotesList) {
+                quotesList.innerHTML = data.quotes.map(q => `<li>${escapeHtml(q)}</li>`).join('');
+            }
+        }
+    } catch(e) {
+        console.error('Ошибка загрузки состояния:', e);
     }
 }
 
@@ -215,22 +258,28 @@ async function fetchState() {
 async function setMood(mood) {
     const response = await fetch('/api/set_mood', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mood: mood })
     });
     const data = await response.json();
     if (data.status === 'ok') {
         const moodNames = { 'artist': 'Художник', 'admin': 'Администратор', 'poet': 'Поэт', 'engineer': 'Инженер' };
-        document.getElementById('current-mood').innerText = moodNames[mood] || mood;
+        const moodSpan = document.getElementById('current-mood');
+        if (moodSpan) moodSpan.innerText = moodNames[mood] || mood;
     }
 }
 
 async function fetchMood() {
-    const response = await fetch('/api/get_mood');
-    const data = await response.json();
-    if (data.mood) {
-        const moodNames = { 'artist': 'Художник', 'admin': 'Администратор', 'poet': 'Поэт', 'engineer': 'Инженер' };
-        document.getElementById('current-mood').innerText = moodNames[data.mood] || data.mood;
+    try {
+        const response = await fetch('/api/get_mood');
+        const data = await response.json();
+        if (data.mood) {
+            const moodNames = { 'artist': 'Художник', 'admin': 'Администратор', 'poet': 'Поэт', 'engineer': 'Инженер' };
+            const moodSpan = document.getElementById('current-mood');
+            if (moodSpan) moodSpan.innerText = moodNames[data.mood] || data.mood;
+        }
+    } catch(e) {
+        console.error('Ошибка загрузки настроения:', e);
     }
 }
 
@@ -240,14 +289,14 @@ async function fetchMood() {
 async function togglePing() {
     const response = await fetch('/api/toggle_ping', { method: 'POST' });
     const data = await response.json();
-    alert(data.message);
+    alert(data.message || 'Пинг переключён');
 }
 
 // ==========================================
 // ЦИТАТЫ
 // ==========================================
 async function addQuote() {
-    const quote = document.getElementById('new-quote').value.trim();
+    const quote = document.getElementById('new-quote')?.value.trim();
     if (!quote) return alert("Введите текст цитаты");
     const response = await fetch('/api/add_quote', {
         method: 'POST',
@@ -256,21 +305,22 @@ async function addQuote() {
     });
     const data = await response.json();
     if (data.status === 'ok') {
-        document.getElementById('new-quote').value = '';
+        const newQuoteInput = document.getElementById('new-quote');
+        if (newQuoteInput) newQuoteInput.value = '';
         fetchState();
     } else {
-        alert('Ошибка: ' + data.error);
+        alert('Ошибка: ' + (data.error || 'неизвестная'));
     }
 }
 
 // ==========================================
-// ПОСТ В VK
+// ПОСТ В VK (прямая отправка)
 // ==========================================
 async function sendPost() {
-    const text = document.getElementById('post-text').value.trim();
+    const text = document.getElementById('post-text')?.value.trim();
     if (!text) return alert("Введите текст поста");
     const statusSpan = document.getElementById('post-status');
-    statusSpan.innerText = '⏳ Отправка...';
+    if (statusSpan) statusSpan.innerText = '⏳ Отправка...';
     const response = await fetch('/vk_post', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -278,12 +328,15 @@ async function sendPost() {
     });
     const data = await response.json();
     if (data.status === 'ok') {
-        statusSpan.innerHTML = `✅ Опубликовано! <a href="${data.url}" target="_blank">Ссылка</a>`;
-        document.getElementById('post-text').value = '';
+        if (statusSpan) statusSpan.innerHTML = `✅ Опубликовано! <a href="${data.url}" target="_blank">Ссылка</a>`;
+        const postText = document.getElementById('post-text');
+        if (postText) postText.value = '';
     } else {
-        statusSpan.innerText = '❌ ' + data.error;
+        if (statusSpan) statusSpan.innerText = '❌ ' + (data.error || 'Ошибка');
     }
-    setTimeout(() => { statusSpan.innerText = ''; }, 5000);
+    setTimeout(() => {
+        if (statusSpan) statusSpan.innerText = '';
+    }, 5000);
 }
 
 // ==========================================
@@ -291,30 +344,46 @@ async function sendPost() {
 // ==========================================
 async function fetchDebugLogs() {
     const container = document.getElementById('debug-report');
+    if (!container) return;
     container.innerHTML = '<div style="color: var(--accent);">⏳ Загрузка...</div>';
-    const response = await fetch('/api/debug/logs?limit=100');
-    const data = await response.json();
-    if (data.logs && data.logs.length) {
-        let html = '<details><summary>🐛 Логи (' + data.logs.length + ')</summary><pre>';
-        data.logs.forEach(log => { html += `[${log.level}] ${log.module} | ${log.message}\n`; });
-        html += '</pre></details>';
-        container.innerHTML = html;
-    } else {
-        container.innerHTML = '<div style="color: var(--text-secondary);">Логов нет</div>';
+    try {
+        const response = await fetch('/api/debug/logs?limit=100');
+        const data = await response.json();
+        if (data.logs && data.logs.length) {
+            let html = '<details><summary>🐛 Логи (' + data.logs.length + ')</summary><pre>';
+            data.logs.forEach(log => {
+                html += `[${log.level}] ${log.module} | ${escapeHtml(log.message)}\n`;
+            });
+            html += '</pre></details>';
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = '<div style="color: var(--text-secondary);">Логов нет</div>';
+        }
+    } catch(e) {
+        container.innerHTML = '<div style="color: #f00;">❌ Ошибка загрузки логов</div>';
     }
 }
 
 async function sendDebugReport() {
     const container = document.getElementById('debug-report');
+    if (!container) return;
     container.innerHTML = '<div style="color: var(--accent);">⏳ Отправка...</div>';
-    const response = await fetch('/api/debug/send', { method: 'POST' });
-    const data = await response.json();
-    if (data.status === 'ok') {
-        container.innerHTML = '<div style="color: var(--success);">✅ Отчёт отправлен в Telegram</div>';
-    } else {
-        container.innerHTML = '<div style="color: #f00;">❌ Ошибка: ' + data.message + '</div>';
+    try {
+        const response = await fetch('/api/debug/send', { method: 'POST' });
+        const data = await response.json();
+        if (data.status === 'ok') {
+            container.innerHTML = '<div style="color: var(--success);">✅ Отчёт отправлен в Telegram</div>';
+        } else {
+            container.innerHTML = '<div style="color: #f00;">❌ Ошибка: ' + escapeHtml(data.message || 'неизвестная') + '</div>';
+        }
+    } catch(e) {
+        container.innerHTML = '<div style="color: #f00;">❌ Ошибка отправки</div>';
     }
-    setTimeout(() => { container.innerHTML = ''; }, 5000);
+    setTimeout(() => {
+        if (container.innerHTML.includes('✅') || container.innerHTML.includes('❌')) {
+            container.innerHTML = '';
+        }
+    }, 5000);
 }
 
 // ==========================================
@@ -325,4 +394,4 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
-}
+                                                      }
