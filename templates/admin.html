@@ -6,7 +6,6 @@
     <title>Ансамбль Следов 6 — веб-морда</title>
     <!-- Favicon: частота сети 0,8 Гц -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='10' y='65' font-family='monospace' font-size='50' fill='%2300ffcc'%3E0.8%3C/text%3E%3C/svg%3E">
-    <!-- Тема оформления (переменная из app.py) -->
     <link rel="stylesheet" href="/static/css/{{ theme }}">
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <style>
@@ -89,6 +88,18 @@
             margin-top: 1rem;
             box-shadow: var(--shadow);
         }
+        .debug-report {
+            margin-top: 10px;
+            font-size: 0.8rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .debug-report pre {
+            background: #f0f0f0;
+            padding: 8px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
     </style>
 </head>
 <body>
@@ -137,6 +148,14 @@
                 <li>Нет цитат</li>
             {% endfor %}
         </ul>
+    </div>
+
+    <!-- Дебаггер -->
+    <div class="card">
+        <h2>🐛 Дебаггер</h2>
+        <button onclick="fetchDebugLogs()">📋 Показать логи (последние 100)</button>
+        <button onclick="sendDebugReport()">📨 Отправить отчёт в Telegram</button>
+        <div id="debug-report" class="debug-report"></div>
     </div>
 </div>
 
@@ -274,6 +293,51 @@
         }
     }
     
+    // ==========================================
+    // ДЕБАГГЕР (логи)
+    // ==========================================
+    async function fetchDebugLogs() {
+        const container = document.getElementById('debug-report');
+        container.innerHTML = '<div style="color: var(--accent);">⏳ Загрузка логов...</div>';
+        try {
+            const resp = await fetch('/api/debug/logs?limit=100');
+            const data = await resp.json();
+            if (data.logs && data.logs.length) {
+                let html = '<details open><summary>🐛 Логи (' + data.logs.length + ' записей)</summary><pre>';
+                data.logs.forEach(log => {
+                    html += `[${log.level}] ${log.module} | ${log.message}\n`;
+                });
+                html += '</pre></details>';
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = '<div style="color: var(--text-secondary);">Логов нет</div>';
+            }
+        } catch(e) {
+            container.innerHTML = '<div style="color: #f00;">❌ Ошибка загрузки логов</div>';
+        }
+    }
+    
+    async function sendDebugReport() {
+        const container = document.getElementById('debug-report');
+        container.innerHTML = '<div style="color: var(--accent);">⏳ Отправка отчёта...</div>';
+        try {
+            const resp = await fetch('/api/debug/send', { method: 'POST' });
+            const data = await resp.json();
+            if (data.status === 'ok') {
+                container.innerHTML = '<div style="color: var(--success);">✅ Отчёт отправлен в Telegram</div>';
+            } else {
+                container.innerHTML = '<div style="color: #f00;">❌ Ошибка: ' + data.message + '</div>';
+            }
+        } catch(e) {
+            container.innerHTML = '<div style="color: #f00;">❌ Ошибка отправки</div>';
+        }
+        setTimeout(() => {
+            if (container.innerHTML.includes('✅') || container.innerHTML.includes('❌')) {
+                container.innerHTML = '';
+            }
+        }, 5000);
+    }
+    
     function escapeHtml(text) {
         if (!text) return '';
         const div = document.createElement('div');
@@ -282,4 +346,4 @@
     }
 </script>
 </body>
-    </html>
+</html>
