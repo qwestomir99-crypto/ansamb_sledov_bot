@@ -8,98 +8,19 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='10' y='65' font-family='monospace' font-size='50' fill='%2300ffcc'%3E0.8%3C/text%3E%3C/svg%3E">
     <link rel="stylesheet" href="/static/css/{{ theme }}">
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <script src="/static/js/admin.js"></script>
     <style>
-        /* Дополнительные стили, которых нет в теме */
-        .message {
-            border-bottom: 1px solid var(--border);
-            padding: 8px;
-            margin: 5px 0;
-        }
-        .message.own {
-            background: var(--accent);
-            color: white;
-            border: none;
-        }
-        .message-telegram {
-            border-left: 4px solid #26a5e4;
-        }
-        .message-vk {
-            border-left: 4px solid #4c75a3;
-        }
-        .messages {
-            max-height: 400px;
-            overflow-y: auto;
-            margin-bottom: 20px;
-        }
-        .source-tag {
-            font-size: 0.7rem;
-            margin-left: 8px;
-            padding: 2px 6px;
-            border-radius: 4px;
-        }
-        .source-telegram {
-            background: #26a5e4;
-            color: #000;
-        }
-        .source-vk {
-            background: #4c75a3;
-            color: #fff;
-        }
-        .hidden {
-            display: none;
-        }
-        .search-row {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-        }
-        .search-row input {
-            flex: 1;
-        }
-        .video-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-            gap: 1rem;
-        }
-        .video-card {
-            background: white;
-            border-radius: 16px;
-            padding: 1rem;
-            cursor: pointer;
-            transition: 0.2s;
-            border: 1px solid var(--border);
-        }
-        .video-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.1);
-        }
-        .video-title {
-            font-weight: 600;
-            margin-bottom: 6px;
-        }
-        .video-channel {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-        }
-        video {
-            width: 100%;
-            max-width: 800px;
-            border-radius: 20px;
-            margin-top: 1rem;
-            box-shadow: var(--shadow);
-        }
-        .debug-report {
-            margin-top: 10px;
-            font-size: 0.8rem;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        .debug-report pre {
-            background: #f0f0f0;
-            padding: 8px;
-            border-radius: 8px;
-            overflow-x: auto;
-        }
+        .admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+        .button-group { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+        .button-group button { flex: 1; min-width: 80px; }
+        .status-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; background: var(--accent); color: white; }
+        .messages { max-height: 400px; overflow-y: auto; margin-bottom: 20px; }
+        .message { border-bottom: 1px solid var(--border); padding: 8px; margin: 5px 0; }
+        .message.own { background: var(--accent); color: white; border: none; }
+        .message-telegram { border-left: 4px solid #26a5e4; }
+        .message-vk { border-left: 4px solid #4c75a3; }
+        .message-actions button { font-size: 0.7rem; padding: 2px 6px; margin-right: 5px; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
@@ -111,13 +32,21 @@
         </form>
     </div>
     <p>Ритм 0,8 Гц. Управление ботом из браузера. Время: {{ time }}</p>
-    <p>
-        <a href="/logs/admin">📋 admin.log</a> |
-        <a href="/logs/error">❌ error.log</a> |
-        <a href="/youtube">🎬 YouTube без VPN</a>
-    </p>
 
-    <!-- Блок сообщений -->
+    <!-- ========================================== -->
+    <!-- 1. КНОПКИ СОЗДАНИЯ ПОСТОВ -->
+    <!-- ========================================== -->
+    <div class="card">
+        <h2>✍️ Создать</h2>
+        <div class="button-group">
+            <button onclick="createPost('telegram')">📱 Пост в Telegram</button>
+            <button onclick="createPost('vk')">📘 Пост в VK</button>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 2. ВХОДЯЩИЕ СООБЩЕНИЯ (VK + Telegram) -->
+    <!-- ========================================== -->
     <div class="card">
         <h2>📨 Входящие сообщения (VK + Telegram)</h2>
         <div id="messages" class="messages">
@@ -128,9 +57,64 @@
             <button onclick="sendReply()">📤 Отправить ответ</button>
             <button onclick="closeReply()" style="background: transparent; border: 1px solid var(--border);">❌ Отмена</button>
         </div>
+        <div id="comment-area" class="hidden" style="margin-top: 1rem;">
+            <textarea id="comment-text" rows="2" cols="50" placeholder="Ваш комментарий..." style="width: 100%; margin-bottom: 0.5rem;"></textarea>
+            <button onclick="sendComment()">✏️ Отправить комментарий</button>
+            <button onclick="closeComment()" style="background: transparent; border: 1px solid var(--border);">❌ Отмена</button>
+        </div>
     </div>
 
-    <!-- Пост в VK -->
+    <!-- ========================================== -->
+    <!-- 3. УПРАВЛЕНИЕ БОТОМ -->
+    <!-- ========================================== -->
+    <div class="card">
+        <h2>⚙️ Управление ботом</h2>
+        <div class="button-group">
+            <button onclick="setMode('утро')">🌅 Утро</button>
+            <button onclick="setMode('день')">☀️ День</button>
+            <button onclick="setMode('вечер')">🌙 Вечер</button>
+            <button onclick="setMode('ночь')">🌌 Ночь</button>
+            <button onclick="togglePing()">🔄 Пинг</button>
+        </div>
+        <div style="margin-top: 0.5rem;">Текущий режим: <span id="current-mode" class="status-badge">день</span></div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 4. НАСТРОЕНИЕ АГЕНТА -->
+    <!-- ========================================== -->
+    <div class="card">
+        <h2>🎭 Настроение агента</h2>
+        <div class="button-group">
+            <button onclick="setMood('artist')">🎨 Художник</button>
+            <button onclick="setMood('admin')">📋 Администратор</button>
+            <button onclick="setMood('poet')">🎭 Поэт</button>
+            <button onclick="setMood('engineer')">🔧 Инженер</button>
+        </div>
+        <div style="margin-top: 0.5rem;">Текущее настроение: <span id="current-mood" class="status-badge">художник</span></div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 5. ЦИТАТЫ -->
+    <!-- ========================================== -->
+    <div class="card">
+        <h2>📜 Управление цитатами</h2>
+        <textarea id="new-quote" rows="2" cols="50" placeholder="Текст новой цитаты..." style="width: 100%;"></textarea>
+        <button onclick="addQuote()">➕ Добавить цитату</button>
+        <details style="margin-top: 1rem;">
+            <summary>📖 Последние 10 цитат</summary>
+            <ul id="quotes-list">
+                {% for q in quotes %}
+                    <li>{{ q[:100] }}{% if q|length > 100 %}...{% endif %}</li>
+                {% else %}
+                    <li>Нет цитат</li>
+                {% endfor %}
+            </ul>
+        </details>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 6. ПОСТ В VK -->
+    <!-- ========================================== -->
     <div class="card">
         <h2>🎬 Пост в VK (текст)</h2>
         <textarea id="post-text" rows="3" cols="50" placeholder="Текст поста..."></textarea><br>
@@ -138,212 +122,17 @@
         <span id="post-status" style="margin-left: 10px;"></span>
     </div>
 
-    <!-- Цитаты -->
-    <div class="card">
-        <h2>📜 Цитаты (последние 10)</h2>
-        <ul id="quotes-list">
-            {% for q in quotes %}
-                <li>{{ q[:100] }}{% if q|length > 100 %}...{% endif %}</li>
-            {% else %}
-                <li>Нет цитат</li>
-            {% endfor %}
-        </ul>
-    </div>
-
-    <!-- Дебаггер -->
+    <!-- ========================================== -->
+    <!-- 7. ДЕБАГГЕР -->
+    <!-- ========================================== -->
     <div class="card">
         <h2>🐛 Дебаггер</h2>
-        <button onclick="fetchDebugLogs()">📋 Показать логи (последние 100)</button>
-        <button onclick="sendDebugReport()">📨 Отправить отчёт в Telegram</button>
-        <div id="debug-report" class="debug-report"></div>
+        <div class="button-group">
+            <button onclick="fetchDebugLogs()">📋 Показать логи</button>
+            <button onclick="sendDebugReport()">📨 Отправить отчёт в Telegram</button>
+        </div>
+        <div id="debug-report" style="margin-top: 1rem;"></div>
     </div>
 </div>
-
-<script>
-    let socket = null;
-    let currentReply = null;
-    
-    document.addEventListener("DOMContentLoaded", () => {
-        connectSocket();
-        fetchState();
-    });
-    
-    function connectSocket() {
-        socket = io();
-        socket.on('message_history', (msgs) => {
-            const container = document.getElementById('messages');
-            container.innerHTML = '';
-            msgs.forEach(msg => appendMessage(msg));
-            if (msgs.length === 0) {
-                container.innerHTML = '<div style="color: var(--text-secondary);">Нет сообщений</div>';
-            }
-        });
-        socket.on('message_updated', (msg) => {
-            appendMessage(msg);
-        });
-        socket.on('connect', () => console.log('Socket connected'));
-    }
-    
-    function appendMessage(msg) {
-        const container = document.getElementById('messages');
-        if (container.innerHTML === '<div style="color: var(--text-secondary);">Загрузка...</div>' || 
-            container.innerHTML === '<div style="color: var(--text-secondary);">Нет сообщений</div>') {
-            container.innerHTML = '';
-        }
-        const div = document.createElement('div');
-        let sourceClass = '';
-        if (msg.source === 'telegram') sourceClass = 'message-telegram';
-        else if (msg.source === 'vk') sourceClass = 'message-vk';
-        div.className = `message ${sourceClass} ${msg.own ? 'own' : ''}`;
-        const sourceName = msg.source === 'telegram' ? '📱 Telegram' : (msg.source === 'admin' ? '🤖 Админ' : '📘 VK');
-        const sender = msg.sender || msg.username || 'unknown';
-        const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
-        div.innerHTML = `
-            <div>
-                <strong>${sourceName} | ${escapeHtml(sender)}</strong>
-                <span class="source-tag source-${msg.source === 'telegram' ? 'telegram' : (msg.source === 'admin' ? 'admin' : 'vk')}">${msg.source}</span>
-            </div>
-            <div>${escapeHtml(msg.text || '')}</div>
-            <small>${time}</small>
-        `;
-        if (!msg.own && msg.source !== 'admin') {
-            const chatId = msg.chat_id || msg.user_id;
-            if (chatId) {
-                div.innerHTML += `<br><button onclick="openReply('${chatId}', '${msg.source}', '${escapeHtml(sender)}')" style="font-size:0.7rem; padding: 3px 6px; margin-top: 5px;">Ответить</button>`;
-            }
-        }
-        container.prepend(div);
-    }
-    
-    function openReply(chatId, source, sender) {
-        currentReply = { chatId: chatId, source: source };
-        document.getElementById('reply-area').classList.remove('hidden');
-        document.getElementById('reply-text').placeholder = `Ответ для ${sender}...`;
-        document.getElementById('reply-text').focus();
-    }
-    
-    function closeReply() {
-        currentReply = null;
-        document.getElementById('reply-area').classList.add('hidden');
-        document.getElementById('reply-text').value = '';
-    }
-    
-    async function sendReply() {
-        if (!currentReply) return;
-        const text = document.getElementById('reply-text').value.trim();
-        if (!text) return;
-        
-        const response = await fetch('/send_reply', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                chat_id: currentReply.chatId,
-                text: text,
-                source: currentReply.source
-            })
-        });
-        const data = await response.json();
-        if (data.status === 'ok') {
-            appendMessage({
-                source: 'admin',
-                text: text,
-                timestamp: new Date().toISOString(),
-                own: true
-            });
-            closeReply();
-        } else {
-            alert('Ошибка: ' + data.error);
-        }
-    }
-    
-    async function sendPost() {
-        const text = document.getElementById('post-text').value.trim();
-        if (!text) return;
-        const statusSpan = document.getElementById('post-status');
-        statusSpan.innerText = '⏳ Отправка...';
-        try {
-            const response = await fetch('/vk_post', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: 'text=' + encodeURIComponent(text)
-            });
-            const data = await response.json();
-            if (data.status === 'ok') {
-                statusSpan.innerHTML = `✅ Опубликовано! <a href="${data.url}" target="_blank">Ссылка</a>`;
-                document.getElementById('post-text').value = '';
-            } else {
-                statusSpan.innerText = '❌ ' + data.error;
-            }
-        } catch (e) {
-            statusSpan.innerText = '❌ Ошибка сети';
-        }
-        setTimeout(() => { statusSpan.innerText = ''; }, 5000);
-    }
-    
-    async function fetchState() {
-        try {
-            const response = await fetch('/api/state');
-            const data = await response.json();
-            if (data.quotes) {
-                const list = document.getElementById('quotes-list');
-                list.innerHTML = data.quotes.map(q => `<li>${escapeHtml(q)}</li>`).join('');
-            }
-        } catch(e) {
-            console.error('Ошибка загрузки состояния:', e);
-        }
-    }
-    
-    // ==========================================
-    // ДЕБАГГЕР (логи)
-    // ==========================================
-    async function fetchDebugLogs() {
-        const container = document.getElementById('debug-report');
-        container.innerHTML = '<div style="color: var(--accent);">⏳ Загрузка логов...</div>';
-        try {
-            const resp = await fetch('/api/debug/logs?limit=100');
-            const data = await resp.json();
-            if (data.logs && data.logs.length) {
-                let html = '<details open><summary>🐛 Логи (' + data.logs.length + ' записей)</summary><pre>';
-                data.logs.forEach(log => {
-                    html += `[${log.level}] ${log.module} | ${log.message}\n`;
-                });
-                html += '</pre></details>';
-                container.innerHTML = html;
-            } else {
-                container.innerHTML = '<div style="color: var(--text-secondary);">Логов нет</div>';
-            }
-        } catch(e) {
-            container.innerHTML = '<div style="color: #f00;">❌ Ошибка загрузки логов</div>';
-        }
-    }
-    
-    async function sendDebugReport() {
-        const container = document.getElementById('debug-report');
-        container.innerHTML = '<div style="color: var(--accent);">⏳ Отправка отчёта...</div>';
-        try {
-            const resp = await fetch('/api/debug/send', { method: 'POST' });
-            const data = await resp.json();
-            if (data.status === 'ok') {
-                container.innerHTML = '<div style="color: var(--success);">✅ Отчёт отправлен в Telegram</div>';
-            } else {
-                container.innerHTML = '<div style="color: #f00;">❌ Ошибка: ' + data.message + '</div>';
-            }
-        } catch(e) {
-            container.innerHTML = '<div style="color: #f00;">❌ Ошибка отправки</div>';
-        }
-        setTimeout(() => {
-            if (container.innerHTML.includes('✅') || container.innerHTML.includes('❌')) {
-                container.innerHTML = '';
-            }
-        }, 5000);
-    }
-    
-    function escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-</script>
 </body>
 </html>
