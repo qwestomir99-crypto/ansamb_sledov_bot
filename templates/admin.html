@@ -4,82 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ансамбль Следов 6 — веб-морда</title>
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <style>
-        * {
-            box-sizing: border-box;
-        }
-        body {
-            background: #0a0a0a;
-            color: #00ffcc;
-            font-family: 'Courier New', monospace;
-            padding: 1rem;
-            margin: 0;
-        }
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-        }
-        .card {
-            background: #111;
-            border-left: 3px solid #00ffcc;
-            padding: 1rem;
-            margin: 1rem 0;
-            border-radius: 8px;
-        }
-        button, input, textarea, select {
-            background: #222;
-            color: #00ffcc;
-            border: 1px solid #00ffcc;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-family: inherit;
-        }
-        button:hover {
-            background: #00ffcc;
-            color: #000;
-            cursor: pointer;
-        }
-        hr {
-            border-color: #00ffcc33;
-        }
-        a {
-            color: #00ffcc;
-        }
-        pre {
-            background: #111;
-            padding: 0.5rem;
-            overflow-x: auto;
-            font-size: 0.8rem;
-        }
-        .message-item {
-            border-bottom: 1px solid #333;
-            padding: 8px;
-            margin-bottom: 5px;
-        }
-        .message-item.own {
-            background-color: #1a3a3a;
-            border-left: 2px solid #00ffcc;
-        }
-        #vk-messages {
-            max-height: 400px;
-            overflow-y: auto;
-            border: 1px solid #00ffcc33;
-            padding: 10px;
-            margin-bottom: 10px;
-        }
-        .status-ok {
-            color: #0f0;
-        }
-        .status-error {
-            color: #f00;
-        }
-        .hidden {
-            display: none;
-        }
-        .inline {
-            display: inline-block;
-            margin-left: 10px;
-        }
+        * { box-sizing: border-box; }
+        body { background: #0a0a0a; color: #00ffcc; font-family: 'Courier New', monospace; padding: 1rem; margin: 0; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .card { background: #111; border-left: 3px solid #00ffcc; padding: 1rem; margin: 1rem 0; border-radius: 8px; }
+        button, input, textarea, select { background: #222; color: #00ffcc; border: 1px solid #00ffcc; padding: 6px 12px; border-radius: 4px; font-family: inherit; }
+        button:hover { background: #00ffcc; color: #000; cursor: pointer; }
+        a { color: #00ffcc; }
+        .message { border-bottom: 1px solid #333; padding: 8px; margin: 5px 0; }
+        .message.own { background: #1a3a3a; border-left: 2px solid #00ffcc; }
+        .message-telegram { border-left: 2px solid #26a5e4; }
+        .message-vk { border-left: 2px solid #4c75a3; }
+        .messages { max-height: 400px; overflow-y: auto; margin-bottom: 20px; }
+        .source-tag { font-size: 0.7rem; margin-left: 8px; padding: 2px 6px; border-radius: 4px; }
+        .source-telegram { background: #26a5e4; color: #000; }
+        .source-vk { background: #4c75a3; color: #fff; }
+        .hidden { display: none; }
+        .inline { display: inline-block; margin-left: 10px; }
+        .status-ok { color: #0f0; }
+        .status-error { color: #f00; }
     </style>
 </head>
 <body>
@@ -87,14 +32,14 @@
     <h1>🔥 Ансамбль Следов 6</h1>
     <p>Ритм 0,8 Гц. Управление ботом из браузера. Время: {{ time }}</p>
     <p>
-        <a href="/logs/admin">📋 admin.log</a> |
-        <a href="/logs/error">❌ error.log</a>
+        <a href="/logs/admin" target="_blank">📋 admin.log</a> |
+        <a href="/logs/error" target="_blank">❌ error.log</a>
     </p>
 
     <!-- Блок управления режимом -->
     <div class="card">
         <h2>🤖 Текущий режим: <strong id="current-mode">{{ mode }}</strong></h2>
-        <form method="post" action="/set_mode" onsubmit="return false" id="mode-form">
+        <form onsubmit="return false">
             <select name="mode" id="mode-select">
                 <option value="утро">🌅 Утро</option>
                 <option value="день">☀️ День</option>
@@ -108,8 +53,8 @@
     <!-- Блок добавления цитаты -->
     <div class="card">
         <h2>📜 Добавить цитату</h2>
-        <form method="post" action="/add_quote" onsubmit="return false" id="quote-form">
-            <textarea name="quote" id="quote-text" rows="2" cols="50" placeholder="Текст цитаты..."></textarea><br>
+        <form onsubmit="return false">
+            <textarea id="quote-text" rows="2" cols="50" placeholder="Текст цитаты..."></textarea><br>
             <button type="button" onclick="addQuote()">➕ Добавить</button>
         </form>
         <details>
@@ -127,305 +72,200 @@
     <!-- Блок поста в VK -->
     <div class="card">
         <h2>🎬 Пост в VK (текст)</h2>
-        <form method="post" action="/vk_post" onsubmit="return false" id="vk-post-form">
-            <textarea name="text" id="vk-post-text" rows="3" cols="50" placeholder="Текст поста..."></textarea><br>
+        <form onsubmit="return false">
+            <textarea id="vk-post-text" rows="3" cols="50" placeholder="Текст поста..."></textarea><br>
             <button type="button" onclick="sendVkPost()">📤 Отправить</button>
         </form>
         <div id="vk-post-status" class="inline"></div>
     </div>
 
-    <!-- Блок сообщений из VK -->
+    <!-- Блок сообщений (VK + Telegram) -->
     <div class="card">
-        <h2>💬 Входящие сообщения (VK)</h2>
-        <div id="vk-messages">
-            <div style="color: #666;">Сообщения будут появляться здесь...</div>
+        <h2>💬 Входящие сообщения (VK + Telegram)</h2>
+        <div id="messages" class="messages">
+            <div style="color: #666;">Загрузка...</div>
         </div>
-        <div id="vk-reply-area" class="hidden">
-            <textarea id="vk-reply-text" rows="2" cols="50" placeholder="Ваш ответ..."></textarea>
-            <input type="hidden" id="vk-reply-peer">
-            <button onclick="sendVkReply()">📤 Отправить ответ</button>
-            <button onclick="closeVkReply()">❌ Отмена</button>
+        <div id="reply-area" class="hidden">
+            <textarea id="reply-text" rows="2" cols="50" placeholder="Ваш ответ..."></textarea>
+            <button onclick="sendReply()">📤 Отправить ответ</button>
+            <button onclick="closeReply()">❌ Отмена</button>
         </div>
     </div>
 </div>
 
 <script>
-    let currentReplyPeer = null;
-    let ws = null;
-    let wsConnected = false;
-
-    // ==========================================
-    // Инициализация
-    // ==========================================
-    document.addEventListener('DOMContentLoaded', function() {
-        connectWebSocket();
+    let socket = null;
+    let currentReply = null;
+    
+    document.addEventListener("DOMContentLoaded", () => {
+        connectSocket();
+        fetchState();
     });
-
-    // ==========================================
-    // WebSocket для real-time сообщений
-    // ==========================================
-    function connectWebSocket() {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const password = getUrlParam('password');
-        let wsUrl = `${protocol}//${window.location.host}/ws`;
-        if (password) {
-            wsUrl += `?password=${password}`;
-        }
-        
-        ws = new WebSocket(wsUrl);
-        
-        ws.onopen = function() {
-            console.log('WebSocket подключён');
-            wsConnected = true;
-            loadVkHistory();
-        };
-        
-        ws.onmessage = function(event) {
-            try {
-                const data = JSON.parse(event.data);
-                if (data.type === 'new_message') {
-                    addVkMessage(data.data, false);
-                } else if (data.type === 'history') {
-                    addVkMessage(data.data, true);
-                }
-            } catch(e) {
-                console.error('Ошибка парсинга WebSocket:', e);
+    
+    function connectSocket() {
+        socket = io();
+        socket.on('message_history', (msgs) => {
+            const container = document.getElementById('messages');
+            container.innerHTML = '';
+            msgs.forEach(msg => appendMessage(msg));
+            if (msgs.length === 0) {
+                container.innerHTML = '<div style="color: #666;">Нет сообщений</div>';
             }
-        };
-        
-        ws.onerror = function(e) {
-            console.error('WebSocket ошибка:', e);
-            wsConnected = false;
-        };
-        
-        ws.onclose = function() {
-            console.log('WebSocket отключён, переподключение через 5 сек');
-            wsConnected = false;
-            setTimeout(connectWebSocket, 5000);
-        };
+        });
+        socket.on('message_updated', (msg) => {
+            appendMessage(msg);
+        });
+        socket.on('connect', () => console.log('Socket connected'));
     }
-
-    function getUrlParam(name) {
-        const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get(name);
-    }
-
-    // ==========================================
-    // Загрузка истории сообщений
-    // ==========================================
-    function loadVkHistory() {
-        const password = getUrlParam('password');
-        let url = '/api/vk/messages?limit=50';
-        if (password) {
-            url += `&password=${password}`;
-        }
-        
-        fetch(url)
-            .then(r => r.json())
-            .then(data => {
-                if (data.messages && data.messages.length > 0) {
-                    // Очищаем заглушку
-                    const container = document.getElementById('vk-messages');
-                    if (container.children.length === 1 && container.children[0].innerHTML.includes('Сообщения будут появляться')) {
-                        container.innerHTML = '';
-                    }
-                    data.messages.reverse().forEach(msg => addVkMessage(msg, true));
-                }
-            })
-            .catch(e => console.error('Ошибка загрузки истории:', e));
-    }
-
-    // ==========================================
-    // Отображение сообщения
-    // ==========================================
-    function addVkMessage(msg, isHistory) {
-        const container = document.getElementById('vk-messages');
-        
-        // Удаляем заглушку если есть
-        if (container.children.length === 1 && container.children[0].innerHTML.includes('Сообщения будут появляться')) {
+    
+    function appendMessage(msg) {
+        const container = document.getElementById('messages');
+        if (container.innerHTML === '<div style="color: #666;">Загрузка...</div>' || 
+            container.innerHTML === '<div style="color: #666;">Нет сообщений</div>') {
             container.innerHTML = '';
         }
-        
         const div = document.createElement('div');
-        div.className = 'message-item';
-        
-        const dateStr = msg.timestamp ? new Date(msg.timestamp).toLocaleString() : new Date(msg.date * 1000).toLocaleString();
-        
+        const sourceClass = msg.source === 'telegram' ? 'message-telegram' : (msg.source === 'admin' ? '' : 'message-vk');
+        div.className = `message ${sourceClass} ${msg.own ? 'own' : ''}`;
+        const sourceName = msg.source === 'telegram' ? '📱 Telegram' : (msg.source === 'admin' ? '🤖 Админ' : '📘 VK');
+        const sender = msg.sender || msg.username || 'unknown';
+        const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
         div.innerHTML = `
-            <strong>👤 ${escapeHtml(String(msg.from_id))}:</strong><br>
-            ${escapeHtml(msg.text || '')}<br>
-            <small>${dateStr}</small>
-            <button onclick="openVkReply(${msg.peer_id}, '${escapeHtml(String(msg.from_id))}')" style="margin-left: 10px;">↩️ Ответить</button>
+            <div>
+                <strong>${sourceName} | ${escapeHtml(sender)}</strong>
+                <span class="source-tag source-${msg.source === 'telegram' ? 'telegram' : (msg.source === 'admin' ? 'admin' : 'vk')}">${msg.source}</span>
+            </div>
+            <div>${escapeHtml(msg.text || '')}</div>
+            <small>${time}</small>
         `;
-        
-        if (isHistory) {
-            container.appendChild(div);
-        } else {
-            container.prepend(div);
+        if (!msg.own && msg.source !== 'admin') {
+            const chatId = msg.chat_id || msg.user_id;
+            if (chatId) {
+                div.innerHTML += `<br><button onclick="openReply('${chatId}', '${msg.source}', '${escapeHtml(sender)}')" style="font-size:0.7rem; padding: 3px 6px;">Ответить</button>`;
+            }
         }
-    }
-
-    // ==========================================
-    // Ответ на сообщение
-    // ==========================================
-    function openVkReply(peerId, fromId) {
-        currentReplyPeer = peerId;
-        document.getElementById('vk-reply-peer').value = peerId;
-        document.getElementById('vk-reply-area').classList.remove('hidden');
-        document.getElementById('vk-reply-text').focus();
-        document.getElementById('vk-reply-text').placeholder = `Ответ для ${fromId}...`;
+        container.prepend(div);
     }
     
-    function closeVkReply() {
-        document.getElementById('vk-reply-area').classList.add('hidden');
-        document.getElementById('vk-reply-text').value = '';
-        currentReplyPeer = null;
+    function openReply(chatId, source, sender) {
+        currentReply = { chatId: chatId, source: source };
+        document.getElementById('reply-area').classList.remove('hidden');
+        document.getElementById('reply-text').placeholder = `Ответ для ${sender}...`;
+        document.getElementById('reply-text').focus();
     }
     
-    function sendVkReply() {
-        const text = document.getElementById('vk-reply-text').value.trim();
-        if (!text || !currentReplyPeer) return;
+    function closeReply() {
+        currentReply = null;
+        document.getElementById('reply-area').classList.add('hidden');
+        document.getElementById('reply-text').value = '';
+    }
+    
+    async function sendReply() {
+        if (!currentReply) return;
+        const text = document.getElementById('reply-text').value.trim();
+        if (!text) return;
         
-        const password = getUrlParam('password');
-        let url = '/api/vk/send';
-        if (password) {
-            url += `?password=${password}`;
-        }
-        
-        fetch(url, {
+        const response = await fetch('/send_reply', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
-                peer_id: currentReplyPeer,
-                message: text
+                chat_id: currentReply.chatId,
+                text: text,
+                source: currentReply.source
             })
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.status === 'ok') {
-                document.getElementById('vk-reply-text').value = '';
-                closeVkReply();
-                
-                // Добавляем отправленное сообщение в UI
-                const container = document.getElementById('vk-messages');
-                const div = document.createElement('div');
-                div.className = 'message-item own';
-                div.innerHTML = `
-                    <strong>🤖 Бот (ответ):</strong><br>
-                    ${escapeHtml(text)}<br>
-                    <small>Отправлено: ${new Date().toLocaleString()}</small>
-                `;
-                container.prepend(div);
-            } else {
-                alert('Ошибка отправки: ' + (data.message || 'неизвестная'));
-            }
-        })
-        .catch(e => {
-            console.error('Ошибка отправки:', e);
-            alert('Ошибка отправки сообщения');
         });
+        const data = await response.json();
+        if (data.status === 'ok') {
+            appendMessage({
+                source: 'admin',
+                text: text,
+                timestamp: new Date().toISOstring(),
+                own: true
+            });
+            closeReply();
+        } else {
+            alert('Ошибка: ' + data.error);
+        }
     }
-
+    
     // ==========================================
     // Управление режимом
     // ==========================================
-    function setMode() {
+    async function setMode() {
         const mode = document.getElementById('mode-select').value;
-        const password = getUrlParam('password');
-        let url = '/set_mode';
-        if (password) {
-            url += `?password=${password}`;
-        }
-        
-        fetch(url, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: `mode=${encodeURIComponent(mode)}`
-        })
-        .then(() => {
-            document.getElementById('current-mode').innerText = mode;
-            showStatus('mode-status', 'Режим изменён', 'ok');
-        })
-        .catch(e => console.error('Ошибка:', e));
+        try {
+            const response = await fetch('/set_mode', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: new URLSearchParams({ mode })
+            });
+            const data = await response.json();
+            document.getElementById('current-mode').innerText = data.mode;
+        } catch (e) { console.error("Ошибка смены режима:", e); }
     }
-
+    
     // ==========================================
     // Добавление цитаты
     // ==========================================
-    function addQuote() {
-        const quote = document.getElementById('quote-text').value.trim();
-        if (!quote) {
-            alert('Введите текст цитаты');
-            return;
-        }
-        
-        const password = getUrlParam('password');
-        let url = '/add_quote';
-        if (password) {
-            url += `?password=${password}`;
-        }
-        
-        fetch(url, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: `quote=${encodeURIComponent(quote)}`
-        })
-        .then(() => {
+    async function addQuote() {
+        const quoteText = document.getElementById('quote-text').value.trim();
+        if (!quoteText) return alert("Текст цитаты пуст!");
+        try {
+            const response = await fetch('/add_quote', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: new URLSearchParams({ quote: quoteText })
+            });
+            const data = await response.json();
             document.getElementById('quote-text').value = '';
-            showStatus('quote-status', 'Цитата добавлена', 'ok');
-            // Обновляем список цитат
-            location.reload();
-        })
-        .catch(e => console.error('Ошибка:', e));
+            if (data.quotes) updateQuotesList(data.quotes);
+        } catch (e) { console.error(e); }
     }
-
+    
+    function updateQuotesList(quotes) {
+        const list = document.getElementById('quotes-list');
+        list.innerHTML = quotes.map(q => `<li>${escapeHtml(q)}</li>`).join('') || '<li>Нет цитат</li>';
+    }
+    
     // ==========================================
-    // Отправка поста в VK
+    // Пост в VK
     // ==========================================
-    function sendVkPost() {
+    async function sendVkPost() {
         const text = document.getElementById('vk-post-text').value.trim();
-        if (!text) {
-            alert('Введите текст поста');
-            return;
-        }
-        
-        const password = getUrlParam('password');
-        let url = '/vk_post';
-        if (password) {
-            url += `?password=${password}`;
-        }
-        
-        fetch(url, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: `text=${encodeURIComponent(text)}`
-        })
-        .then(() => {
-            document.getElementById('vk-post-text').value = '';
-            showStatus('vk-post-status', 'Пост отправлен', 'ok');
-        })
-        .catch(e => console.error('Ошибка:', e));
+        if (!text) return alert("Текст поста не может быть пустым");
+        const statusDiv = document.getElementById('vk-post-status');
+        statusDiv.innerText = "⏳ Отправка...";
+        try {
+            const response = await fetch('/vk_post', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: new URLSearchParams({ text })
+            });
+            const data = await response.json();
+            if (data.status === 'ok') {
+                statusDiv.innerHTML = `✅ Опубликовано! <a href="${data.url}" target="_blank">Ссылка</a>`;
+                document.getElementById('vk-post-text').value = '';
+            } else {
+                statusDiv.innerText = `❌ Ошибка: ${data.error}`;
+            }
+        } catch (e) { statusDiv.innerText = "❌ Ошибка сети"; }
     }
-
+    
+    // ==========================================
+    // Состояние
+    // ==========================================
+    async function fetchState() {
+        try {
+            const response = await fetch('/api/state');
+            const data = await response.json();
+            document.getElementById('current-mode').innerText = data.mode;
+            if (data.quotes) updateQuotesList(data.quotes);
+        } catch(e) { console.error(e); }
+    }
+    
     // ==========================================
     // Вспомогательные функции
     // ==========================================
-    function showStatus(elementId, message, type) {
-        let el = document.getElementById(elementId);
-        if (!el) {
-            el = document.createElement('span');
-            el.id = elementId;
-            el.className = 'inline';
-            const parent = document.querySelector('#vk-post-form');
-            if (parent) parent.appendChild(el);
-        }
-        el.innerHTML = message;
-        el.className = `inline status-${type}`;
-        setTimeout(() => {
-            el.innerHTML = '';
-        }, 3000);
-    }
-    
     function escapeHtml(text) {
         if (!text) return '';
         const div = document.createElement('div');
