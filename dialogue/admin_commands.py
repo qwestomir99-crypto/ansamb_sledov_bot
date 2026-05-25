@@ -1,8 +1,10 @@
 # ==========================================
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
-# Задача: админ-меню, кнопки, управление цитатами, постинг в VK (с поддержкой нескольких файлов)
+# Задача: админ-меню, кнопки, управление цитатами, постинг в VK
 # Комментарий: использует button_map.py для единого управления кнопками
+#              Добавлено подменю «Настроение» и кнопка диалога
+#              Добавлено автоудаление сообщений (safe_delete)
 # Зависит от: telebot, button_map, publisher, quotes, diagnostics
 # Вызывается из: bot.py (handle_message), callbacks.py
 # ==========================================
@@ -38,7 +40,7 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "tleem2026")
 ADMIN_USER_ID = int(os.environ.get("ADMIN_USER_ID", 0))
 
 # ==========================================
-# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (удаление портянки)
 # ==========================================
 def safe_delete(message, delay=3):
     """Безопасно удаляет сообщение с задержкой"""
@@ -72,11 +74,9 @@ def download_file(bot, file_id, suffix=""):
 authorized_admins = {}
 
 def is_admin_authorized(user_id):
-    """Проверяет, авторизован ли пользователь в админ-панели (по user_id)."""
     return authorized_admins.get(user_id, False)
 
 def authorize_admin(user_id, password):
-    """Авторизует админа, если пароль верен."""
     if password == ADMIN_PASSWORD:
         authorized_admins[user_id] = True
         debug_log("ADMIN", f"Админ {user_id} авторизован")
@@ -84,30 +84,45 @@ def authorize_admin(user_id, password):
     return False
 
 def logout_admin(user_id):
-    """Завершает сессию админа."""
     if user_id in authorized_admins:
         del authorized_admins[user_id]
         debug_log("ADMIN", f"Админ {user_id} вышел")
 
 # ==========================================
-# КЛАВИАТУРЫ (через button_map)
+# КЛАВИАТУРЫ
 # ==========================================
 def get_admin_menu():
-    """Возвращает клавиатуру админ-меню (из button_map)."""
     return get_admin_menu_keyboard()
 
 def get_user_menu():
-    """Возвращает клавиатуру пользовательского меню (из button_map)."""
     return get_user_menu_keyboard()
+
+def get_moods_keyboard():
+    """Клавиатура для выбора настроения"""
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    try:
+        from dialogue.user_settings import MOODS
+        for mood_id, mood_data in MOODS.items():
+            keyboard.add(InlineKeyboardButton(
+                f"{mood_data['emoji']} {mood_data['name']}",
+                callback_data=f"set_mood_{mood_id}"
+            ))
+    except ImportError:
+        keyboard.add(InlineKeyboardButton("🎨 Художник", callback_data="set_mood_artist"))
+        keyboard.add(InlineKeyboardButton("📋 Администратор", callback_data="set_mood_admin"))
+    keyboard.add(InlineKeyboardButton("❌ Закрыть", callback_data="close_mood_menu"))
+    return keyboard
+
+def get_dialog_keyboard():
+    """Кнопка для начала диалога"""
+    keyboard = InlineKeyboardMarkup(row_width=1)
+    keyboard.add(InlineKeyboardButton("🗣 Начать диалог", callback_data="start_dialog"))
+    return keyboard
 
 # ==========================================
 # ОБРАБОТЧИК КОМАНДЫ #админ
 # ==========================================
 def handle_admin_command(message, bot):
-    """
-    Обрабатывает команду #админ.
-    Запрашивает пароль или открывает меню, если уже авторизован.
-    """
     user_id = message.from_user.id
     text = message.text.lower()
     
@@ -131,10 +146,9 @@ def handle_admin_command(message, bot):
     bot.reply_to(message, "🔐 Введите пароль для входа в админ-панель:\n(или #админ пароль)")
 
 # ==========================================
-# ОБРАБОТЧИКИ КНОПОК (вызываются из callbacks.py)
+# ОБРАБОТЧИКИ КНОПОК
 # ==========================================
 def show_admin_panel(call, bot):
-    """Показывает главную админ-панель."""
     bot.edit_message_text(
         "🛡️ *Админ-панель*\n\nВыберите действие:",
         chat_id=call.message.chat.id,
@@ -145,7 +159,6 @@ def show_admin_panel(call, bot):
     bot.answer_callback_query(call.id)
 
 def show_add_post_ui(call, bot):
-    """Показывает интерфейс для добавления поста."""
     msg = bot.send_message(
         call.message.chat.id,
         "📝 *Добавление поста*\n\n"
@@ -157,7 +170,6 @@ def show_add_post_ui(call, bot):
     bot.register_next_step_handler(msg, process_post_text, bot)
 
 def process_post_text(message, bot):
-    """Обрабатывает текст поста и запрашивает теги."""
     if message.text == "/cancel":
         msg = bot.reply_to(message, "❌ Добавление поста отменено.", reply_markup=get_admin_menu())
         safe_delete(message, 3)
@@ -177,7 +189,6 @@ def process_post_text(message, bot):
     safe_delete(message, 2)
 
 def process_post_tags(message, bot, user_id):
-    """Обрабатывает теги и создаёт пост."""
     if message.text == "/skip":
         tags = []
     elif message.text == "/cancel":
@@ -203,7 +214,6 @@ def process_post_tags(message, bot, user_id):
     safe_delete(msg, 5)
 
 def show_vk_post_ui(call, bot):
-    """Показывает интерфейс для отправки поста в VK с поддержкой нескольких файлов."""
     msg = bot.send_message(
         call.message.chat.id,
         "🎬 *Пост в VK*\n\n"
@@ -216,7 +226,6 @@ def show_vk_post_ui(call, bot):
     bot.register_next_step_handler(msg, process_vk_post, bot)
 
 def process_vk_post(message, bot):
-    """Обрабатывает текст/файлы и отправляет в VK с поддержкой нескольких вложений."""
     if message.text == "/cancel":
         msg = bot.reply_to(message, "❌ Отправка в VK отменена.", reply_markup=get_admin_menu())
         safe_delete(message, 3)
@@ -235,25 +244,21 @@ def process_vk_post(message, bot):
     
     file_paths = []
     
-    # Собираем все фото
     if hasattr(message, 'photo') and message.photo:
         for photo in message.photo:
             temp_path = download_file(bot, photo.file_id, f"vk_photo_{photo.file_id}.jpg")
             file_paths.append(temp_path)
     
-    # Видео
     if hasattr(message, 'video') and message.video:
         temp_path = download_file(bot, message.video.file_id, f"vk_video_{message.video.file_id}.mp4")
         file_paths.append(temp_path)
     
-    # Документы
     if hasattr(message, 'document') and message.document:
         temp_path = download_file(bot, message.document.file_id, f"vk_doc_{message.document.file_id}")
         file_paths.append(temp_path)
     
     caption = message.caption or ""
     
-    # Отправляем в VK
     from dialogue.publisher_utils import post_to_vk
     success, result = post_to_vk(caption, "", vk_token, vk_owner_id, file_paths if file_paths else None)
     
@@ -266,7 +271,6 @@ def process_vk_post(message, bot):
     safe_delete(message, 3)
     safe_delete(msg, 10)
     
-    # Чистим временные файлы
     for fp in file_paths:
         if os.path.exists(fp):
             try:
@@ -275,7 +279,6 @@ def process_vk_post(message, bot):
                 pass
 
 def show_quotes_panel(call, bot):
-    """Показывает панель управления цитатами."""
     keyboard = InlineKeyboardMarkup(row_width=2)
     keyboard.add(
         InlineKeyboardButton(get_text("list_quotes"), callback_data=get_callback("list_quotes")),
@@ -297,7 +300,6 @@ def show_quotes_panel(call, bot):
     bot.answer_callback_query(call.id)
 
 def list_quotes(call, bot):
-    """Показывает список цитат (последние 20)."""
     quotes = get_quotes_list()
     if not quotes:
         bot.edit_message_text(
@@ -326,7 +328,6 @@ def list_quotes(call, bot):
     bot.answer_callback_query(call.id)
 
 def add_quote_ui(call, bot):
-    """Показывает интерфейс для добавления цитаты."""
     msg = bot.send_message(
         call.message.chat.id,
         "📜 *Добавление цитаты*\n\n"
@@ -338,7 +339,6 @@ def add_quote_ui(call, bot):
     bot.register_next_step_handler(msg, process_new_quote, bot)
 
 def process_new_quote(message, bot):
-    """Обрабатывает новую цитату и сохраняет её."""
     if message.text == "/cancel":
         msg = bot.reply_to(message, "❌ Добавление цитаты отменено.", reply_markup=get_admin_menu())
         safe_delete(message, 3)
@@ -355,7 +355,6 @@ def process_new_quote(message, bot):
     safe_delete(msg, 5)
 
 def set_quote_interval_ui(call, bot):
-    """Показывает интерфейс для изменения интервала цитат."""
     msg = bot.send_message(
         call.message.chat.id,
         f"⏱️ *Текущий интервал цитат:* {get_quotes_interval()} мин.\n\n"
@@ -367,7 +366,6 @@ def set_quote_interval_ui(call, bot):
     bot.register_next_step_handler(msg, process_quote_interval, bot)
 
 def process_quote_interval(message, bot):
-    """Устанавливает новый интервал цитат."""
     if message.text == "/cancel":
         msg = bot.reply_to(message, "❌ Изменение интервала отменено.", reply_markup=get_admin_menu())
         safe_delete(message, 3)
@@ -387,7 +385,6 @@ def process_quote_interval(message, bot):
     safe_delete(msg, 5)
 
 def show_diagnostics(call, bot):
-    """Показывает панель диагностики."""
     from dialogue.admin.diagnostics import get_diagnostics_menu
     bot.edit_message_text(
         "📋 *Диагностика*\n\n"
@@ -400,16 +397,70 @@ def show_diagnostics(call, bot):
     bot.answer_callback_query(call.id)
 
 def admin_logout(call, bot):
-    """Завершает сессию админа."""
+    """Завершает сессию админа с полным удалением сообщения"""
     user_id = call.from_user.id
     logout_admin(user_id)
+    # Удаляем сообщение с кнопками
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except:
+        pass
+    # Отправляем короткое подтверждение и тоже удаляем через 3 секунды
+    msg = bot.send_message(
+        call.message.chat.id,
+        "👋 Вы вышли из админ-панели.\n\nДля входа используйте #админ"
+    )
+    safe_delete(msg, 3)
+    bot.answer_callback_query(call.id)
+
+# ==========================================
+# ПОДМЕНЮ «НАСТРОЕНИЕ» И ДИАЛОГ
+# ==========================================
+def show_mood_menu(call, bot):
+    """Показывает меню выбора настроения"""
     bot.edit_message_text(
-        "👋 Вы вышли из админ-панели.\n\n"
-        "Для входа используйте #админ",
+        "🎭 *Выберите настроение*\n\n"
+        "От этого зависит стиль ответов агента.",
         chat_id=call.message.chat.id,
-        message_id=call.message.message_id
+        message_id=call.message.message_id,
+        reply_markup=get_moods_keyboard(),
+        parse_mode='Markdown'
     )
     bot.answer_callback_query(call.id)
+
+def show_dialog_ui(call, bot):
+    """Кнопка начала диалога (вместо #говори)"""
+    msg = bot.send_message(
+        call.message.chat.id,
+        "🗣 *Начните диалог*\n\n"
+        "Просто напишите сообщение — я передам его агенту.",
+        parse_mode='Markdown'
+    )
+    safe_delete(call.message, 1)
+    bot.register_next_step_handler(msg, process_dialog_message, bot)
+
+def process_dialog_message(message, bot):
+    """Обрабатывает сообщение от пользователя (диалог с агентом)"""
+    from dialogue.agent import ask_agent
+    
+    # Показываем, что агент думает
+    status_msg = bot.reply_to(message, "⏳ Старший брат думает...")
+    
+    answer = ask_agent(message.text)
+    
+    # Удаляем статус
+    try:
+        bot.delete_message(status_msg.chat.id, status_msg.message_id)
+    except:
+        pass
+    
+    if answer:
+        bot.reply_to(message, f"🗣 *Старший брат:*\n{answer}", parse_mode='Markdown')
+    else:
+        bot.reply_to(message, "🌙 Старший брат отдыхает. Попробуй позже.")
+    
+    # Удаляем сообщение пользователя через 5 секунд (опционально)
+    safe_delete(message, 5)
 
 # ==========================================
 # ВРЕМЕННОЕ ХРАНИЛИЩЕ
