@@ -1,11 +1,11 @@
 # ==========================================
 # Файл: dialogue/agent_memory.py
 # Справка: README.md → Агент / Память
-# Задача: хранение важных фраз и контекста (задел на будущее)
-# Комментарий: опциональный модуль, не влияет на основную работу агента
-#              Пока не используется, но память уже есть
-# Зависит от: json, os
-# Вызывается из: (пока не вызывается)
+# Задача: хранение важных фраз и диалогов (долговременная память)
+# Комментарий: опциональный модуль, не влияет на основную работу
+#              Сохраняет важные фразы, которые агент «запоминает»
+# Зависит от: json, os, datetime
+# Вызывается из: agent.py (опционально), evolve_agent.py
 # ==========================================
 
 import os
@@ -75,19 +75,26 @@ def get_learned_phrases(limit=10):
     memory = get_memory()
     return memory.get("learned_phrases", [])[-limit:]
 
-def remember_dialogue(question, answer):
+def remember_dialogue(question, answer, user_id=None):
     """Сохраняет важный диалог (вопрос-ответ)"""
     memory = get_memory()
-    memory["important_dialogues"].append({
-        "question": question,
-        "answer": answer,
-        "timestamp": datetime.now().isoformat()
-    })
+    dialogue = {
+        "timestamp": datetime.now().isoformat(),
+        "question": question[:200],
+        "answer": answer[:200],
+        "user_id": user_id
+    }
+    memory["important_dialogues"].append(dialogue)
     # Ограничиваем размер (не более 50 диалогов)
     if len(memory["important_dialogues"]) > 50:
         memory["important_dialogues"] = memory["important_dialogues"][-50:]
     save_memory(memory)
     debug_log("AGENT_MEMORY", f"Диалог запомнен: {question[:50]}...", "INFO")
+
+def get_important_dialogues(limit=5):
+    """Возвращает последние важные диалоги"""
+    memory = get_memory()
+    return memory.get("important_dialogues", [])[-limit:]
 
 def cleanup_old_memory(days=30):
     """Удаляет старые диалоги из памяти"""
