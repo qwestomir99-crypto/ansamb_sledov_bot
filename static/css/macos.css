@@ -1,0 +1,222 @@
+/* ==========================================
+   Тема: macOS (светлая, воздушная)
+   Используется в веб-морде через переменную WEB_THEME
+   ========================================== */
+
+:root {
+    --bg: #f5f5f7;
+    --card-bg: rgba(255, 255, 255, 0.85);
+    --text: #1d1d1f;
+    --text-secondary: #86868b;
+    --border: rgba(0, 0, 0, 0.08);
+    --accent: #007aff;
+    --accent-hover: #005fc5;
+    --shadow: 0 8px 20px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.02);
+    --error: #ff3b30;
+    --success: #34c759;
+    --warning: #ff9500;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: var(--bg);
+    font-family: -apple-system, 'Inter', 'SF Pro Text', 'Segoe UI', sans-serif;
+    color: var(--text);
+    padding: 2rem;
+    line-height: 1.4;
+}
+
+.container {
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+/* Карточки — как на macOS */
+.card {
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Заголовки */
+h1 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-size: 1.8rem;
+    margin-bottom: 0.25rem;
+}
+h2 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-size: 1.3rem;
+    margin-bottom: 0.75rem;
+}
+
+/* Кнопки, инпуты, селекты, текстовые поля */
+button, input, textarea, select {
+    background: #fff;
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    font-weight: 500;
+    cursor: pointer;
+}
+button:hover {
+    background: var(--accent-hover);
+    transform: scale(0.98);
+}
+input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+}
+textarea {
+    width: 100%;
+    resize: vertical;
+}
+
+/* Сообщения (VK / Telegram / Админ) */
+.messages {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+}
+.message {
+    background: white;
+    border-radius: 16px;
+    padding: 12px;
+    margin: 8px 0;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    transition: 0.1s;
+}
+.message.own {
+    background: var(--accent);
+    color: white;
+    border: none;
+}
+.message-telegram {
+    border-left: 4px solid #26a5e4;
+}
+.message-vk {
+    border-left: 4px solid #4c75a3;
+}
+.message small {
+    font-size: 0.7rem;
+    opacity: 0.7;
+}
+
+/* Ссылки */
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+a:hover {
+    text-decoration: underline;
+}
+
+/* Поле поиска (YouTube) */
+.search-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+.search-row input {
+    flex: 1;
+}
+
+/* Сетка видео (каталог) */
+.video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
+}
+.video-card {
+    background: white;
+    border-radius: 16px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: 0.2s;
+    border: 1px solid var(--border);
+}
+.video-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 20px rgba(0, 0, 0, 0.1);
+}
+.video-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.video-channel {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+/* Прокси-плеер */
+video {
+    width: 100%;
+    max-width: 800px;
+    border-radius: 20px;
+    margin-top: 1rem;
+    box-shadow: var(--shadow);
+}
+
+/* Скрытые блоки */
+.hidden {
+    display: none;
+}
+
+/* Статусы (ok / error) */
+.status-ok {
+    color: var(--success);
+}
+.status-error {
+    color: var(--error);
+}
+.status-warning {
+    color: var(--warning);
+}
+
+/* Логи (pre) */
+pre {
+    background: #f0f0f0;
+    padding: 0.5rem;
+    border-radius: 12px;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    border: 1px solid var(--border);
+}
+
+/* Кнопка выхода */
+.logout-btn {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+.logout-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    transform: none;
+  }
