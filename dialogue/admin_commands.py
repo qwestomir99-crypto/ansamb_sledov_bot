@@ -3,8 +3,9 @@
 # Справка: README.md → Админ-панель
 # Задача: админ-меню, кнопки, управление цитатами, постинг в VK
 # Комментарий: использует button_map.py для единого управления кнопками
-#              Добавлены подменю «Настроение» и кнопка диалога
+#              Добавлены подменю «Настроение» и кнопка диалога (для всех)
 #              Добавлено автоудаление сообщений (safe_delete)
+#              Добавлен вход в админку из гостевого меню
 # Зависит от: telebot, button_map, publisher, quotes, diagnostics
 # Вызывается из: bot.py (handle_message), callbacks.py
 # ==========================================
@@ -125,6 +126,29 @@ def handle_admin_command(message, bot):
         return
     
     bot.reply_to(message, "🔐 Введите пароль для входа в админ-панель:\n(или #админ пароль)")
+
+# ==========================================
+# ВХОД В АДМИНКУ ИЗ ГОСТЕВОГО МЕНЮ
+# ==========================================
+def admin_login_from_menu(call, bot):
+    """Запрашивает пароль при нажатии кнопки «Админ-панель» в гостевом меню"""
+    user_id = call.from_user.id
+    msg = bot.send_message(
+        call.message.chat.id,
+        "🔐 Введите пароль для входа в админ-панель:"
+    )
+    safe_delete(call.message, 1)
+    bot.register_next_step_handler(msg, process_admin_password, bot, user_id)
+
+def process_admin_password(message, bot, user_id):
+    """Обрабатывает ввод пароля после нажатия кнопки"""
+    password = message.text.strip()
+    if authorize_admin(user_id, password):
+        bot.reply_to(message, "✅ Авторизация успешна!", reply_markup=get_admin_menu())
+    else:
+        msg = bot.reply_to(message, "❌ Неверный пароль.")
+        safe_delete(msg, 5)
+    safe_delete(message, 3)
 
 # ==========================================
 # ОБРАБОТЧИКИ КНОПОК
@@ -381,15 +405,13 @@ def admin_logout(call, bot):
     """Завершает сессию админа с полным удалением сообщения"""
     user_id = call.from_user.id
     logout_admin(user_id)
-    # Удаляем сообщение с кнопками
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except:
         pass
-    # Отправляем короткое подтверждение и тоже удаляем через 3 секунды
     msg = bot.send_message(
         call.message.chat.id,
-        "👋 Вы вышли из админ-панели.\n\nДля входа используйте #админ"
+        "👋 Вы вышли из админ-панели.\n\nДля входа используйте #админ или кнопку в меню."
     )
     safe_delete(msg, 3)
     bot.answer_callback_query(call.id)
@@ -398,7 +420,6 @@ def admin_logout(call, bot):
 # ПОДМЕНЮ «НАСТРОЕНИЕ» И ДИАЛОГ
 # ==========================================
 def show_mood_menu(call, bot):
-    """Показывает меню выбора настроения (с кнопкой Назад и Закрыть)"""
     bot.edit_message_text(
         "🎭 *Выберите настроение*\n\n"
         "От этого зависит стиль ответов агента.\n\n"
@@ -414,7 +435,7 @@ def show_mood_menu(call, bot):
     bot.answer_callback_query(call.id)
 
 def show_dialog_ui(call, bot):
-    """Кнопка начала диалога (вместо #говори)"""
+    """Показывает интерфейс для начала диалога (доступен всем)"""
     msg = bot.send_message(
         call.message.chat.id,
         "🗣 *Начните диалог*\n\n"
@@ -436,12 +457,11 @@ def process_dialog_message(message, bot):
     
     from dialogue.agent import ask_agent
     
-    # Показываем, что агент думает
     status_msg = bot.reply_to(message, "⏳ Старший брат думает...")
     
-    answer = ask_agent(message.text)
+    # Передаём user_id для учёта настроения
+    answer = ask_agent(message.text, user_id=message.from_user.id)
     
-    # Удаляем статус
     try:
         bot.delete_message(status_msg.chat.id, status_msg.message_id)
     except:
@@ -452,7 +472,6 @@ def process_dialog_message(message, bot):
     else:
         bot.reply_to(message, "🌙 Старший брат отдыхает. Попробуй позже.")
     
-    # Удаляем сообщение пользователя через 5 секунд (чтобы не засорять чат)
     safe_delete(message, 5)
 
 # ==========================================
