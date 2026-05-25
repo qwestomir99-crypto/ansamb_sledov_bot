@@ -2,6 +2,7 @@
 # Файл: bot.py
 # Задача: Telegram-бот
 # Комментарий: отправляет входящие сообщения в веб-морду через WebSocket
+#              Добавлена команда /debug для получения отчёта с логами
 # ==========================================
 
 print("[DEBUG] 0. Начало загрузки bot.py")
@@ -132,7 +133,6 @@ def on_disconnect():
     print("[WS] Отключено от веб-морде")
 
 async def send_to_web_morda(event, data):
-    """Отправляет событие в веб-морду через WebSocket"""
     try:
         await sio.connect(WEBSOCKET_URL)
         await sio.emit(event, data)
@@ -225,13 +225,23 @@ def handle_big_video(message):
     except Exception as e:
         bot.reply_to(message, f"❌ Ошибка: {e}")
 
+@bot.message_handler(commands=['debug'])
+def cmd_debug(message):
+    """Отправляет отчёт с логами (только для админа)"""
+    user_id = message.from_user.id
+    if user_id != ADMIN_USER_ID:
+        bot.reply_to(message, "❌ Только для админа")
+        return
+    bot.reply_to(message, "⏳ Собираю логи...")
+    from debug_utils import send_debug_report
+    send_debug_report(bot, user_id, limit=150)
+
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
     text = message.text.lower()
     debug_log("HANDLERS", f"Получена команда: {text[:50]}...")
     
-    # === ОТПРАВКА В ВЕБ-МОРДУ ===
-    # Отправляем все сообщения (кроме команд, начинающихся с / или #)
+    # Отправка в веб-морду (не команды)
     if not text.startswith(('/', '#')):
         asyncio.run(send_to_web_morda('new_message', {
             'source': 'telegram',
@@ -241,7 +251,6 @@ def handle_message(message):
             'text': message.text,
             'time': datetime.now().strftime("%H:%M:%S")
         }))
-    # ============================
 
     if text == "#":
         try:
