@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>YouTube через Ансамбль — прокси и поиск</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='10' y='65' font-family='monospace' font-size='50' fill='%2300ffcc'%3E0.8%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="/static/css/{{ theme }}">
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 YouTube через Ансамбль</h1>
+        <p>Поиск, каталог, прокси — без VPN и рекламы.</p>
+        <div class="card">
+            <div class="search-row">
+                <input type="text" id="search-query" placeholder="Поиск: квантовая физика, философия, нейросети..." onkeypress="if(event.key==='Enter') searchVideos()">
+                <button onclick="searchVideos()">🔍 Поиск</button>
+            </div>
+            <div id="catalog" class="video-grid">
+                <div style="color: var(--text-secondary);">Введите запрос для поиска.</div>
+            </div>
+            <div id="player-container" style="margin-top: 20px;"></div>
+        </div>
+        <p><a href="/">← Назад в веб-морду</a></p>
+    </div>
+    <script>
+    async function searchVideos() {
+        const query = document.getElementById('search-query').value.trim();
+        if (!query) return;
+        const catalogDiv = document.getElementById('catalog');
+        catalogDiv.innerHTML = '<div style="color: var(--accent);">⏳ Поиск...</div>';
+        try {
+            const resp = await fetch(`/youtube_search?q=${encodeURIComponent(query)}`);
+            const data = await resp.json();
+            if (data.error) {
+                catalogDiv.innerHTML = `<div style="color: #f00;">❌ ${data.error}</div>`;
+                return;
+            }
+            if (!data.length) {
+                catalogDiv.innerHTML = '<div style="color: var(--text-secondary);">Ничего не найдено</div>';
+                return;
+            }
+            catalogDiv.innerHTML = '';
+            data.forEach(video => {
+                const card = document.createElement('div');
+                card.className = 'video-card';
+                card.innerHTML = `
+                    <div class="video-title">${escapeHtml(video.title)}</div>
+                    <div class="video-channel">${escapeHtml(video.author)} • ${video.views_short || ''}</div>
+                `;
+                card.onclick = () => loadVideo(video.video_url);
+                catalogDiv.appendChild(card);
+            });
+        } catch(e) {
+            catalogDiv.innerHTML = '<div style="color:#f00;">Ошибка поиска</div>';
+        }
+    }
+    
+    async function loadVideo(videoUrl) {
+        const container = document.getElementById('player-container');
+        container.innerHTML = '<div style="color: var(--accent);">⏳ Загрузка видео...</div>';
+        try {
+            const resp = await fetch('/youtube_info', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({url: videoUrl})
+            });
+            const data = await resp.json();
+            if (data.error) {
+                container.innerHTML = `<div style="color:#f00;">❌ ${data.error}</div>`;
+                return;
+            }
+            container.innerHTML = `
+                <video controls autoplay>
+                    <source src="${data.stream_url}" type="video/mp4">
+                    Ваш браузер не поддерживает видео.
+                </video>
+                <div style="margin-top: 10px;">🎵 ${escapeHtml(data.title)} | Длительность: ${Math.floor(data.duration/60)}:${(data.duration%60).toString().padStart(2,'0')}</div>
+            `;
+        } catch(e) {
+            container.innerHTML = '<div style="color:#f00;">❌ Ошибка загрузки видео</div>';
+        }
+    }
+    
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    </script>
+</body>
+</html>
