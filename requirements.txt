@@ -6,3 +6,4 @@ gunicorn
 schedule
 python-dotenv
 pytz
+yt-dlp
