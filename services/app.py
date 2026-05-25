@@ -1,6 +1,114 @@
 # ==========================================
-# YOUTUBE ПРОКСИ + ПОИСК
+# Файл: services/app.py
+# Справка: README.md → Веб-морда
+# Задача: единый веб-интерфейс для VK, Telegram и YouTube (прокси)
+# Комментарий: тема оформления задаётся переменной WEB_THEME
+# Зависит от: flask, flask-socketio, vk_api, telebot, yt-dlp, python-dotenv
+# Вызывается из: Render (web service, start command: gunicorn app:app)
 # ==========================================
+
+import os
+import json
+import datetime
+from threading import Thread
+from flask import Flask, render_template_string, request, jsonify, session, redirect, url_for, Response, send_from_directory
+from flask_socketio import SocketIO, emit
+from functools import wraps
+import telebot
+import requests
+import yt_dlp
+
+# ==========================================
+# НАСТРОЙКИ
+# ==========================================
+VK_TOKEN = os.environ.get("VK_TOKEN")
+try:
+    VK_GROUP_ID = int(os.environ.get("VK_GROUP_ID", 0))
+except (ValueError, TypeError):
+    VK_GROUP_ID = 0
+
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
+if not ADMIN_PASSWORD:
+    raise ValueError("ADMIN_PASSWORD не задан")
+
+SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "secret_traces_key_6")
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+THEME_CSS = os.environ.get("WEB_THEME", "macos.css")
+
+app = Flask(__name__)
+app.config['SECRET_KEY'] = SECRET_KEY
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SECURE'] = True
+
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Telegram бот для отправки ответов
+bot = telebot.TeleBot(BOT_TOKEN) if BOT_TOKEN else None
+
+# Хранилище сообщений (в памяти)
+messages = []
+
+# ==========================================
+# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# ==========================================
+QUOTES_FILE = "dialogue/data/quotes.txt"
+
+def get_quotes():
+    try:
+        with open(QUOTES_FILE, "r") as f:
+            return [line.strip() for line in f.readlines() if line.strip()][-10:]
+    except:
+        return []
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('authenticated'):
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({"error": "Unauthorized"}), 401
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated
+
+# ==========================================
+# СТАТИЧЕСКИЕ ФАЙЛЫ
+# ==========================================
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    return send_from_directory('static', filename)
+
+# ==========================================
+# YOUTUBE ПРОКСИ
+# ==========================================
+def get_youtube_info(url):
+    """
+    Получает информацию о видео: ссылку на видеофайл (720p) и название.
+    """
+    ydl_opts = {
+        'format': 'best[height<=720]',
+        'quiet': True,
+        'no_warnings': True,
+        'extract_flat': False
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            video_url = None
+            for fmt in info.get('formats', []):
+                if fmt.get('height') and fmt['height'] <= 720 and fmt.get('ext') == 'mp4':
+                    if fmt.get('acodec') and fmt['acodec'] != 'none':
+                        video_url = fmt['url']
+                        break
+            if not video_url:
+                video_url = info.get('url') or info['formats'][0]['url']
+            return {
+                'title': info.get('title', 'YouTube видео'),
+                'video_url': video_url,
+                'duration': info.get('duration', 0)
+            }
+    except Exception as e:
+        print(f"[YOUTUBE] Ошибка: {e}")
+        return None
 
 @app.route('/youtube')
 @login_required
@@ -11,22 +119,7 @@ def youtube_page():
     <html>
     <head>
         <title>YouTube через Ансамбль — прокси и поиск</title>
-        <style>
-            body { background: #0a0a0a; color: #00ffcc; font-family: monospace; padding: 2rem; }
-            .container { max-width: 1000px; margin: 0 auto; }
-            .card { background: #111; border-left: 3px solid #00ffcc; padding: 1rem; margin: 1rem 0; border-radius: 8px; }
-            input, button { background: #222; color: #00ffcc; border: 1px solid #00ffcc; padding: 8px 12px; border-radius: 4px; }
-            button:hover { background: #00ffcc; color: #000; cursor: pointer; }
-            .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; margin-top: 1rem; }
-            .video-card { background: #111; border-left: 2px solid #00ffcc; padding: 0.5rem; cursor: pointer; transition: 0.2s; }
-            .video-card:hover { background: #1a1a1a; transform: translateY(-2px); }
-            .video-title { font-weight: bold; margin-bottom: 0.3rem; font-size: 0.9rem; }
-            .video-channel { font-size: 0.7rem; color: #888; }
-            video { width: 100%; max-width: 800px; margin-top: 20px; border: 1px solid #00ffcc; }
-            a { color: #00ffcc; }
-            .search-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-            .search-row input { flex: 1; }
-        </style>
+        <link rel="stylesheet" href="/static/css/{{ theme }}">
     </head>
     <body>
         <div class="container">
@@ -38,7 +131,7 @@ def youtube_page():
                     <button onclick="searchVideos()">🔍 Поиск</button>
                 </div>
                 <div id="catalog" class="video-grid">
-                    <div style="color: #666;">Введите запрос для поиска.</div>
+                    <div style="color: var(--text-secondary);">Введите запрос для поиска.</div>
                 </div>
                 <div id="player-container" style="margin-top: 20px;"></div>
             </div>
@@ -49,16 +142,16 @@ def youtube_page():
             const query = document.getElementById('search-query').value.trim();
             if (!query) return;
             const catalogDiv = document.getElementById('catalog');
-            catalogDiv.innerHTML = '<div style="color:#ff0;">⏳ Поиск...</div>';
+            catalogDiv.innerHTML = '<div style="color: var(--accent);">⏳ Поиск...</div>';
             try {
                 const resp = await fetch(`/youtube_search?q=${encodeURIComponent(query)}`);
                 const data = await resp.json();
                 if (data.error) {
-                    catalogDiv.innerHTML = `<div style="color:#f00;">❌ ${data.error}</div>`;
+                    catalogDiv.innerHTML = `<div style="color: #f00;">❌ ${data.error}</div>`;
                     return;
                 }
                 if (!data.length) {
-                    catalogDiv.innerHTML = '<div style="color:#f00;">Ничего не найдено</div>';
+                    catalogDiv.innerHTML = '<div style="color: var(--text-secondary);">Ничего не найдено</div>';
                     return;
                 }
                 catalogDiv.innerHTML = '';
@@ -79,7 +172,7 @@ def youtube_page():
         
         async function loadVideo(videoUrl) {
             const container = document.getElementById('player-container');
-            container.innerHTML = '<div style="color:#ff0;">⏳ Загрузка видео...</div>';
+            container.innerHTML = '<div style="color: var(--accent);">⏳ Загрузка видео...</div>';
             try {
                 const resp = await fetch('/youtube_info', {
                     method: 'POST',
@@ -112,7 +205,7 @@ def youtube_page():
         </script>
     </body>
     </html>
-    ''')
+    ''', theme=THEME_CSS)
 
 @app.route('/youtube_search', methods=['GET'])
 @login_required
@@ -122,7 +215,6 @@ def youtube_search():
     if not query:
         return jsonify({'error': 'Empty query'}), 400
     
-    # Используем публичный инстанс Invidious
     invidious_api = "https://yewtu.be/api/v1/search"
     try:
         resp = requests.get(invidious_api, params={
@@ -141,7 +233,7 @@ def youtube_search():
                 'views_short': item.get('viewCount', '0'),
                 'duration': item.get('lengthSeconds', 0)
             })
-        return jsonify(videos[:20])  # не больше 20 видео
+        return jsonify(videos[:20])
     except Exception as e:
         print(f"[YOUTUBE_SEARCH] Ошибка: {e}")
         return jsonify({'error': str(e)}), 500
@@ -155,29 +247,15 @@ def youtube_info():
     if not url:
         return jsonify({'error': 'URL не указан'}), 400
     
-    import yt_dlp
-    ydl_opts = {
-        'format': 'best[height<=720]',
-        'quiet': True,
-        'no_warnings': True,
-        'extract_flat': False
-    }
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            video_url = None
-            for fmt in info.get('formats', []):
-                if fmt.get('height') and fmt['height'] <= 720 and fmt.get('ext') == 'mp4':
-                    if fmt.get('acodec') and fmt['acodec'] != 'none':
-                        video_url = fmt['url']
-                        break
-            if not video_url:
-                video_url = info.get('url') or info['formats'][0]['url']
-            return jsonify({
-                'title': info.get('title', 'YouTube видео'),
-                'stream_url': f"/youtube_stream?url={url}",
-                'duration': info.get('duration', 0)
-            })
+        info = get_youtube_info(url)
+        if not info:
+            return jsonify({'error': 'Не удалось загрузить видео'}), 500
+        return jsonify({
+            'title': info['title'],
+            'stream_url': f"/youtube_stream?url={url}",
+            'duration': info['duration']
+        })
     except Exception as e:
         print(f"[YOUTUBE_INFO] Ошибка: {e}")
         return jsonify({'error': str(e)}), 500
@@ -190,24 +268,11 @@ def youtube_stream():
     if not url:
         return "URL не указан", 400
     
-    import yt_dlp
-    ydl_opts = {
-        'format': 'best[height<=720]',
-        'quiet': True,
-        'no_warnings': True,
-        'extract_flat': False
-    }
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            video_url = None
-            for fmt in info.get('formats', []):
-                if fmt.get('height') and fmt['height'] <= 720 and fmt.get('ext') == 'mp4':
-                    if fmt.get('acodec') and fmt['acodec'] != 'none':
-                        video_url = fmt['url']
-                        break
-            if not video_url:
-                video_url = info.get('url') or info['formats'][0]['url']
+        info = get_youtube_info(url)
+        if not info or not info.get('video_url'):
+            return "Не удалось получить видео", 500
+        video_url = info['video_url']
         
         def generate():
             try:
@@ -222,3 +287,331 @@ def youtube_stream():
     except Exception as e:
         print(f"[YOUTUBE_STREAM] Ошибка: {e}")
         return f"Ошибка потока: {e}", 500
+
+# ==========================================
+# WEBSOCKET СОБЫТИЯ
+# ==========================================
+@socketio.on('connect')
+def handle_connect():
+    print("[WS] Клиент подключён")
+    emit('message_history', messages[-50:])
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print("[WS] Клиент отключён")
+
+@socketio.on('new_message')
+def handle_new_message(data):
+    data['timestamp'] = datetime.datetime.now().isoformat()
+    messages.append(data)
+    emit('message_updated', data, broadcast=True)
+    print(f"[WS] {data.get('source')}: {data.get('text', '')[:50]}")
+
+# ==========================================
+# ОСНОВНЫЕ МАРШРУТЫ
+# ==========================================
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        password = request.form.get('password')
+        if password == ADMIN_PASSWORD:
+            session.clear()
+            session['authenticated'] = True
+            session.permanent = True
+            return redirect(url_for('index'))
+        else:
+            error = 'Неверный пароль'
+    
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Вход — Ансамбль Следов 6</title>
+        <style>
+            body { background: #0a0a0a; color: #00ffcc; font-family: monospace; display: flex; justify-content: center; align-items: center; height: 100vh; }
+            .login-card { background: #111; border-left: 3px solid #00ffcc; padding: 2rem; border-radius: 8px; width: 300px; }
+            input, button { background: #222; color: #00ffcc; border: 1px solid #00ffcc; padding: 8px; width: 100%; margin: 10px 0; border-radius: 4px; }
+            button:hover { background: #00ffcc; color: #000; cursor: pointer; }
+            .error { color: #f00; }
+        </style>
+    </head>
+    <body>
+        <div class="login-card">
+            <h2>🔐 Вход</h2>
+            <form method="post">
+                <input type="password" name="password" placeholder="Админ-пароль" autofocus>
+                <button type="submit">Войти</button>
+                <div class="error">''' + (error if error else '') + '''</div>
+            </form>
+        </div>
+    </body>
+    </html>
+    '''
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+@app.route('/')
+@login_required
+def index():
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Ансамбль Следов 6 — веб-морда</title>
+        <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+        <link rel="stylesheet" href="/static/css/{{ theme }}">
+    </head>
+    <body>
+        <div class="container">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h1>🔥 Ансамбль Следов 6</h1>
+                <form method="post" action="/logout">
+                    <button type="submit" style="background: transparent; color: var(--text); border: 1px solid var(--border);">🚪 Выйти</button>
+                </form>
+            </div>
+            <p>Ритм 0,8 Гц. Управление ботом из браузера. Время: {{ time }}</p>
+            <p>
+                <a href="/logs/admin">📋 admin.log</a> |
+                <a href="/logs/error">❌ error.log</a> |
+                <a href="/youtube">🎬 YouTube без VPN</a>
+            </p>
+            
+            <div class="card">
+                <h2>📨 Входящие сообщения (VK + Telegram)</h2>
+                <div id="messages" class="messages">
+                    <div style="color: var(--text-secondary);">Загрузка...</div>
+                </div>
+                <div id="reply-area" class="hidden" style="margin-top: 1rem;">
+                    <textarea id="reply-text" rows="2" cols="50" placeholder="Ваш ответ..." style="width: 100%; margin-bottom: 0.5rem;"></textarea>
+                    <button onclick="sendReply()">📤 Отправить ответ</button>
+                    <button onclick="closeReply()" style="background: transparent; color: var(--text); border: 1px solid var(--border);">❌ Отмена</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>🎬 Пост в VK (текст)</h2>
+                <textarea id="post-text" rows="3" cols="50" placeholder="Текст поста..."></textarea><br>
+                <button onclick="sendPost()">Отправить</button>
+                <span id="post-status"></span>
+            </div>
+            
+            <div class="card">
+                <h2>📜 Цитаты (последние 10)</h2>
+                <ul id="quotes-list">
+                    {% for q in quotes %}<li>{{ q[:100] }}</li>{% endfor %}
+                </ul>
+            </div>
+        </div>
+        
+        <script>
+            let socket = null;
+            let currentReply = null;
+            
+            document.addEventListener("DOMContentLoaded", () => {
+                connectSocket();
+                fetchState();
+            });
+            
+            function connectSocket() {
+                socket = io();
+                socket.on('message_history', (msgs) => {
+                    const container = document.getElementById('messages');
+                    container.innerHTML = '';
+                    msgs.forEach(msg => appendMessage(msg));
+                    if (msgs.length === 0) {
+                        container.innerHTML = '<div style="color: var(--text-secondary);">Нет сообщений</div>';
+                    }
+                });
+                socket.on('message_updated', (msg) => {
+                    appendMessage(msg);
+                });
+                socket.on('connect', () => console.log('Socket connected'));
+            }
+            
+            function appendMessage(msg) {
+                const container = document.getElementById('messages');
+                if (container.innerHTML === '<div style="color: var(--text-secondary);">Загрузка...</div>' || 
+                    container.innerHTML === '<div style="color: var(--text-secondary);">Нет сообщений</div>') {
+                    container.innerHTML = '';
+                }
+                const div = document.createElement('div');
+                const sourceClass = msg.source === 'telegram' ? 'message-telegram' : (msg.source === 'admin' ? '' : 'message-vk');
+                div.className = `message ${sourceClass} ${msg.own ? 'own' : ''}`;
+                const sourceName = msg.source === 'telegram' ? '📱 Telegram' : (msg.source === 'admin' ? '🤖 Админ' : '📘 VK');
+                const sender = msg.sender || msg.username || 'unknown';
+                const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+                div.innerHTML = `
+                    <div>
+                        <strong>${sourceName} | ${escapeHtml(sender)}</strong>
+                    </div>
+                    <div>${escapeHtml(msg.text || '')}</div>
+                    <small>${time}</small>
+                `;
+                if (!msg.own && msg.source !== 'admin') {
+                    const chatId = msg.chat_id || msg.user_id;
+                    if (chatId) {
+                        div.innerHTML += `<br><button onclick="openReply('${chatId}', '${msg.source}', '${escapeHtml(sender)}')" style="font-size:0.7rem; padding: 3px 6px;">Ответить</button>`;
+                    }
+                }
+                container.prepend(div);
+            }
+            
+            function openReply(chatId, source, sender) {
+                currentReply = { chatId: chatId, source: source };
+                document.getElementById('reply-area').classList.remove('hidden');
+                document.getElementById('reply-text').placeholder = `Ответ для ${sender}...`;
+                document.getElementById('reply-text').focus();
+            }
+            
+            function closeReply() {
+                currentReply = null;
+                document.getElementById('reply-area').classList.add('hidden');
+                document.getElementById('reply-text').value = '';
+            }
+            
+            async function sendReply() {
+                if (!currentReply) return;
+                const text = document.getElementById('reply-text').value.trim();
+                if (!text) return;
+                
+                const response = await fetch('/send_reply', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        chat_id: currentReply.chatId,
+                        text: text,
+                        source: currentReply.source
+                    })
+                });
+                const data = await response.json();
+                if (data.status === 'ok') {
+                    appendMessage({
+                        source: 'admin',
+                        text: text,
+                        timestamp: new Date().toISOString(),
+                        own: true
+                    });
+                    closeReply();
+                } else {
+                    alert('Ошибка: ' + data.error);
+                }
+            }
+            
+            async function sendPost() {
+                const text = document.getElementById('post-text').value.trim();
+                if (!text) return;
+                const statusSpan = document.getElementById('post-status');
+                statusSpan.innerText = '⏳ Отправка...';
+                const response = await fetch('/vk_post', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'text=' + encodeURIComponent(text)
+                });
+                const data = await response.json();
+                if (data.status === 'ok') {
+                    statusSpan.innerHTML = `✅ Опубликовано! <a href="${data.url}" target="_blank">Ссылка</a>`;
+                    document.getElementById('post-text').value = '';
+                } else {
+                    statusSpan.innerText = '❌ ' + data.error;
+                }
+                setTimeout(() => { statusSpan.innerText = ''; }, 5000);
+            }
+            
+            async function fetchState() {
+                const response = await fetch('/api/state');
+                const data = await response.json();
+                if (data.quotes) {
+                    const list = document.getElementById('quotes-list');
+                    list.innerHTML = data.quotes.map(q => `<li>${escapeHtml(q)}</li>`).join('');
+                }
+            }
+            
+            function escapeHtml(text) {
+                if (!text) return '';
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+        </script>
+    </body>
+    </html>
+    ''', time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), quotes=get_quotes(), theme=THEME_CSS)
+
+# ==========================================
+# API МАРШРУТЫ
+# ==========================================
+@app.route('/ping')
+def ping():
+    return {"status": "ok", "service": "web-morda + youtube proxy"}, 200
+
+@app.route('/vk_post', methods=['POST'])
+@login_required
+def vk_post():
+    text = request.form.get('text', '').strip()
+    if not text:
+        return jsonify({"status": "error", "error": "Текст пуст"}), 400
+    if not VK_TOKEN or not VK_GROUP_ID:
+        return jsonify({"status": "error", "error": "VK_TOKEN или VK_GROUP_ID не заданы"}), 500
+    try:
+        import vk_api
+        vk_session = vk_api.VkApi(token=VK_TOKEN)
+        vk = vk_session.get_api()
+        post = vk.wall.post(owner_id=-VK_GROUP_ID, message=text, from_group=1)
+        post_id = post.get('post_id')
+        post_url = f"https://vk.com/wall-{abs(VK_GROUP_ID)}_{post_id}"
+        return jsonify({"status": "ok", "post_id": post_id, "url": post_url}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+@app.route('/api/state', methods=['GET'])
+@login_required
+def api_state():
+    return jsonify({
+        "quotes": get_quotes()
+    })
+
+@app.route('/logs/<name>')
+@login_required
+def view_log(name):
+    log_file = f"{name}.log"
+    if not os.path.exists(log_file):
+        return f"Лог не найден", 404
+    with open(log_file, 'r') as f:
+        return f"<pre>{f.read()}</pre>"
+
+@app.route('/send_reply', methods=['POST'])
+def send_reply():
+    data = request.json
+    chat_id = data.get('chat_id')
+    text = data.get('text')
+    source = data.get('source')
+    
+    if source == 'telegram' and bot:
+        try:
+            bot.send_message(chat_id, text)
+            socketio.emit('message_updated', {
+                'source': 'admin',
+                'text': text,
+                'timestamp': datetime.datetime.now().isoformat(),
+                'own': True
+            })
+            return jsonify({"status": "ok"})
+        except Exception as e:
+            return jsonify({"status": "error", "error": str(e)})
+    elif source == 'vk':
+        return jsonify({"status": "error", "error": "VK replies not implemented"})
+    else:
+        return jsonify({"status": "error", "error": "Unknown source"})
+
+# ==========================================
+# ЗАПУСК
+# ==========================================
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 10000))
+    socketio.run(app, host='0.0.0.0', port=port, debug=False)
