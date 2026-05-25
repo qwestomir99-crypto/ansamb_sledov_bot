@@ -106,7 +106,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 24.05.2026 22:08:56*
+*Обновлено: 25.05.2026 00:07:49*
 
 | Файл | Статус |
 |------|--------|
@@ -137,7 +137,7 @@
 | `dialogue/ping_modes.py` | ✅ Redmi-шапка |
 | `dialogue/post_manager.py` | ✅ Redmi-шапка |
 | `dialogue/publisher.py` | ✅ Redmi-шапка |
-| `dialogue/publisher_utils.py` | ❌ Без шапки |
+| `dialogue/publisher_utils.py` | ✅ Redmi-шапка |
 | `dialogue/quotes.py` | ✅ Redmi-шапка |
 | `dialogue/scheduler.py` | ✅ Redmi-шапка |
 | `dialogue/setting.py` | ❌ Без шапки |
@@ -163,6 +163,7 @@
 | `services/youtube_reader.py` | ✅ Redmi-шапка |
 | `settings.py` | ❌ Без шапки |
 | `tag_analyzer.py` | ❌ Без шапки |
+| `utils.py` | ✅ Redmi-шапка |
 | `web_server.py` | ❌ Без шапки |
 
 ## 🔄 Состояние проекта (22.05.2026)
