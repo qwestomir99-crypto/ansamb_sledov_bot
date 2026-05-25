@@ -3,7 +3,7 @@
 # Справка: README.md → Админ-панель / Кнопки
 # Задача: единая таблица всех кнопок (текст + callback)
 # Комментарий: замена "магических строк" в admin_commands.py и callbacks.py
-#              Добавлены кнопки "Настроение" и "Начать диалог"
+#              Добавлены кнопки "Настроение", "Начать диалог", "Назад"
 # Зависит от: телеграм-бота (используется в клавиатурах)
 # Вызывается из: dialogue/admin_commands.py, dialogue/callbacks.py
 # ==========================================
@@ -54,7 +54,7 @@ BUTTONS = {
     "user_fix":       {"text": "🔒 #фиксируем",    "callback": "user_fix"},
     "user_flash":     {"text": "⚡ #вспышка",      "callback": "user_flash"},
     
-    # НОВЫЕ КНОПКИ: НАСТРОЕНИЕ И ДИАЛОГ
+    # НОВЫЕ КНОПКИ
     "mood":           {"text": "🎭 Настроение",    "callback": "mood_menu"},
     "start_dialog":   {"text": "🗣 Начать диалог", "callback": "start_dialog"},
 }
@@ -64,10 +64,7 @@ BUTTONS = {
 # ==========================================
 
 def get_button(button_id: str) -> dict:
-    """
-    Возвращает словарь с текстом и callback для кнопки.
-    Если кнопка не найдена — возвращает заглушку.
-    """
+    """Возвращает словарь с текстом и callback для кнопки."""
     return BUTTONS.get(button_id, {"text": "⚠️ Ошибка", "callback": "error"})
 
 def get_text(button_id: str) -> str:
@@ -83,9 +80,7 @@ def get_callback(button_id: str) -> str:
 # ==========================================
 
 def get_admin_menu_keyboard():
-    """
-    Возвращает клавиатуру админ-меню (InlineKeyboardMarkup) из словаря BUTTONS.
-    """
+    """Возвращает клавиатуру админ-меню."""
     from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
     
     keyboard = InlineKeyboardMarkup(row_width=2)
@@ -101,7 +96,6 @@ def get_admin_menu_keyboard():
         InlineKeyboardButton(get_text("diagnostics"), callback_data=get_callback("diagnostics")),
         InlineKeyboardButton(get_text("logout"), callback_data=get_callback("logout")),
     )
-    # Добавляем новые кнопки в админ-меню
     keyboard.add(
         InlineKeyboardButton(get_text("mood"), callback_data=get_callback("mood")),
         InlineKeyboardButton(get_text("start_dialog"), callback_data=get_callback("start_dialog")),
@@ -109,9 +103,7 @@ def get_admin_menu_keyboard():
     return keyboard
 
 def get_user_menu_keyboard():
-    """
-    Возвращает пользовательскую клавиатуру.
-    """
+    """Возвращает пользовательскую клавиатуру."""
     from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
     
     keyboard = InlineKeyboardMarkup(row_width=2)
@@ -123,21 +115,23 @@ def get_user_menu_keyboard():
         InlineKeyboardButton(get_text("user_fix"), callback_data=get_callback("user_fix")),
         InlineKeyboardButton(get_text("user_flash"), callback_data=get_callback("user_flash")),
     )
-    # Добавляем новые кнопки в пользовательское меню
     keyboard.add(
         InlineKeyboardButton(get_text("mood"), callback_data=get_callback("mood")),
         InlineKeyboardButton(get_text("start_dialog"), callback_data=get_callback("start_dialog")),
     )
     return keyboard
 
-def get_moods_keyboard():
+def get_moods_keyboard(with_back=True):
     """
-    Возвращает клавиатуру для выбора настроения (используется отдельно).
+    Возвращает клавиатуру для выбора настроения.
+    - with_back=True: добавляет кнопку "◀️ Назад в меню"
+    - всегда есть кнопка "❌ Закрыть" (выход из админки)
     """
     from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
     
     keyboard = InlineKeyboardMarkup(row_width=2)
-    # Стандартные настроения (можно расширить)
+    
+    # Список настроений
     moods = [
         ("🎨 Художник", "mood_artist"),
         ("📋 Администратор", "mood_admin"),
@@ -146,13 +140,18 @@ def get_moods_keyboard():
     ]
     for text, callback in moods:
         keyboard.add(InlineKeyboardButton(text, callback_data=callback))
-    keyboard.add(InlineKeyboardButton("❌ Закрыть", callback_data="close_mood_menu"))
+    
+    # Кнопка "Назад" (если нужна)
+    if with_back:
+        keyboard.add(InlineKeyboardButton("◀️ Назад в меню", callback_data="back_to_admin"))
+    
+    # Кнопка "Закрыть" (полный выход)
+    keyboard.add(InlineKeyboardButton("❌ Закрыть", callback_data="admin_logout"))
+    
     return keyboard
 
 def get_dialog_keyboard():
-    """
-    Возвращает клавиатуру для начала диалога.
-    """
+    """Возвращает клавиатуру для начала диалога."""
     from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
     keyboard = InlineKeyboardMarkup(row_width=1)
     keyboard.add(InlineKeyboardButton("🗣 Начать диалог", callback_data="start_dialog"))
