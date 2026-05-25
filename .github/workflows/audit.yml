@@ -1,9 +1,20 @@
+# ==========================================
+# Файл: .github/workflows/redmi-audit.yml
+# Справка: README.md → Redmi-аудит
+# Задача: автоматическая проверка REDMI-шапок и обновление README.md
+# Комментарий: запускается по push в ветку dump, вручную или раз в 6 часов
+# Зависит от: python, redmi_audit.py
+# Вызывается из: GitHub Actions
+# ==========================================
+
 name: Redmi Audit
 
 on:
   push:
-    branches: [ main, master ]
-  workflow_dispatch:
+    branches: [ dump ]           # ← изменено с main/master на dump
+  workflow_dispatch:             # ручной запуск из интерфейса GitHub
+  schedule:
+    - cron: '0 */6 * * *'        # каждые 6 часов (на всякий случай)
 
 permissions:
   contents: write
@@ -12,11 +23,13 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           
@@ -26,7 +39,7 @@ jobs:
       - name: Commit and push if changed
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config.user.email "github-actions[bot]@users.noreply.github.com"
           git add README.md
           git diff --quiet && git diff --staged --quiet || git commit -m "📡 Redmi audit update"
           git push
