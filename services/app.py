@@ -3,7 +3,7 @@
 # Справка: README.md → Веб-морда
 # Задача: единый веб-интерфейс для VK, Telegram и YouTube (прокси)
 # Комментарий: тема оформления задаётся переменной WEB_THEME
-#              Добавлен дебаггер (логи, отчёты)
+#              Добавлен дебаггер (логи, отчёты, API для фронтенда)
 # Зависит от: flask, flask-socketio, vk_api, telebot, yt-dlp, python-dotenv
 # Вызывается из: Render (web service, start command: gunicorn app:app)
 # ==========================================
@@ -344,6 +344,17 @@ def api_debug_send():
     except Exception as e:
         log_web("ERROR", f"Ошибка отправки отчёта: {e}")
         return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/api/debug/log', methods=['POST'])
+@login_required
+def api_debug_log():
+    """Принимает лог-сообщения с фронтенда"""
+    data = request.json
+    level = data.get('level', 'INFO')
+    module = data.get('module', 'FRONTEND')
+    message = data.get('message', '')
+    debug_log(module, message, level)
+    return jsonify({"status": "ok"})
 
 # ==========================================
 # ЗАПУСК
