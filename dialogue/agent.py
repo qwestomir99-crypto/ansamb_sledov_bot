@@ -70,7 +70,24 @@ def _log_to_journal(text):
     from dialogue.agent_journal import log
     log(text)
 
+def _remember_phrase(phrase):
+    """Сохраняет важную фразу в память агента"""
+    try:
+        from dialogue.agent_memory import remember_phrase as remember
+        return remember(phrase)
+    except ImportError:
+        return False
+
+def _remember_dialogue(prompt, answer, user_id):
+    """Сохраняет важный диалог в память агента"""
+    try:
+        from dialogue.agent_memory import remember_dialogue as remember_d
+        return remember_d(prompt, answer, user_id)
+    except ImportError:
+        return False
+
 def _add_sediment(prompt, answer, user_id):
+    """Добавляет осадок от диалога для эволюции"""
     try:
         from evolve_agent import add_sediment
         return add_sediment(prompt, answer, user_id)
@@ -136,6 +153,10 @@ def ask_agent(prompt, user_id=None):
         # Сохраняем осадок для эволюции
         _add_sediment(prompt, answer, user_id)
         
+        # Запоминаем важные фразы и диалоги (опционально)
+        if len(prompt) > 20 and len(answer) > 20:
+            _remember_dialogue(prompt, answer, user_id)
+        
         return answer.strip()
     except Exception as e:
         debug_log("AGENT", f"Ошибка: {e}", "ERROR")
@@ -146,11 +167,19 @@ def get_agent_status():
     """Возвращает статус агента для админки"""
     from dialogue.agent_settings import get_agent_settings
     from dialogue.agent_journal import get_journal_lines
+    try:
+        from dialogue.agent_memory import get_memory_stats
+        memory_stats = get_memory_stats()
+    except ImportError:
+        memory_stats = {"phrases_count": 0, "dialogues_count": 0}
+    
     s = get_agent_settings()
     return {
         "temperature": s.get("temperature", 0.7),
         "max_tokens": s.get("max_tokens", 500),
-        "journal_lines": get_journal_lines()
+        "journal_lines": get_journal_lines(),
+        "memory_phrases": memory_stats.get("phrases_count", 0),
+        "memory_dialogues": memory_stats.get("dialogues_count", 0)
     }
 
 # ==========================================
@@ -161,3 +190,5 @@ if __name__ == "__main__":
     test_prompt = "Что такое разлом?"
     print(f"Вопрос: {test_prompt}")
     print(f"Ответ: {ask_agent(test_prompt, user_id=123456)}")
+    print("\nСтатус агента:")
+    print(get_agent_status())
