@@ -132,6 +132,7 @@ def on_disconnect():
     print("[WS] Отключено от веб-морде")
 
 async def send_to_web_morda(event, data):
+    """Отправляет событие в веб-морду через WebSocket"""
     try:
         await sio.connect(WEBSOCKET_URL)
         await sio.emit(event, data)
@@ -230,14 +231,17 @@ def handle_message(message):
     debug_log("HANDLERS", f"Получена команда: {text[:50]}...")
     
     # === ОТПРАВКА В ВЕБ-МОРДУ ===
-    asyncio.run(send_to_web_morda('new_message', {
-        'source': 'telegram',
-        'user_id': message.from_user.id,
-        'username': message.from_user.username or message.from_user.first_name,
-        'text': message.text,
-        'time': datetime.now().strftime("%H:%M:%S")
-    }))
-    # === КОНЕЦ ===
+    # Отправляем все сообщения (кроме команд, начинающихся с / или #)
+    if not text.startswith(('/', '#')):
+        asyncio.run(send_to_web_morda('new_message', {
+            'source': 'telegram',
+            'chat_id': message.chat.id,
+            'user_id': message.from_user.id,
+            'username': message.from_user.username or message.from_user.first_name,
+            'text': message.text,
+            'time': datetime.now().strftime("%H:%M:%S")
+        }))
+    # ============================
 
     if text == "#":
         try:
