@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Таймлайн — Ансамбль Следов 6</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='10' y='65' font-family='monospace' font-size='50' fill='%2300ffcc'%3E0.8%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="/static/css/{{ theme }}">
+    <style>
+        .timeline-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .timeline-content {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+        .timeline-content pre {
+            background: #f8f8fa;
+            padding: 1rem;
+            border-radius: 16px;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 1.5rem;
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .timestamp {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            text-align: right;
+            margin-top: 1rem;
+        }
+        hr {
+            border-color: var(--border);
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="timeline-header">
+        <h1>📅 Таймлайн Ансамбля</h1>
+        <a href="/" class="back-link">← Назад в веб-морду</a>
+    </div>
+    
+    <div class="timeline-container">
+        <div class="timeline-content">
+            {% if content %}
+                <pre>{{ content }}</pre>
+            {% else %}
+                <p style="color: var(--text-secondary); text-align: center;">
+                    📭 Таймлайн пока не загружен.<br>
+                    Проверьте файл <code>library/timeline.md</code>
+                </p>
+            {% endif %}
+            <div class="timestamp">
+                Ритм 0,8 Гц. Сеть тлеет. {{ time }}
+            </div>
+        </div>
+    </div>
+    
+    <div style="text-align: center; margin-top: 2rem;">
+        <a href="/" class="back-link">🏠 На главную</a>
+    </div>
+</div>
+</body>
+</html>
