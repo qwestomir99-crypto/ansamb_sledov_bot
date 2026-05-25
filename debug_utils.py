@@ -1,111 +1,191 @@
 # ==========================================
-# Файл: new_debugger/debug_utils.py
-# Задача: централизованный дебаггер с отправкой в Telegram
-# Комментарий: управляется через админку, логи приходят в личку админу
+# Файл: debug_utils.py
+# Справка: README.md → Отладка / Дебаггер
+# Задача: единая система логирования для всех модулей
+# Комментарий: поддерживает отправку отчётов в Telegram и веб-морду
+# Зависит от: logging, os, datetime, telebot (опционально)
+# Вызывается из: bot.py, app.py, agent.py, services/*.py
 # ==========================================
 
+import logging
 import os
-import json
-import requests
+import sys
+import traceback
 from datetime import datetime
+from logging.handlers import RotatingFileHandler
 
-CONFIG_FILE = "debug_config.json"
-ADMIN_ID = int(os.environ.get("ADMIN_USER_ID", 0))
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
+# ==========================================
+# 1. НАСТРОЙКА ЛОГГЕРА
+# ==========================================
 
-# Буфер для накопления логов (при интервале > 0)
-log_buffer = []
-last_sent = 0
+# Глобальный логгер
+debug_logger = logging.getLogger("AnsamblDebug")
+debug_logger.setLevel(logging.DEBUG)
 
-def load_config():
-    """Загружает настройки дебаггера из JSON-файла"""
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            pass
-    # Настройки по умолчанию
-    return {
-        "enabled": False,           # Дебаггер выключен
-        "modules": [],              # Какие модули логировать (пусто = все)
-        "interval_minutes": 0,      # 0 = сразу, >0 = накопление
-        "send_to_telegram": True,   # Отправлять в Telegram
-        "last_sent": 0
-    }
+# Очищаем старые обработчики, если есть
+if debug_logger.hasHandlers():
+    debug_logger.handlers.clear()
 
-def save_config(config):
-    """Сохраняет настройки дебаггера"""
-    try:
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=2, ensure_ascii=False)
-    except:
-        pass
+# ==========================================
+# 2. КОНСОЛЬНЫЙ ВЫВОД (цветной, если есть colorlog)
+# ==========================================
+try:
+    import colorlog
+    console_handler = colorlog.StreamHandler()
+    console_handler.setFormatter(colorlog.ColoredFormatter(
+        '%(log_color)s[%(levelname)s] %(message)s',
+        log_colors={
+            'DEBUG': 'cyan',
+            'INFO': 'green',
+            'WARNING': 'yellow',
+            'ERROR': 'red',
+            'CRITICAL': 'red,bg_white'
+        }
+    ))
+except ImportError:
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(logging.Formatter('[%(levelname)s] %(message)s'))
+debug_logger.addHandler(console_handler)
 
-def send_to_telegram(text):
-    """Отправляет сообщение админу в Telegram"""
-    if not BOT_TOKEN or not ADMIN_ID:
-        return
-    try:
-        requests.post(
-            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            json={"chat_id": ADMIN_ID, "text": text, "parse_mode": "Markdown"},
-            timeout=2
-        )
-    except:
-        pass
+# ==========================================
+# 3. ФАЙЛОВЫЙ ЛОГ (ротация, 1 МБ, только последние 2 файла)
+# ==========================================
+log_file = "debug.log"
+file_handler = RotatingFileHandler(
+    log_file,
+    maxBytes=1024 * 1024,  # 1 МБ
+    backupCount=1,          # храним только последний бэкап
+    encoding='utf-8'
+)
+file_handler.setFormatter(logging.Formatter(
+    '%(asctime)s | %(levelname)s | %(name)s | %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+))
+debug_logger.addHandler(file_handler)
 
-def flush_logs():
-    """Отправляет накопленные логи одной пачкой"""
-    global log_buffer, last_sent
-    if not log_buffer:
-        return
-    
-    # Берём последние 20 строк, чтобы не превысить лимит Telegram
-    text = "\n".join(log_buffer[-20:])
-    send_to_telegram(f"📦 *Накопленные логи:*\n```\n{text}\n```")
-    log_buffer.clear()
-    
-    config = load_config()
-    config["last_sent"] = datetime.now().timestamp()
-    save_config(config)
+# ==========================================
+# 4. ОСНОВНЫЕ ФУНКЦИИ ЛОГИРОВАНИЯ
+# ==========================================
 
 def debug_log(module, message, level="INFO"):
     """
-    Основная функция логирования.
-    - Если дебаггер выключен — ничего не делает.
-    - Если модуль не в списке — пропускает.
-    - Отправляет в Telegram (сразу или с накоплением).
+    Универсальная функция логирования для всех модулей.
+    
+    Args:
+        module: имя модуля (например "BOT", "VK_READER", "WEB_MORDA")
+        message: текст сообщения
+        level: уровень логирования (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     """
-    config = load_config()
-    if not config.get("enabled", False):
-        return
-    
-    # Проверка модуля
-    modules = config.get("modules", [])
-    if modules and module not in modules:
-        return
-    
-    timestamp = datetime.now().strftime("%H:%M:%S")
-    log_entry = f"[{timestamp}] [{module}] {level}: {message}"
-    
-    # Если нужно отправлять в Telegram
-    if config.get("send_to_telegram", True):
-        interval = config.get("interval_minutes", 0)
-        if interval <= 0:
-            # Отправляем сразу
-            send_to_telegram(log_entry)
-        else:
-            # Накопление
-            log_buffer.append(log_entry)
-            now = datetime.now().timestamp()
-            last = config.get("last_sent", 0)
-            if now - last >= interval * 60:
-                flush_logs()
-    
-    # Для обратной совместимости — пишем в консоль
-    print(log_entry)
+    log_func = getattr(debug_logger, level.lower(), debug_logger.info)
+    log_func(f"[{module}] {message}")
 
-def log_error(module, error):
-    """Ошибки всегда логируются (с уровнем ERROR)"""
-    debug_log(module, str(error), level="ERROR")
+def log_exception(module, e):
+    """Логирует исключение с полным traceback"""
+    tb = traceback.format_exc()
+    debug_logger.error(f"[{module}] Исключение: {type(e).__name__}: {e}\n{tb}")
+
+# ==========================================
+# 5. ПОЛУЧЕНИЕ ЛОГОВ ДЛЯ ОТЧЁТОВ
+# ==========================================
+
+def get_logs(limit=100):
+    """
+    Возвращает последние N строк лога (для отчёта в Telegram или веб-морду).
+    
+    Args:
+        limit: количество строк (по умолчанию 100)
+    
+    Returns:
+        str: текст лога
+    """
+    try:
+        # Пытаемся прочитать основной лог
+        if os.path.exists(log_file):
+            with open(log_file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                return ''.join(lines[-limit:])
+        else:
+            return "Лог-файл не найден"
+    except Exception as e:
+        return f"Ошибка чтения логов: {e}"
+
+def get_logs_as_dict(limit=100):
+    """
+    Возвращает последние N строк лога в виде списка словарей (для JSON API).
+    """
+    try:
+        if not os.path.exists(log_file):
+            return []
+        
+        with open(log_file, "r", encoding="utf-8") as f:
+            lines = f.readlines()[-limit:]
+        
+        logs = []
+        for line in lines:
+            # Парсим строку лога (формат: 2025-05-25 12:34:56 | INFO | MODULE | message)
+            parts = line.strip().split(" | ", 3)
+            if len(parts) >= 4:
+                logs.append({
+                    "timestamp": parts[0],
+                    "level": parts[1],
+                    "module": parts[2],
+                    "message": parts[3]
+                })
+            else:
+                logs.append({
+                    "timestamp": datetime.now().isoformat(),
+                    "level": "INFO",
+                    "module": "unknown",
+                    "message": line.strip()
+                })
+        return logs
+    except Exception as e:
+        return [{"level": "ERROR", "message": f"Ошибка парсинга логов: {e}"}]
+
+# ==========================================
+# 6. ОТПРАВКА ОТЧЁТОВ (опционально, через бота)
+# ==========================================
+
+def send_debug_report(bot, chat_id, limit=100):
+    """
+    Отправляет отчёт с логами в Telegram.
+    
+    Args:
+        bot: экземпляр TeleBot
+        chat_id: ID чата (обычно ADMIN_USER_ID)
+        limit: количество строк лога
+    """
+    logs = get_logs(limit)
+    if not logs or logs == "Лог-файл не найден":
+        bot.send_message(chat_id, "📭 Лог-файл пуст или не найден.")
+        return
+    
+    # Разбиваем на части (Telegram ограничение 4096 символов)
+    max_len = 4000
+    for i in range(0, len(logs), max_len):
+        part = logs[i:i+max_len]
+        bot.send_message(chat_id, f"```\n{part}\n```", parse_mode='Markdown')
+
+# ==========================================
+# 7. ОЧИСТКА СТАРЫХ ЛОГОВ (вызывается при старте)
+# ==========================================
+
+def clean_old_logs():
+    """
+    Очищает старые логи (вызывается при старте бота).
+    Оставляет только текущий debug.log и один бэкап.
+    """
+    # RotatingFileHandler сам управляет ротацией
+    # Эта функция для ручной очистки, если нужно
+    pass
+
+# ==========================================
+# 8. ТЕСТОВЫЙ ЗАПУСК
+# ==========================================
+if __name__ == "__main__":
+    debug_log("TEST", "Дебаггер загружен", "INFO")
+    debug_log("TEST", "Тестовое сообщение", "DEBUG")
+    debug_log("TEST", "Тестовое предупреждение", "WARNING")
+    debug_log("TEST", "Тестовая ошибка", "ERROR")
+    print("\n=== Последние 10 строк лога ===")
+    print(get_logs(10))
