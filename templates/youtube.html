@@ -4,61 +4,160 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>YouTube через Ансамбль — прокси и поиск</title>
+    <!-- Favicon: частота сети 0,8 Гц -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='10' y='65' font-family='monospace' font-size='50' fill='%2300ffcc'%3E0.8%3C/text%3E%3C/svg%3E">
     <link rel="stylesheet" href="/static/css/{{ theme }}">
+    <style>
+        /* Дополнительные стили для YouTube-страницы */
+        .search-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .search-row input {
+            flex: 1;
+        }
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 1rem;
+        }
+        .video-card {
+            background: white;
+            border-radius: 16px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: 0.2s;
+            border: 1px solid var(--border);
+        }
+        .video-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.1);
+        }
+        .video-title {
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .video-channel {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        video {
+            width: 100%;
+            max-width: 800px;
+            border-radius: 20px;
+            margin-top: 1rem;
+            box-shadow: var(--shadow);
+        }
+        .player-container {
+            margin-top: 20px;
+        }
+        .status-loading {
+            color: var(--accent);
+        }
+        .status-error {
+            color: #ff3b30;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎬 YouTube через Ансамбль</h1>
-        <p>Поиск, каталог, прокси — без VPN и рекламы.</p>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h1>🎬 YouTube через Ансамбль</h1>
+            <a href="/" style="font-size: 0.9rem;">← Назад в веб-морду</a>
+        </div>
+        <p>Поиск, каталог, прокси — без VPN и рекламы. Ритм 0,8 Гц.</p>
+        
         <div class="card">
             <div class="search-row">
-                <input type="text" id="search-query" placeholder="Поиск: квантовая физика, философия, нейросети..." onkeypress="if(event.key==='Enter') searchVideos()">
+                <input type="text" id="search-query" placeholder="Поиск: квантовая физика, философия, нейросети, искусство..." 
+                       onkeypress="if(event.key==='Enter') searchVideos()">
                 <button onclick="searchVideos()">🔍 Поиск</button>
             </div>
+            
             <div id="catalog" class="video-grid">
                 <div style="color: var(--text-secondary);">Введите запрос для поиска.</div>
             </div>
-            <div id="player-container" style="margin-top: 20px;"></div>
+            
+            <div id="player-container" class="player-container"></div>
         </div>
-        <p><a href="/">← Назад в веб-морду</a></p>
+        
+        <div class="card" style="margin-top: 1rem;">
+            <details>
+                <summary>📜 О прокси</summary>
+                <p style="margin-top: 0.5rem; font-size: 0.8rem;">
+                    Видео идут через сервер Render. YouTube видит только IP сервера, а не ваш. 
+                    Реклама отсутствует. Качество — до 720p для экономии трафика.
+                </p>
+            </details>
+        </div>
     </div>
+
     <script>
+    // Логирование действий (отправка в дебаггер через API)
+    async function logToDebug(level, message) {
+        try {
+            await fetch('/api/debug/log', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({level: level, module: 'YOUTUBE_PAGE', message: message})
+            });
+        } catch(e) {
+            console.log('Лог не отправлен:', e);
+        }
+    }
+
     async function searchVideos() {
         const query = document.getElementById('search-query').value.trim();
-        if (!query) return;
+        if (!query) {
+            logToDebug('WARNING', 'Пустой поисковый запрос');
+            return;
+        }
+        
         const catalogDiv = document.getElementById('catalog');
-        catalogDiv.innerHTML = '<div style="color: var(--accent);">⏳ Поиск...</div>';
+        catalogDiv.innerHTML = '<div class="status-loading">⏳ Поиск...</div>';
+        logToDebug('INFO', `Поиск: ${query}`);
+        
         try {
             const resp = await fetch(`/youtube_search?q=${encodeURIComponent(query)}`);
             const data = await resp.json();
+            
             if (data.error) {
-                catalogDiv.innerHTML = `<div style="color: #f00;">❌ ${data.error}</div>`;
+                catalogDiv.innerHTML = `<div class="status-error">❌ ${data.error}</div>`;
+                logToDebug('ERROR', `Ошибка поиска: ${data.error}`);
                 return;
             }
+            
             if (!data.length) {
                 catalogDiv.innerHTML = '<div style="color: var(--text-secondary);">Ничего не найдено</div>';
+                logToDebug('INFO', `Поиск "${query}" не дал результатов`);
                 return;
             }
+            
             catalogDiv.innerHTML = '';
+            logToDebug('INFO', `Найдено ${data.length} видео по запросу "${query}"`);
+            
             data.forEach(video => {
                 const card = document.createElement('div');
                 card.className = 'video-card';
                 card.innerHTML = `
                     <div class="video-title">${escapeHtml(video.title)}</div>
-                    <div class="video-channel">${escapeHtml(video.author)} • ${video.views_short || ''}</div>
+                    <div class="video-channel">${escapeHtml(video.author)} • ${video.views_short || '0'} просмотров</div>
                 `;
-                card.onclick = () => loadVideo(video.video_url);
+                card.onclick = () => loadVideo(video.video_url, video.title);
                 catalogDiv.appendChild(card);
             });
         } catch(e) {
-            catalogDiv.innerHTML = '<div style="color:#f00;">Ошибка поиска</div>';
+            catalogDiv.innerHTML = '<div class="status-error">❌ Ошибка поиска</div>';
+            logToDebug('ERROR', `Исключение при поиске: ${e.message}`);
         }
     }
     
-    async function loadVideo(videoUrl) {
+    async function loadVideo(videoUrl, videoTitle) {
         const container = document.getElementById('player-container');
-        container.innerHTML = '<div style="color: var(--accent);">⏳ Загрузка видео...</div>';
+        container.innerHTML = '<div class="status-loading">⏳ Загрузка видео...</div>';
+        logToDebug('INFO', `Загрузка видео: ${videoTitle || videoUrl}`);
+        
         try {
             const resp = await fetch('/youtube_info', {
                 method: 'POST',
@@ -66,19 +165,27 @@
                 body: JSON.stringify({url: videoUrl})
             });
             const data = await resp.json();
+            
             if (data.error) {
-                container.innerHTML = `<div style="color:#f00;">❌ ${data.error}</div>`;
+                container.innerHTML = `<div class="status-error">❌ ${data.error}</div>`;
+                logToDebug('ERROR', `Ошибка загрузки видео: ${data.error}`);
                 return;
             }
+            
+            const duration = Math.floor(data.duration / 60) + ':' + (data.duration % 60).toString().padStart(2, '0');
             container.innerHTML = `
                 <video controls autoplay>
                     <source src="${data.stream_url}" type="video/mp4">
                     Ваш браузер не поддерживает видео.
                 </video>
-                <div style="margin-top: 10px;">🎵 ${escapeHtml(data.title)} | Длительность: ${Math.floor(data.duration/60)}:${(data.duration%60).toString().padStart(2,'0')}</div>
+                <div style="margin-top: 10px;">
+                    🎵 ${escapeHtml(data.title)} | Длительность: ${duration}
+                </div>
             `;
+            logToDebug('INFO', `Видео загружено: ${data.title}`);
         } catch(e) {
-            container.innerHTML = '<div style="color:#f00;">❌ Ошибка загрузки видео</div>';
+            container.innerHTML = '<div class="status-error">❌ Ошибка загрузки видео</div>';
+            logToDebug('ERROR', `Исключение при загрузке видео: ${e.message}`);
         }
     }
     
@@ -88,6 +195,11 @@
         div.textContent = text;
         return div.innerHTML;
     }
+    
+    // Логируем загрузку страницы
+    document.addEventListener('DOMContentLoaded', () => {
+        logToDebug('INFO', 'Страница YouTube загружена');
+    });
     </script>
 </body>
 </html>
