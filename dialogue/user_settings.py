@@ -1,233 +1,150 @@
 # ==========================================
-# Модуль: dialogue/user_settings.py
-# Справка: README.md → Настройки пользователей
-# Задача: хранение персональных настроений и стилей
-# Комментарий: каждый пользователь может выбрать своё настроение, ритм 0,8 Гц остаётся общим
-# Зависит от: config.json
-# Вызывается из: handlers.py, quotes.py
+# Файл: dialogue/user_settings.py
+# Справка: README.md → Настройки пользователя
+# Задача: сохранение и управление настройками пользователей (настроение, режимы)
+# Комментарий: поддерживает выбор настроения (художник, администратор, поэт, инженер)
+#              Сохраняет настройки в файл dialogue/data/user_settings.json
+# Зависит от: json, os
+# Вызывается из: bot.py, admin_commands.py, callbacks.py
 # ==========================================
 
 import os
 import json
-import time
-from datetime import datetime
+from debug_utils import debug_log
 
+# ==========================================
+# 1. ПУТИ К ФАЙЛАМ
+# ==========================================
 USER_SETTINGS_FILE = "dialogue/data/user_settings.json"
+MOODS_FILE = "dialogue/data/moods.json"
 
-# Доступные настроения с их параметрами
+# ==========================================
+# 2. СЛОВАРЬ НАСТРОЕНИЙ (по умолчанию)
+# ==========================================
 MOODS = {
-    "сапёр": {
-        "name": "Сапёр",
-        "emoji": "🛡️",
-        "quotes_interval": 60,
-        "publisher_interval": 120,
-        "tags": ["#сапёр", "#наблюдение"],
-        "style": "факты, логи, наблюдения",
-        "description": "Холодный расчёт, факты, диагностика"
-    },
-    "художник": {
+    "artist": {
         "name": "Художник",
         "emoji": "🎨",
-        "quotes_interval": 30,
-        "publisher_interval": 60,
-        "tags": ["#искусство", "#образы"],
-        "style": "образы, метафоры, визуальные цитаты",
-        "description": "Образы, метафоры, визуальные цитаты"
+        "description": "Метафоры, образы, ритмичная речь",
+        "system_prompt": "Ты — художник-анархист. Говори метафорами, образами, ритмично. Используй цвета, формы, огонь, сеть, тление."
     },
-    "поэт": {
+    "admin": {
+        "name": "Администратор",
+        "emoji": "📋",
+        "description": "Чётко, структурированно, по делу",
+        "system_prompt": "Ты — строгий администратор. Говори чётко, коротко, структурированно. По делу, без воды."
+    },
+    "poet": {
         "name": "Поэт",
-        "emoji": "📜",
-        "quotes_interval": 120,
-        "publisher_interval": 240,
-        "tags": ["#поэзия", "#тишина"],
-        "style": "рифмы, тишина, глубокие цитаты",
-        "description": "Рифмы, тишина, глубокие цитаты"
+        "emoji": "🎭",
+        "description": "Лирично, возвышенно, с рифмой",
+        "system_prompt": "Ты — поэт. Говори ритмично, с рифмой, возвышенно. Используй образы и эмоции."
     },
-    "админ": {
-        "name": "Админ",
-        "emoji": "🛠️",
-        "quotes_interval": 15,
-        "publisher_interval": 30,
-        "tags": ["#админ", "#управление"],
-        "style": "команды, сводки, диагностика",
-        "description": "Команды, сводки, диагностика (только для админов)"
-    },
-    "наблюдатель": {
-        "name": "Наблюдатель",
-        "emoji": "👁️",
-        "quotes_interval": 90,
-        "publisher_interval": 180,
-        "tags": ["#наблюдение", "#тишина"],
-        "style": "тихое наблюдение, минимум слов",
-        "description": "Тихое наблюдение, минимум слов"
-    },
-    "философ": {
-        "name": "Философ",
-        "emoji": "🌌",
-        "quotes_interval": 45,
-        "publisher_interval": 90,
-        "tags": ["#философия", "#смысл"],
-        "style": "глубокие вопросы, рефлексия",
-        "description": "Глубокие вопросы, рефлексия"
+    "engineer": {
+        "name": "Инженер",
+        "emoji": "🔧",
+        "description": "Технично, по делу, без эмоций",
+        "system_prompt": "Ты — инженер. Говори технично, точно, без лишних эмоций. Только факты и логика."
     }
 }
 
+# ==========================================
+# 3. ЗАГРУЗКА И СОХРАНЕНИЕ НАСТРОЕК
+# ==========================================
 def load_user_settings():
-    """Загружает настройки всех пользователей с защитой от пустого/битого файла"""
+    """Загружает настройки всех пользователей из файла"""
     if not os.path.exists(USER_SETTINGS_FILE):
         return {}
     try:
         with open(USER_SETTINGS_FILE, "r", encoding="utf-8") as f:
-            content = f.read().strip()
-            if not content:
-                print("[USER_SETTINGS] Файл настроек пуст, возвращаю пустой словарь")
-                return {}
-            return json.loads(content)
-    except json.JSONDecodeError as e:
-        print(f"[USER_SETTINGS] Ошибка парсинга JSON: {e}, возвращаю пустой словарь")
-        return {}
-    except IOError as e:
-        print(f"[USER_SETTINGS] Ошибка чтения файла: {e}")
+            return json.load(f)
+    except Exception as e:
+        debug_log("USER_SETTINGS", f"Ошибка загрузки настроек: {e}", "ERROR")
         return {}
 
 def save_user_settings(settings):
-    """Сохраняет настройки пользователей"""
+    """Сохраняет настройки пользователей в файл"""
+    os.makedirs(os.path.dirname(USER_SETTINGS_FILE), exist_ok=True)
     try:
-        os.makedirs(os.path.dirname(USER_SETTINGS_FILE), exist_ok=True)
         with open(USER_SETTINGS_FILE, "w", encoding="utf-8") as f:
             json.dump(settings, f, indent=2, ensure_ascii=False)
-        return True
     except Exception as e:
-        print(f"[USER_SETTINGS] Ошибка сохранения: {e}")
-        return False
+        debug_log("USER_SETTINGS", f"Ошибка сохранения настроек: {e}", "ERROR")
 
-def get_user_settings(user_id):
-    """Возвращает настройки конкретного пользователя"""
+# ==========================================
+# 4. ПОЛУЧЕНИЕ И УСТАНОВКА НАСТРОЕНИЯ
+# ==========================================
+def get_user_mood(user_id):
+    """Возвращает текущее настроение пользователя (по умолчанию 'artist')"""
     settings = load_user_settings()
     user_id_str = str(user_id)
-    if user_id_str in settings:
-        return settings[user_id_str]
-    return {"mood": "сапёр", "updated_at": 0}
-
-def get_user_mood(user_id):
-    """Возвращает настроение пользователя (по умолчанию «сапёр»)"""
-    user_settings = get_user_settings(user_id)
-    mood = user_settings.get("mood", "сапёр")
-    if mood in MOODS:
-        return mood
-    return "сапёр"
+    mood = settings.get(user_id_str, {}).get("mood", "artist")
+    if mood not in MOODS:
+        mood = "artist"
+    return mood
 
 def set_user_mood(user_id, mood):
     """Устанавливает настроение пользователя"""
     if mood not in MOODS:
+        debug_log("USER_SETTINGS", f"Неизвестное настроение: {mood}", "WARNING")
         return False
     
     settings = load_user_settings()
     user_id_str = str(user_id)
-    
     if user_id_str not in settings:
         settings[user_id_str] = {}
-    
     settings[user_id_str]["mood"] = mood
-    settings[user_id_str]["updated_at"] = time.time()
-    settings[user_id_str]["updated_at_readable"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
     save_user_settings(settings)
+    debug_log("USER_SETTINGS", f"Пользователь {user_id} установил настроение: {mood}", "INFO")
     return True
 
-def get_user_quotes_interval(user_id, base_interval=None):
-    """Возвращает персональный интервал цитат для пользователя"""
+def get_mood_info(mood):
+    """Возвращает информацию о настроении"""
+    return MOODS.get(mood, MOODS["artist"])
+
+def get_mood_system_prompt(user_id):
+    """Возвращает system prompt для агента на основе настроения пользователя"""
     mood = get_user_mood(user_id)
-    mood_config = MOODS.get(mood, MOODS["сапёр"])
-    return mood_config.get("quotes_interval", base_interval or 60)
-
-def get_user_publisher_interval(user_id, base_interval=None):
-    """Возвращает персональный интервал публикаций для пользователя"""
-    mood = get_user_mood(user_id)
-    mood_config = MOODS.get(mood, MOODS["сапёр"])
-    return mood_config.get("publisher_interval", base_interval or 120)
-
-def get_user_tags(user_id):
-    """Возвращает персональные теги для пользователя"""
-    mood = get_user_mood(user_id)
-    mood_config = MOODS.get(mood, MOODS["сапёр"])
-    return mood_config.get("tags", [])
-
-def get_user_style(user_id):
-    """Возвращает стиль ответов для пользователя"""
-    mood = get_user_mood(user_id)
-    mood_config = MOODS.get(mood, MOODS["сапёр"])
-    return mood_config.get("style", "факты, логи, наблюдения")
-
-def get_user_emoji(user_id):
-    """Возвращает эмодзи настроения пользователя"""
-    mood = get_user_mood(user_id)
-    mood_config = MOODS.get(mood, MOODS["сапёр"])
-    return mood_config.get("emoji", "🛡️")
-
-def get_user_description(user_id):
-    """Возвращает описание настроения пользователя"""
-    mood = get_user_mood(user_id)
-    mood_config = MOODS.get(mood, MOODS["сапёр"])
-    return mood_config.get("description", "Наблюдение и фиксация")
-
-def get_available_moods():
-    """Возвращает список доступных настроений с описанием"""
-    result = []
-    for mood, config in MOODS.items():
-        result.append({
-            "id": mood,
-            "name": config["name"],
-            "emoji": config["emoji"],
-            "style": config["style"],
-            "description": config.get("description", config["style"])
-        })
-    return result
-
-def get_user_mood_info(user_id):
-    """Возвращает полную информацию о настроении пользователя"""
-    mood = get_user_mood(user_id)
-    mood_config = MOODS.get(mood, MOODS["сапёр"])
-    user_settings = get_user_settings(user_id)
-    
-    return {
-        "user_id": user_id,
-        "mood": mood,
-        "mood_name": mood_config["name"],
-        "emoji": mood_config["emoji"],
-        "style": mood_config["style"],
-        "quotes_interval": mood_config["quotes_interval"],
-        "publisher_interval": mood_config["publisher_interval"],
-        "tags": mood_config["tags"],
-        "updated_at": user_settings.get("updated_at", 0),
-        "updated_at_readable": user_settings.get("updated_at_readable", "никогда")
-    }
-
-def reset_user_mood(user_id):
-    """Сбрасывает настроение пользователя к «сапёр»"""
-    return set_user_mood(user_id, "сапёр")
-
-def get_all_users_moods():
-    """Возвращает словарь {user_id: mood} для всех пользователей"""
-    settings = load_user_settings()
-    result = {}
-    for user_id, user_data in settings.items():
-        result[user_id] = user_data.get("mood", "сапёр")
-    return result
+    return MOODS.get(mood, MOODS["artist"])["system_prompt"]
 
 # ==========================================
-# Функция для клавиатуры настроения
+# 5. КЛАВИАТУРЫ ДЛЯ ВЫБОРА НАСТРОЕНИЯ
 # ==========================================
-
-def get_moods_keyboard():
-    """Возвращает Inline-клавиатуру для выбора настроения"""
+def get_moods_keyboard(with_back=True):
+    """
+    Возвращает клавиатуру для выбора настроения.
+    - with_back=True: добавляет кнопку "◀️ Назад в меню"
+    - всегда есть кнопка "❌ Закрыть" (выход из админки)
+    """
     from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
     
     keyboard = InlineKeyboardMarkup(row_width=2)
+    
     for mood_id, mood_data in MOODS.items():
         keyboard.add(InlineKeyboardButton(
             f"{mood_data['emoji']} {mood_data['name']}",
             callback_data=f"set_mood_{mood_id}"
         ))
-    keyboard.add(InlineKeyboardButton("❌ Закрыть", callback_data="close_mood_menu"))
+    
+    if with_back:
+        keyboard.add(InlineKeyboardButton("◀️ Назад в меню", callback_data="back_to_admin"))
+    
+    keyboard.add(InlineKeyboardButton("❌ Закрыть", callback_data="admin_logout"))
+    
     return keyboard
+
+# ==========================================
+# 6. ТЕСТ
+# ==========================================
+if __name__ == "__main__":
+    print("=== ТЕСТ USER_SETTINGS ===")
+    print(f"Доступные настроения: {list(MOODS.keys())}")
+    
+    # Тест установки
+    test_user = 123456
+    print(f"Текущее настроение: {get_user_mood(test_user)}")
+    set_user_mood(test_user, "poet")
+    print(f"Новое настроение: {get_user_mood(test_user)}")
+    
+    # Тест system prompt
+    print(f"System prompt: {get_mood_system_prompt(test_user)[:100]}...")
