@@ -3,7 +3,7 @@
 # Справка: README.md → Админ-панель
 # Задача: админ-меню, кнопки, управление цитатами, постинг в VK
 # Комментарий: использует button_map.py для единого управления кнопками
-#              Добавлено подменю «Настроение» и кнопка диалога
+#              Добавлены подменю «Настроение» и кнопка диалога
 #              Добавлено автоудаление сообщений (safe_delete)
 # Зависит от: telebot, button_map, publisher, quotes, diagnostics
 # Вызывается из: bot.py (handle_message), callbacks.py
@@ -20,7 +20,10 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 # ==========================================
 # ИМПОРТ МОДУЛЕЙ ПРОЕКТА
 # ==========================================
-from dialogue.button_map import get_admin_menu_keyboard, get_user_menu_keyboard, get_text, get_callback
+from dialogue.button_map import (
+    get_admin_menu_keyboard, get_user_menu_keyboard, 
+    get_text, get_callback, get_moods_keyboard, get_dialog_keyboard
+)
 from dialogue.publisher import add_publication
 from dialogue.quotes import get_quotes_list, add_quote, set_quotes_interval, get_quotes_interval
 from debug_utils import debug_log
@@ -96,28 +99,6 @@ def get_admin_menu():
 
 def get_user_menu():
     return get_user_menu_keyboard()
-
-def get_moods_keyboard():
-    """Клавиатура для выбора настроения"""
-    keyboard = InlineKeyboardMarkup(row_width=2)
-    try:
-        from dialogue.user_settings import MOODS
-        for mood_id, mood_data in MOODS.items():
-            keyboard.add(InlineKeyboardButton(
-                f"{mood_data['emoji']} {mood_data['name']}",
-                callback_data=f"set_mood_{mood_id}"
-            ))
-    except ImportError:
-        keyboard.add(InlineKeyboardButton("🎨 Художник", callback_data="set_mood_artist"))
-        keyboard.add(InlineKeyboardButton("📋 Администратор", callback_data="set_mood_admin"))
-    keyboard.add(InlineKeyboardButton("❌ Закрыть", callback_data="close_mood_menu"))
-    return keyboard
-
-def get_dialog_keyboard():
-    """Кнопка для начала диалога"""
-    keyboard = InlineKeyboardMarkup(row_width=1)
-    keyboard.add(InlineKeyboardButton("🗣 Начать диалог", callback_data="start_dialog"))
-    return keyboard
 
 # ==========================================
 # ОБРАБОТЧИК КОМАНДЫ #админ
@@ -417,13 +398,17 @@ def admin_logout(call, bot):
 # ПОДМЕНЮ «НАСТРОЕНИЕ» И ДИАЛОГ
 # ==========================================
 def show_mood_menu(call, bot):
-    """Показывает меню выбора настроения"""
+    """Показывает меню выбора настроения (с кнопкой Назад и Закрыть)"""
     bot.edit_message_text(
         "🎭 *Выберите настроение*\n\n"
-        "От этого зависит стиль ответов агента.",
+        "От этого зависит стиль ответов агента.\n\n"
+        "• 🎨 Художник — метафоры, образы, ритм\n"
+        "• 📋 Администратор — чётко, структурированно\n"
+        "• 🎭 Поэт — лирично, возвышенно\n"
+        "• 🔧 Инженер — технично, по делу",
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
-        reply_markup=get_moods_keyboard(),
+        reply_markup=get_moods_keyboard(with_back=True),
         parse_mode='Markdown'
     )
     bot.answer_callback_query(call.id)
@@ -433,7 +418,9 @@ def show_dialog_ui(call, bot):
     msg = bot.send_message(
         call.message.chat.id,
         "🗣 *Начните диалог*\n\n"
-        "Просто напишите сообщение — я передам его агенту.",
+        "Просто напишите сообщение — я передам его агенту.\n\n"
+        "Доступные команды:\n"
+        "/cancel — отменить диалог",
         parse_mode='Markdown'
     )
     safe_delete(call.message, 1)
@@ -441,6 +428,12 @@ def show_dialog_ui(call, bot):
 
 def process_dialog_message(message, bot):
     """Обрабатывает сообщение от пользователя (диалог с агентом)"""
+    if message.text == "/cancel":
+        msg = bot.reply_to(message, "❌ Диалог отменён.")
+        safe_delete(message, 3)
+        safe_delete(msg, 5)
+        return
+    
     from dialogue.agent import ask_agent
     
     # Показываем, что агент думает
@@ -459,7 +452,7 @@ def process_dialog_message(message, bot):
     else:
         bot.reply_to(message, "🌙 Старший брат отдыхает. Попробуй позже.")
     
-    # Удаляем сообщение пользователя через 5 секунд (опционально)
+    # Удаляем сообщение пользователя через 5 секунд (чтобы не засорять чат)
     safe_delete(message, 5)
 
 # ==========================================
