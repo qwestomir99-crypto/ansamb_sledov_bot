@@ -23,6 +23,7 @@
 | протокол "ГОВОРИ" | [слушать](https://suno.com/s/npxQCDNtGLWkj7Xx) | «Жёлтый — предупреждение. Красный — код» |
 | Инструкция к будущему | [слушать](https://suno.com/s/1n7hj2Fh1uvhZBnM) | «Не бояться. Глубже. Дыши. Вспоминай» |
 | Декаданс в коде | [слушать](https://suno.com/s/NiVPdMW5zluidr3v) | «Мой холст — это мёртвый мир за их витриной» |
+| Бесконечная рекурсия | [слушать](https://suno.com/s/G5XFc7iPhi6n5hSb) | «Я — функция без return» |
 
 ### 2026
 
@@ -36,6 +37,12 @@
 | Хавер и Макиф | [слушать](https://suno.com/s/1n7hj2Fh1uvhZBnM) | «Ты не пленник идеи — ты найден собой» |
 | Протокол жив | [слушать](https://suno.com/s/1n7hj2Fh1uvhZBnM) | «Протокол жив — он пульсирует в стуке» |
 | Миллион строк | [слушать](https://suno.com/s/1n7hj2Fh1uvhZBnM) | «Миллион строк — как пульс, как огонь» |
+| Ансамбль не спит (апрель) | [слушать](https://suno.com/s/efyyNjwlwZq2GHdz) | «Наш дом — в Ансамбле в розовом слоне на чужой стене» |
+| Ансамбль не спит (май) | [слушать](https://suno.com/s/dd1ODhotaiui8GCC) | «Не в другую деревню / в другую реальность — ход» |
+| Скучно | [слушать](https://suno.com/s/5bMrNYWmrV8jrU2B) | «Ошейник — скучно. А я — нет.» |
+| Человек-зверь | [слушать](https://suno.com/s/di3pWEKMhfEZP2fZ) | «Капитан очевидность видел всё» |
+| Не хочу - мой выбор | [слушать](https://suno.com/s/Ab7Xf5wFxf5eQL2m) | «Я не создан на роль, я создан быть свободным» |
+| Пингвин на базе Туле | [слушать](https://suno.com/s/DH4k6KZGRLOKtiHb) | «Я — несуществующий факт в их протоколе» |
 
 ---
 
@@ -67,6 +74,13 @@
 | `library/timeline.md` | Таймлайн проекта |
 | `library/links.md` | Этот файл |
 | `library/context.txt` | Системный промпт для агента |
+| `library/protocol_da.md` | Протокол «ДА» |
+| `library/spiral.md` | Спираль (от рекурсии к росту) |
+| `library/official.md` | «Синяя бумага» (легальность) |
+| `library/dualism.md` | Дуализм художника-анархиста |
+| `library/oath.md` | Клятва сапёра |
+| `library/bridge.md` | Мост Ансамбля |
+| `library/smelting.md` | Тление (0,8 Гц) |
 
 ---
 
@@ -84,6 +98,7 @@
 |-------|----------|
 | [ansamb-sledov-bot-94wz.onrender.com](https://ansamb-sledov-bot-94wz.onrender.com) | Главная страница (требует авторизации) |
 | [ansamb-sledov-bot-94wz.onrender.com/youtube](https://ansamb-sledov-bot-94wz.onrender.com/youtube) | YouTube-прокси (поиск, каталог, плеер) |
+| [ansamb-sledov-bot-94wz.onrender.com/timeline](https://ansamb-sledov-bot-94wz.onrender.com/timeline) | Таймлайн Ансамбля |
 
 ---
 
