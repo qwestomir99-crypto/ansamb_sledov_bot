@@ -1,9 +1,9 @@
 # ==========================================
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
-# Задача: единый веб-интерфейс для VK, Telegram и YouTube (прокси)
-# Комментарий: маршруты и подключение модулей. Вся логика — в web_api, vk_api, tg_api
-# Зависит от: flask, flask-socketio, vk_api, telebot, yt-dlp, python-dotenv
+# Задача: единый веб-интерфейс (маршруты + WebSocket + YouTube)
+# Комментарий: всё API вынесено в web_api.py, vk_api.py, tg_api.py
+# Зависит от: flask, flask-socketio, yt-dlp
 # Вызывается из: Render (web service, start command: gunicorn app:app)
 # ==========================================
 
@@ -37,8 +37,6 @@ app.config['SESSION_COOKIE_SECURE'] = True
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 bot = telebot.TeleBot(BOT_TOKEN) if BOT_TOKEN else None
-
-# Хранилище сообщений (в памяти)
 messages = []
 
 # ==========================================
@@ -219,7 +217,7 @@ def handle_new_message(data):
     log_web("INFO", f"Новое сообщение от {data.get('source')}: {data.get('text', '')[:50]}")
 
 # ==========================================
-# АВТОРИЗАЦИЯ
+# ОСНОВНЫЕ МАРШРУТЫ
 # ==========================================
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -250,6 +248,21 @@ def index():
     return render_template('admin.html', 
         time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
         quotes=get_quotes(),
+        theme=THEME_CSS
+    )
+
+@app.route('/timeline')
+@login_required
+def timeline():
+    timeline_path = os.path.join(os.path.dirname(__file__), '..', 'library', 'timeline.md')
+    try:
+        with open(timeline_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except Exception as e:
+        content = f"# Таймлайн\n\nОшибка загрузки: {e}"
+    return render_template('timeline.html', 
+        time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+        content=content,
         theme=THEME_CSS
     )
 
@@ -305,11 +318,9 @@ def send_reply():
             log_web("ERROR", f"Ошибка отправки ответа: {e}")
             return jsonify({"status": "error", "error": str(e)})
     elif source == 'vk':
-        # Используем VK API для отправки сообщения
         VK_TOKEN = os.environ.get("VK_TOKEN")
         if not VK_TOKEN:
             return jsonify({"status": "error", "error": "VK не настроен"}), 500
-        import requests
         params = {
             "access_token": VK_TOKEN,
             "v": "5.199",
