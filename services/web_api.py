@@ -1,18 +1,35 @@
 # ==========================================
 # Файл: services/web_api.py
 # Справка: README.md → Веб-морда / API
-# Задача: API для управления ботом, режимами, цитатами, настроением
+# Задача: API для управления ботом, режимами, цитатами, настроением, аудитом, темами
 # Комментарий: используется веб-мордой для панели управления
-# Зависит от: flask, debug_utils, ping_utils
+# Зависит от: flask, debug_utils, ping_utils, debug_audit, theme
 # Вызывается из: services/app.py (blueprint)
 # ==========================================
 
 import os
 import json
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session, redirect, url_for
+from functools import wraps
 from debug_utils import debug_log
 
 web_api = Blueprint('web_api', __name__)
+
+# ==========================================
+# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# ==========================================
+def log_web(level, message):
+    debug_log("WEB_API", message, level)
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('authenticated'):
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({"error": "Unauthorized"}), 401
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated
 
 # ==========================================
 # ПУТИ К ФАЙЛАМ
@@ -22,11 +39,8 @@ MODE_FILE = "dialogue/data/mode.txt"
 MOOD_FILE = "dialogue/data/mood.txt"
 
 # ==========================================
-# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# РАБОТА С ЦИТАТАМИ
 # ==========================================
-def log_web(level, message):
-    debug_log("WEB_API", message, level)
-
 def get_quotes():
     try:
         with open(QUOTES_FILE, "r") as f:
@@ -44,6 +58,9 @@ def add_quote(quote):
         log_web("ERROR", f"Ошибка добавления цитаты: {e}")
         return False
 
+# ==========================================
+# РАБОТА С РЕЖИМАМИ
+# ==========================================
 def get_current_mode():
     try:
         with open(MODE_FILE, "r") as f:
@@ -61,6 +78,9 @@ def set_current_mode(mode):
         log_web("ERROR", f"Ошибка сохранения режима: {e}")
         return False
 
+# ==========================================
+# РАБОТА С НАСТРОЕНИЕМ
+# ==========================================
 def get_current_mood():
     try:
         with open(MOOD_FILE, "r") as f:
@@ -83,6 +103,7 @@ def set_current_mood(mood):
 # ==========================================
 
 @web_api.route('/state', methods=['GET'])
+@login_required
 def api_state():
     """Возвращает текущее состояние (режим, цитаты)"""
     return jsonify({
@@ -91,6 +112,7 @@ def api_state():
     })
 
 @web_api.route('/set_mode', methods=['POST'])
+@login_required
 def api_set_mode():
     """Устанавливает режим бота (утро/день/вечер/ночь)"""
     data = request.json
@@ -102,6 +124,7 @@ def api_set_mode():
     return jsonify({"status": "error", "error": "Invalid mode"}), 400
 
 @web_api.route('/set_mood', methods=['POST'])
+@login_required
 def api_set_mood():
     """Устанавливает настроение агента (artist/admin/poet/engineer)"""
     data = request.json
@@ -113,11 +136,13 @@ def api_set_mood():
     return jsonify({"status": "error", "error": "Invalid mood"}), 400
 
 @web_api.route('/get_mood', methods=['GET'])
+@login_required
 def api_get_mood():
     """Возвращает текущее настроение агента"""
     return jsonify({"status": "ok", "mood": get_current_mood()})
 
 @web_api.route('/toggle_ping', methods=['POST'])
+@login_required
 def api_toggle_ping():
     """Включает/выключает пинг бота"""
     try:
@@ -130,6 +155,7 @@ def api_toggle_ping():
         return jsonify({"status": "error", "error": str(e)}), 500
 
 @web_api.route('/add_quote', methods=['POST'])
+@login_required
 def api_add_quote():
     """Добавляет новую цитату"""
     data = request.json
@@ -142,11 +168,9 @@ def api_add_quote():
     return jsonify({"status": "error", "error": "Ошибка сохранения"}), 500
 
 @web_api.route('/create_post', methods=['POST'])
+@login_required
 def api_create_post():
-    """
-    Создаёт новый пост в Telegram или VK.
-    Ожидает JSON: {"platform": "telegram" или "vk", "text": "текст поста"}
-    """
+    """Создаёт новый пост в Telegram или VK"""
     data = request.json
     platform = data.get('platform')
     text = data.get('text', '').strip()
@@ -155,23 +179,20 @@ def api_create_post():
         return jsonify({"status": "error", "error": "Пустой текст"}), 400
     
     if platform == 'telegram':
-        # Отправляем в Telegram (через бота)
         bot_token = os.environ.get("BOT_TOKEN")
         publish_channel = os.environ.get("PUBLISH_CHANNEL", "@qwestomir")
         if not bot_token:
             return jsonify({"status": "error", "error": "Telegram бот не настроен"}), 500
         try:
             import telebot
-            bot = telebot.TeleBot(bot_token)
-            bot.send_message(publish_channel, text, parse_mode='Markdown')
-            log_web("INFO", f"Пост в Telegram отправлен: {text[:50]}")
+            tg_bot = telebot.TeleBot(bot_token)
+            tg_bot.send_message(publish_channel, text, parse_mode='Markdown')
+            log_web("INFO", f"Пост в Telegram отправлен")
             return jsonify({"status": "ok", "message": "Пост отправлен в Telegram"})
         except Exception as e:
             log_web("ERROR", f"Ошибка отправки в Telegram: {e}")
             return jsonify({"status": "error", "error": str(e)}), 500
-    
     elif platform == 'vk':
-        # Отправляем в VK
         vk_token = os.environ.get("VK_TOKEN")
         vk_group_id = os.environ.get("VK_GROUP_ID")
         if not vk_token or not vk_group_id:
@@ -182,47 +203,78 @@ def api_create_post():
             vk = vk_session.get_api()
             post = vk.wall.post(owner_id=-int(vk_group_id), message=text, from_group=1)
             post_url = f"https://vk.com/wall-{abs(int(vk_group_id))}_{post['post_id']}"
-            log_web("INFO", f"Пост в VK опубликован: {post_url}")
+            log_web("INFO", f"Пост в VK отправлен: {post_url}")
             return jsonify({"status": "ok", "message": "Пост отправлен в VK", "url": post_url})
         except Exception as e:
             log_web("ERROR", f"Ошибка отправки в VK: {e}")
             return jsonify({"status": "error", "error": str(e)}), 500
-    
     else:
         return jsonify({"status": "error", "error": "Invalid platform"}), 400
 
-@web_api.route('/get_quote_stats', methods=['GET'])
-def api_get_quote_stats():
-    """Возвращает статистику по цитатам (количество)"""
-    quotes = get_quotes()
-    total = len(quotes)
-    return jsonify({"status": "ok", "total": total, "last_10": quotes})
+# ==========================================
+# УПРАВЛЕНИЕ ТЕМОЙ
+# ==========================================
+@web_api.route('/set_theme', methods=['POST'])
+@login_required
+def api_set_theme():
+    """Сохраняет выбранную тему пользователя"""
+    data = request.json
+    theme = data.get('theme')
+    if theme not in ['macos.css', 'dark.css']:
+        return jsonify({"status": "error", "error": "Invalid theme"}), 400
+    
+    from services.theme import save_theme
+    save_theme(theme)
+    log_web("INFO", f"Тема изменена на {theme}")
+    return jsonify({"status": "ok", "theme": theme})
 
-@web_api.route('/clear_quotes', methods=['POST'])
-def api_clear_quotes():
-    """Очищает все цитаты (только для админа)"""
+# ==========================================
+# АУДИТ И ИНДЕКС
+# ==========================================
+@web_api.route('/audit/run', methods=['POST'])
+@login_required
+def api_audit_run():
+    """Запускает аудит"""
     try:
-        os.makedirs(os.path.dirname(QUOTES_FILE), exist_ok=True)
-        with open(QUOTES_FILE, "w") as f:
-            f.write("")
-        log_web("INFO", "Все цитаты очищены")
-        return jsonify({"status": "ok"})
+        from debug_audit import run_audit
+        result = run_audit()
+        if result:
+            return jsonify({"status": "ok", "message": "Аудит выполнен", "results": result})
+        return jsonify({"status": "error", "message": "Ошибка выполнения аудита"}), 500
+    except ImportError:
+        return jsonify({"status": "error", "message": "debug_audit.py не найден"}), 500
     except Exception as e:
-        log_web("ERROR", f"Ошибка очистки цитат: {e}")
-        return jsonify({"status": "error", "error": str(e)}), 500
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-# ==========================================
-# ДЛЯ ТЕСТА
-# ==========================================
-if __name__ == "__main__":
-    print("WEB API модуль загружен")
-    print("Доступные эндпоинты:")
-    print("  GET /api/state - состояние бота")
-    print("  POST /api/set_mode - установить режим")
-    print("  POST /api/set_mood - установить настроение")
-    print("  GET /api/get_mood - получить настроение")
-    print("  POST /api/toggle_ping - переключить пинг")
-    print("  POST /api/add_quote - добавить цитату")
-    print("  POST /api/create_post - создать пост")
-    print("  GET /api/get_quote_stats - статистика цитат")
-    print("  POST /api/clear_quotes - очистить цитаты")
+@web_api.route('/audit/status', methods=['GET'])
+@login_required
+def api_audit_status():
+    """Возвращает статус последнего аудита"""
+    from debug_utils import get_audit_status
+    return jsonify(get_audit_status())
+
+@web_api.route('/audit/index', methods=['GET'])
+@login_required
+def api_audit_index():
+    """Возвращает содержимое debug_index.json"""
+    index_file = "debug_index.json"
+    if not os.path.exists(index_file):
+        return jsonify({"status": "error", "message": "Индекс не найден"}), 404
+    try:
+        with open(index_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return jsonify({"status": "ok", "index": data})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@web_api.route('/audit/logs/stats', methods=['GET'])
+@login_required
+def api_audit_log_stats():
+    """Возвращает статистику по логам"""
+    try:
+        from debug_audit import analyze_logs
+        return jsonify(analyze_logs())
+    except ImportError:
+        return jsonify({"status": "error", "message": "debug_audit.py не найден"}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
