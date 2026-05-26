@@ -1,11 +1,10 @@
 # ==========================================
 # Файл: services/autoposter.py
 # Справка: README.md → Автопостинг YouTube
-# Задача: публикация случайного видео из плейлиста в VK с превью
-# Комментарий: видео отправляется как attachment, чтобы VK показывал обложку.
+# Задача: публикация случайного видео из плейлиста в VK
+# Комментарий: если не удаётся прикрепить видео как attachment (превью),
+#              публикуем текст с прямой ссылкой на видео — так пост не пустой.
 #              Использует dialogue.youtube_auto для получения видео.
-#              Исправлена обработка отсутствия медиа — публикует только текст,
-#              если видео не прикрепляется.
 # Зависит от: requests, os, random, json, debug_utils, dialogue.youtube_auto
 # Вызывается из: bot.py (отдельный поток)
 # ==========================================
@@ -43,10 +42,10 @@ def get_random_quote():
         log_auto("ERROR", f"Ошибка чтения цитат: {e}")
         return "Сеть тлеет. Ритм 0,8 Гц."
 
-def post_to_vk_with_preview(message, video_url, access_token, owner_id):
+def post_to_vk_with_link(message, video_url, access_token, owner_id):
     """
-    Отправляет пост в VK с видео-ссылкой как attachment.
-    Это заставляет VK показывать превью (обложку видео).
+    Отправляет пост в VK, где видео — обычная ссылка в тексте,
+    а не attachment. Так пост не будет пустым, даже если превью не подтягивается.
     """
     if not access_token or not owner_id:
         log_auto("ERROR", "Нет токена VK или owner_id")
@@ -59,7 +58,7 @@ def post_to_vk_with_preview(message, video_url, access_token, owner_id):
     except:
         default_tags = "#Ансамбль #СледНаКонтаке"
     
-    full_message = f"{message}\n\n{default_tags}"
+    full_message = f"{message}\n\n📌 Ссылка на видео: {video_url}\n\n{default_tags}"
     
     params = {
         "access_token": access_token,
@@ -69,41 +68,17 @@ def post_to_vk_with_preview(message, video_url, access_token, owner_id):
         "from_group": 1
     }
     
-    # Пытаемся прикрепить видео
-    if video_url:
-        params["attachments"] = video_url
-    else:
-        log_auto("WARNING", "Видео не прикрепляется, публикуем только текст")
-    
     try:
         r = requests.get("https://api.vk.com/method/wall.post", params=params, timeout=30)
         data = r.json()
         
         if "response" in data:
-            log_auto("INFO", f"✅ Опубликовано в VK: {message[:50]}...")
+            log_auto("INFO", f"✅ Опубликовано в VK со ссылкой: {message[:50]}...")
             return True, None
         else:
             error_msg = data.get("error", {}).get("error_msg", "неизвестная ошибка")
-            # Если ошибка связана с видео, пробуем без attachments
-            if "link_photo_sizing_rule" in error_msg or "No photo given" in error_msg:
-                log_auto("WARNING", f"Ошибка с видео: {error_msg}. Пробуем без attachments.")
-                del params["attachments"]
-                try:
-                    r2 = requests.get("https://api.vk.com/method/wall.post", params=params, timeout=30)
-                    data2 = r2.json()
-                    if "response" in data2:
-                        log_auto("INFO", f"✅ Опубликовано без видео: {message[:50]}...")
-                        return True, None
-                    else:
-                        error_msg2 = data2.get("error", {}).get("error_msg", "неизвестная ошибка")
-                        log_auto("ERROR", f"Ошибка VK (без видео): {error_msg2}")
-                        return False, error_msg2
-                except Exception as e2:
-                    log_auto("ERROR", f"Исключение при повторной попытке: {e2}")
-                    return False, str(e2)
-            else:
-                log_auto("ERROR", f"Ошибка VK: {error_msg}")
-                return False, error_msg
+            log_auto("ERROR", f"Ошибка VK: {error_msg}")
+            return False, error_msg
     except Exception as e:
         log_auto("ERROR", f"Исключение VK: {e}")
         return False, str(e)
@@ -112,7 +87,7 @@ def post_to_vk_with_preview(message, video_url, access_token, owner_id):
 # ОСНОВНАЯ ФУНКЦИЯ
 # ==========================================
 def check_and_publish():
-    """Публикует случайное видео из плейлиста в VK с превью"""
+    """Публикует случайное видео из плейлиста в VK со ссылкой"""
     log_auto("INFO", "=" * 50)
     log_auto("INFO", "НАЧАЛО ПУБЛИКАЦИИ СЛУЧАЙНОГО ВИДЕО ИЗ ПЛЕЙЛИСТА")
     log_auto("INFO", "=" * 50)
@@ -138,7 +113,7 @@ def check_and_publish():
     vk_token = os.environ.get("VK_TOKEN")
     vk_owner_id = os.environ.get("VK_OWNER_ID")
     
-    success, error = post_to_vk_with_preview(post_text, video['url'], vk_token, vk_owner_id)
+    success, error = post_to_vk_with_link(post_text, video['url'], vk_token, vk_owner_id)
     
     if success:
         log_auto("INFO", "✅ Случайное видео из плейлиста успешно опубликовано в VK!")
