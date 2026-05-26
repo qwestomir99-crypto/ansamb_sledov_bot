@@ -3,6 +3,7 @@
 # Справка: README.md → Цитаты
 # Задача: публикация цитат по расписанию + случайный пост из VK
 # Комментарий: интервал цитат зависит от настроения пользователя (если задано)
+#              Исправлена ошибка слишком длинной подписи в Telegram (limit 1024)
 # Зависит от: config.json, activity_modes.py, user_settings.py, services.photo_reader
 # Вызывается из: bot.py
 # ==========================================
@@ -91,6 +92,12 @@ def set_quotes_interval_minutes(minutes):
 quote_thread_running = False
 quote_thread = None
 
+def truncate_caption(text, limit=1024):
+    """Обрезает текст до лимита Telegram (1024 символа)"""
+    if len(text) <= limit:
+        return text
+    return text[:limit-3] + "..."
+
 def send_quote_with_photo(bot, chat_id, quote):
     """Отправляет цитату с фото из VK (если есть)"""
     try:
@@ -98,16 +105,20 @@ def send_quote_with_photo(bot, chat_id, quote):
         
         post = get_random_post()
         if post and post.get('photo_url'):
-            caption = f"{post['text']}\n\n📜 {quote}\n\n{' '.join(post.get('tags', [])[:3])}"
+            # Собираем подпись
+            full_caption = f"{post['text']}\n\n📜 {quote}\n\n{' '.join(post.get('tags', [])[:3])}"
+            # Обрезаем до лимита Telegram
+            caption = truncate_caption(full_caption, 1024)
             bot.send_photo(chat_id, post['photo_url'], caption=caption, parse_mode='Markdown')
-            debug_log("QUOTES", "Цитата отправлена с фото")
+            debug_log("QUOTES", f"Цитата отправлена с фото (длина подписи: {len(caption)} симв.)")
             return True
         else:
             bot.send_message(chat_id, f"📜 *Цитата дня* • {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n{quote}\n\n#ЦитатаДня #СапёрыАутентичности", parse_mode='Markdown')
             debug_log("QUOTES", "Цитата отправлена без фото (пост не найден)")
             return False
     except Exception as e:
-        debug_log("QUOTES", f"Ошибка добавления фото: {e}", "ERROR")
+        debug_log("QUOTES", f"Ошибка отправки цитаты с фото: {e}", "ERROR")
+        # Если фото не отправилось — отправляем просто текст
         bot.send_message(chat_id, f"📜 *Цитата дня* • {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n{quote}\n\n#ЦитатаДня #СапёрыАутентичности", parse_mode='Markdown')
         return False
 
