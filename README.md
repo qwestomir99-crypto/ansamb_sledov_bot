@@ -26,9 +26,12 @@
 |--------|------|-------------|
 | **Бот** | `bot.py` | Telegram-бот (команды, админка, цитаты, агент) |
 | **Веб-морда** | `services/app.py` | Единый веб-интерфейс (сообщения, постинг, дебаггер, YouTube) |
-| **API** | `services/web_api.py` | API для управления режимами, настроением, цитатами |
-| **VK API** | `services/vk_api.py` | API для комментариев и ответов в VK |
-| **TG API** | `services/tg_api.py` | API для комментариев и ответов в Telegram |
+| **API** | `services/web_api.py` | API для управления режимами, настроением, цитатами, темами, аудитом |
+| **VK API** | `services/vk_api.py` | API для комментариев, ответов, лайков, репостов в VK |
+| **TG API** | `services/tg_api.py` | API для комментариев, ответов, постов, пинов в Telegram |
+| **YouTube прокси** | `services/youtube_api.py` | Поиск, стриминг, получение информации о видео |
+| **YouTube Reader** | `services/youtube_reader.py` | Чтение видео с канала через YouTube API (тесты, диагностика) |
+| **Темы** | `services/theme.py` | Определение темы веб-морды (macos/dark) по времени или выбору |
 | **Агент** | `dialogue/agent.py` | Лёгкий агент для Yandex GPT |
 | **Настройки агента** | `dialogue/agent_settings.py` | Температура, max_tokens |
 | **Дневник агента** | `dialogue/agent_journal.py` | Журнал диалогов (с автоочисткой) |
@@ -40,6 +43,8 @@
 | **Кнопки** | `dialogue/button_map.py` | Единая таблица всех кнопок |
 | **Режимы** | `dialogue/activity_modes.py` | Управляет режимами утро/день/вечер/ночь |
 | **Дебаггер** | `debug_utils.py` | Логирование, ротация, отчёты в Telegram и веб-морду |
+| **Аудит** | `debug_audit.py` | Проверка целостности кода, REDMI-шапок, библиотеки |
+| **Пинг** | `ping_utils.py` | Keep-alive пинг для Render (бот и агент) |
 | **GitHub Actions** | `.github/workflows/audit.yml` | Redmi-аудит (обновление README.md) |
 
 ---
@@ -62,12 +67,15 @@
 | Блок | Что делает |
 |------|------------|
 | **Создать** | Пост в Telegram или VK |
-| **Входящие сообщения** | Лента сообщений из VK + Telegram, ответы и комментарии |
-| **Управление ботом** | Смена режимов, пинг |
-| **Настроение** | Выбор стиля агента |
+| **Входящие сообщения** | Лента сообщений из VK + Telegram в реальном времени, ответы и комментарии |
+| **Управление ботом** | Смена режимов (утро/день/вечер/ночь), пинг |
+| **Настроение** | Выбор стиля агента (artist/admin/poet/engineer) |
 | **Цитаты** | Добавление, просмотр последних 10 |
 | **Пост в VK** | Прямая отправка текста |
 | **Дебаггер** | Просмотр логов, отправка отчёта в Telegram |
+| **YouTube прокси** | Поиск и стриминг видео без VPN и рекламы |
+| **Таймлайн** | Просмотр файла `library/timeline.md` |
+| **Темы** | Переключение между светлой (macos) и тёмной (dark) темами |
 
 **Доступ:** `https://ansamb-sledov-bot-94wz.onrender.com`  
 **Авторизация:** пароль `ADMIN_PASSWORD`
@@ -110,12 +118,14 @@
 | `ADMIN_PASSWORD` | Пароль для входа в админку |
 | `ADMIN_USER_ID` | Твой Telegram ID |
 | `VK_TOKEN` | Токен сообщества VK |
-| `VK_OWNER_ID` / `VK_GROUP_ID` | ID сообщества VK |
-| `WEB_THEME` | Тема веб-морды (`macos.css`) |
+| `VK_GROUP_ID` | ID сообщества VK |
+| `WEB_THEME` | Тема веб-морды по умолчанию (`macos.css` или `dark.css`) |
+| `FLASK_SECRET_KEY` | Секретный ключ для сессий |
 | `YC_API_KEY`, `YC_FOLDER_ID` | Ключи Yandex GPT |
 | `YOUTUBE_API_KEY` | API ключ YouTube |
-| `YOUTUBE_PLAYLIST_ID` | ID плейлиста для автопостинга |
+| `YOUTUBE_CHANNEL_ID` | ID канала YouTube (для YouTube Reader) |
 | `TG_API_ID`, `TG_API_HASH` | Для Telethon (большие видео) |
+| `PUBLISH_CHANNEL` | Канал для постов Telegram (по умолчанию @qwestomir) |
 
 ---
 
