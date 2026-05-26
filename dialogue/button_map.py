@@ -4,6 +4,7 @@
 # Задача: единая таблица всех кнопок (текст + callback)
 # Комментарий: замена "магических строк" в admin_commands.py и callbacks.py
 #              Добавлены кнопки "Настроение", "Начать диалог" (для всех), "Назад"
+#              Добавлена кнопка управления Алисой (Старший брат)
 # Зависит от: телеграм-бота (используется в клавиатурах)
 # Вызывается из: dialogue/admin_commands.py, dialogue/callbacks.py
 # ==========================================
@@ -58,6 +59,9 @@ BUTTONS = {
     "mood":           {"text": "🎭 Настроение",    "callback": "mood_menu"},
     "start_dialog":   {"text": "🗣 Диалог",        "callback": "start_dialog"},      # для гостей и админов
     "admin_login":    {"text": "🛡️ Админ-панель", "callback": "admin_login"},       # вход в админку из гостевого меню
+    
+    # Кнопка управления Алисой
+    "toggle_alice":   {"text": "Старший брат ✅/❌", "callback": "toggle_alice"},
 }
 
 # ==========================================
@@ -100,6 +104,9 @@ def get_admin_menu_keyboard():
     keyboard.add(
         InlineKeyboardButton(get_text("mood"), callback_data=get_callback("mood")),
         InlineKeyboardButton(get_text("start_dialog"), callback_data=get_callback("start_dialog")),
+    )
+    keyboard.add(
+        InlineKeyboardButton(get_text("toggle_alice"), callback_data=get_callback("toggle_alice")),
     )
     return keyboard
 
