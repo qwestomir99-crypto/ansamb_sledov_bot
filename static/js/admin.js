@@ -1,7 +1,7 @@
 // ==========================================
 // Файл: static/js/admin.js
 // Справка: README.md → Веб-морда / Клиентская логика
-// Задача: управление веб-мордой (сообщения, ответы, комментарии, режимы, настроение)
+// Задача: управление веб-мордой (сообщения, ответы, комментарии, режимы, настроение, аудит)
 // Комментарий: работает с API из services/app.py
 // Зависит от: socket.io
 // Вызывается из: templates/admin.html
@@ -24,7 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setInterval(() => {
         fetchState();
         fetchMood();
-    }, 60000); // обновляем каждую минуту
+    }, 60000);
 });
 
 // ==========================================
@@ -49,9 +49,6 @@ function connectSocket() {
     socket.on('disconnect', () => console.log('Socket disconnected'));
 }
 
-// ==========================================
-// ОТОБРАЖЕНИЕ СООБЩЕНИЯ
-// ==========================================
 function appendMessage(msg) {
     const container = document.getElementById('messages');
     if (!container) return;
@@ -340,7 +337,7 @@ async function sendPost() {
 }
 
 // ==========================================
-// ДЕБАГГЕР
+// ДЕБАГГЕР (логи, аудит, индекс)
 // ==========================================
 async function fetchDebugLogs() {
     const container = document.getElementById('debug-report');
@@ -387,6 +384,69 @@ async function sendDebugReport() {
 }
 
 // ==========================================
+// АУДИТ И ИНДЕКС
+// ==========================================
+async function runAudit() {
+    const container = document.getElementById('audit-result');
+    container.innerHTML = '<div style="color: var(--accent);">⏳ Запуск аудита...</div>';
+    try {
+        const response = await fetch('/api/audit/run', { method: 'POST' });
+        const data = await response.json();
+        if (data.status === 'ok') {
+            let html = '<details><summary>✅ Аудит выполнен</summary><pre>';
+            html += JSON.stringify(data.results, null, 2);
+            html += '</pre></details>';
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = `<div style="color: #f00;">❌ Ошибка: ${data.message}</div>`;
+        }
+    } catch(e) {
+        container.innerHTML = '<div style="color: #f00;">❌ Ошибка запуска аудита</div>';
+    }
+}
+
+async function showAuditStatus() {
+    const container = document.getElementById('audit-result');
+    container.innerHTML = '<div style="color: var(--accent);">⏳ Загрузка...</div>';
+    try {
+        const response = await fetch('/api/audit/status');
+        const data = await response.json();
+        if (data.audit_exists) {
+            let html = '<details><summary>📊 Статус аудита</summary>';
+            html += `<p>Последний аудит: ${data.last_audit || 'никогда'}</p>`;
+            if (data.results) {
+                html += '<pre>' + JSON.stringify(data.results, null, 2) + '</pre>';
+            }
+            html += '</details>';
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = '<div style="color: var(--text-secondary);">Аудит ещё не запускался</div>';
+        }
+    } catch(e) {
+        container.innerHTML = '<div style="color: #f00;">❌ Ошибка загрузки статуса</div>';
+    }
+}
+
+async function showDebugIndex() {
+    const container = document.getElementById('index-result');
+    container.innerHTML = '<div style="color: var(--accent);">⏳ Загрузка...</div>';
+    try {
+        const response = await fetch('/api/audit/index');
+        const data = await response.json();
+        if (data.status === 'ok') {
+            let html = '<details><summary>🗂️ Индекс (база знаний)</summary>';
+            html += '<pre>' + JSON.stringify(data.index, null, 2) + '</pre>';
+            html += '</details>';
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = `<div style="color: #f00;">❌ Ошибка: ${data.message}</div>`;
+        }
+    } catch(e) {
+        container.innerHTML = '<div style="color: #f00;">❌ Ошибка загрузки индекса</div>';
+    }
+}
+
+// ==========================================
 // ВСПОМОГАТЕЛЬНЫЕ
 // ==========================================
 function escapeHtml(text) {
@@ -394,4 +454,4 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
-}
+        }
