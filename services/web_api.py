@@ -3,7 +3,7 @@
 # Справка: README.md → Веб-морда / API
 # Задача: API для управления ботом, режимами, цитатами, настроением, аудитом, темами
 # Комментарий: используется веб-мордой для панели управления
-# Зависит от: flask, debug_utils, ping_utils, debug_audit, theme
+# Зависит от: flask, debug_utils, ping_utils, debug_audit, theme, tg_api, vk_api
 # Вызывается из: services/app.py (blueprint)
 # ==========================================
 
@@ -150,9 +150,10 @@ def api_toggle_ping():
         new_state = toggle_ping()
         log_web("INFO", f"Пинг {'включён' if new_state else 'выключён'}")
         return jsonify({"status": "ok", "message": f"Пинг {'включён' if new_state else 'выключён'}"})
+    except ImportError:
+        return jsonify({"status": "error", "message": "ping_utils.py не найден"}), 500
     except Exception as e:
-        log_web("ERROR", f"Ошибка переключения пинга: {e}")
-        return jsonify({"status": "error", "error": str(e)}), 500
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @web_api.route('/add_quote', methods=['POST'])
 @login_required
@@ -179,35 +180,23 @@ def api_create_post():
         return jsonify({"status": "error", "error": "Пустой текст"}), 400
     
     if platform == 'telegram':
-        bot_token = os.environ.get("BOT_TOKEN")
-        publish_channel = os.environ.get("PUBLISH_CHANNEL", "@qwestomir")
-        if not bot_token:
-            return jsonify({"status": "error", "error": "Telegram бот не настроен"}), 500
         try:
-            import telebot
-            tg_bot = telebot.TeleBot(bot_token)
-            tg_bot.send_message(publish_channel, text, parse_mode='Markdown')
-            log_web("INFO", f"Пост в Telegram отправлен")
-            return jsonify({"status": "ok", "message": "Пост отправлен в Telegram"})
+            from services.tg_api import send_telegram_message
+            success = send_telegram_message(text)
+            if success:
+                return jsonify({"status": "ok", "message": "Пост отправлен в Telegram"})
+            return jsonify({"status": "error", "message": "Ошибка отправки в Telegram"}), 500
         except Exception as e:
-            log_web("ERROR", f"Ошибка отправки в Telegram: {e}")
-            return jsonify({"status": "error", "error": str(e)}), 500
+            return jsonify({"status": "error", "message": str(e)}), 500
     elif platform == 'vk':
-        vk_token = os.environ.get("VK_TOKEN")
-        vk_group_id = os.environ.get("VK_GROUP_ID")
-        if not vk_token or not vk_group_id:
-            return jsonify({"status": "error", "error": "VK не настроен"}), 500
         try:
-            import vk_api
-            vk_session = vk_api.VkApi(token=vk_token)
-            vk = vk_session.get_api()
-            post = vk.wall.post(owner_id=-int(vk_group_id), message=text, from_group=1)
-            post_url = f"https://vk.com/wall-{abs(int(vk_group_id))}_{post['post_id']}"
-            log_web("INFO", f"Пост в VK отправлен: {post_url}")
-            return jsonify({"status": "ok", "message": "Пост отправлен в VK", "url": post_url})
+            from services.vk_api import send_vk_post
+            success = send_vk_post(text)
+            if success:
+                return jsonify({"status": "ok", "message": "Пост отправлен в VK"})
+            return jsonify({"status": "error", "message": "Ошибка отправки в VK"}), 500
         except Exception as e:
-            log_web("ERROR", f"Ошибка отправки в VK: {e}")
-            return jsonify({"status": "error", "error": str(e)}), 500
+            return jsonify({"status": "error", "message": str(e)}), 500
     else:
         return jsonify({"status": "error", "error": "Invalid platform"}), 400
 
@@ -259,7 +248,7 @@ def api_audit_index():
     """Возвращает содержимое debug_index.json"""
     index_file = "debug_index.json"
     if not os.path.exists(index_file):
-        return jsonify({"status": "error", "message": "Индекс не найден"}), 404
+        return jsonify({"status": "ok", "index": {}})
     try:
         with open(index_file, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -275,6 +264,6 @@ def api_audit_log_stats():
         from debug_audit import analyze_logs
         return jsonify(analyze_logs())
     except ImportError:
-        return jsonify({"status": "error", "message": "debug_audit.py не найден"}), 500
+        return jsonify({"status": "ok", "stats": {}})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
