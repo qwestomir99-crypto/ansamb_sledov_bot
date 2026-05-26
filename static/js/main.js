@@ -92,7 +92,7 @@ function renderMessages(messages) {
 }
 
 // ==========================================
-# ОТВЕТЫ И КОММЕНТАРИИ
+// ОТВЕТЫ И КОММЕНТАРИИ
 // ==========================================
 let currentReplyChatId = null;
 let currentReplySource = null;
@@ -175,7 +175,7 @@ async function sendComment() {
 }
 
 // ==========================================
-# СОЗДАТЬ ПОСТ
+// СОЗДАТЬ ПОСТ
 // ==========================================
 function createPost(platform) {
     const text = prompt(`Введите текст поста для ${platform === 'telegram' ? 'Telegram' : 'VK'}:`);
@@ -198,7 +198,7 @@ function createPost(platform) {
 }
 
 // ==========================================
-# УПРАВЛЕНИЕ БОТОМ (РЕЖИМЫ)
+// УПРАВЛЕНИЕ БОТОМ (РЕЖИМЫ)
 // ==========================================
 async function setMode(mode) {
     try {
@@ -233,7 +233,27 @@ async function togglePing() {
 }
 
 // ==========================================
-# НАСТРОЕНИЕ АГЕНТА
+// УПРАВЛЕНИЕ АЛИСОЙ
+// ==========================================
+async function toggleAlice() {
+    try {
+        const resp = await fetch('/api/toggle_alice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await resp.json();
+        if (data.status === 'ok') {
+            alert(`Алиса ${data.enabled ? 'включена ✅' : 'выключена ❌'}`);
+        } else {
+            alert('Ошибка: ' + (data.error || 'неизвестная ошибка'));
+        }
+    } catch(e) {
+        alert('Ошибка: ' + e.message);
+    }
+}
+
+// ==========================================
+// НАСТРОЕНИЕ АГЕНТА
 // ==========================================
 async function setMood(mood) {
     try {
@@ -254,7 +274,7 @@ async function setMood(mood) {
 }
 
 // ==========================================
-# ЦИТАТЫ
+// ЦИТАТЫ
 // ==========================================
 async function addQuote() {
     const text = document.getElementById('new-quote').value.trim();
@@ -288,7 +308,7 @@ async function addQuote() {
 }
 
 // ==========================================
-# ПОСТ В VK
+// ПОСТ В VK
 // ==========================================
 async function sendPost() {
     const text = document.getElementById('post-text').value.trim();
@@ -316,7 +336,7 @@ async function sendPost() {
 }
 
 // ==========================================
-# ДЕБАГГЕР
+// ДЕБАГГЕР
 // ==========================================
 async function fetchDebugLogs() {
     const reportDiv = document.getElementById('debug-report');
@@ -400,7 +420,7 @@ async function showDebugIndex() {
 }
 
 // ==========================================
-# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 // ==========================================
 function escapeHtml(text) {
     if (!text) return '';
