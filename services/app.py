@@ -3,6 +3,7 @@
 # Справка: README.md → Веб-морда
 # Задача: единый веб-интерфейс (маршруты + WebSocket + YouTube)
 # Комментарий: всё API вынесено в web_api.py, vk_api.py, tg_api.py
+#              Добавлены API для аудита и индекса дебаггера
 # Зависит от: flask, flask-socketio, yt-dlp
 # Вызывается из: Render (web service, start command: gunicorn app:app)
 # ==========================================
@@ -380,6 +381,58 @@ def api_debug_log():
     message = data.get('message', '')
     debug_log(module, message, level)
     return jsonify({"status": "ok"})
+
+# ==========================================
+# АУДИТ И ИНДЕКС (НОВЫЕ API)
+# ==========================================
+@app.route('/api/audit/run', methods=['POST'])
+@login_required
+def api_audit_run():
+    """Запускает аудит (проверка REDMI-шапок, библиотеки, импортов)"""
+    try:
+        from debug_audit import run_audit
+        result = run_audit()
+        if result:
+            return jsonify({"status": "ok", "message": "Аудит выполнен", "results": result})
+        else:
+            return jsonify({"status": "error", "message": "Ошибка выполнения аудита"}), 500
+    except ImportError:
+        return jsonify({"status": "error", "message": "debug_audit.py не найден"}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/audit/status', methods=['GET'])
+@login_required
+def api_audit_status():
+    """Возвращает статус последнего аудита"""
+    from debug_utils import get_audit_status
+    return jsonify(get_audit_status())
+
+@app.route('/api/audit/index', methods=['GET'])
+@login_required
+def api_audit_index():
+    """Возвращает содержимое debug_index.json (база знаний)"""
+    index_file = "debug_index.json"
+    if not os.path.exists(index_file):
+        return jsonify({"status": "error", "message": "Индекс не найден"}), 404
+    try:
+        with open(index_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return jsonify({"status": "ok", "index": data})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/audit/logs/stats', methods=['GET'])
+@login_required
+def api_audit_log_stats():
+    """Возвращает статистику по логам (количество ошибок по модулям)"""
+    try:
+        from debug_audit import analyze_logs
+        return jsonify(analyze_logs())
+    except ImportError:
+        return jsonify({"status": "error", "message": "debug_audit.py не найден"}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # ==========================================
 # ЗАПУСК
