@@ -1,10 +1,12 @@
 # ==========================================
 # Файл: dialogue/agent.py
 # Справка: README.md → Агент / #говори
-# Задача: лёгкий агент для Yandex GPT с эволюцией и памятью
-# Комментарий: всё тяжёлое — во внешних модулях (journal, settings, memory, rules)
-#              Добавлен механизм «осадка» для самообучения
-# Зависит от: requests, os, json, debug_utils
+# Задача: лёгкий агент для Yandex GPT с персонажами и библиотекой
+# Комментарий: весь контент — в library/, правила — в evolve_agent.py,
+#              память — в agent_memory.py, журнал — в agent_journal.py,
+#              настройки — в agent_settings.py.
+#              agent.py — тонкий слой между запросом и библиотекой.
+# Зависит от: requests, os, json, debug_utils, library/, evolve_agent, memory, journal, settings
 # Вызывается из: bot.py (ask_agent), admin_commands.py (process_dialog_message)
 # ==========================================
 
@@ -15,6 +17,28 @@ from datetime import datetime
 from debug_utils import debug_log
 
 # ==========================================
+# ВНЕШНИЕ МОДУЛИ
+# ==========================================
+try:
+    from dialogue.agent_settings import get_agent_settings
+    from dialogue.agent_journal import log as log_to_journal
+    from dialogue.agent_memory import remember_phrase, remember_dialogue, get_memory_stats
+    from evolve_agent import add_sediment, apply_rules
+    from dialogue.user_settings import get_user_mood, get_mood_prompt
+except ImportError as e:
+    debug_log("AGENT", f"Не удалось импортировать внешние модули: {e}", "ERROR")
+    # Заглушки, чтобы не падало при отсутствии модулей
+    def get_agent_settings(): return {}
+    def log_to_journal(*args): pass
+    def remember_phrase(*args): return False
+    def remember_dialogue(*args): return False
+    def get_memory_stats(): return {}
+    def add_sediment(*args): return False
+    def apply_rules(*args): return ""
+    def get_user_mood(*args): return "artist"
+    def get_mood_prompt(*args): return ""
+
+# ==========================================
 # КОНСТАНТЫ
 # ==========================================
 YANDEX_GPT_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
@@ -22,107 +46,82 @@ YC_API_KEY = os.environ.get("YC_API_KEY")
 YC_FOLDER_ID = os.environ.get("YC_FOLDER_ID")
 
 CONTEXT_FILE = "library/context.txt"
-RULES_FILE = "agent_data/rules.json"
+LIBRARY_INDEX = "library/schema.json"
+CHARACTERS_FILE = "library/characters.md"
 
 # ==========================================
-# ЗАГРУЗКА ПРАВИЛ (для применения)
+# ЗАГРУЗКА ПЕРСОНАЖЕЙ (из library/)
 # ==========================================
-def load_rules():
-    """Загружает правила эволюции из rules.json"""
-    if not os.path.exists(RULES_FILE):
-        return []
+def load_characters():
+    """Загружает персонажей из schema.json (машиночитаемый индекс)"""
+    if not os.path.exists(LIBRARY_INDEX):
+        debug_log("AGENT", "schema.json не найден, персонажи не загружены", "WARNING")
+        return {}
     try:
-        with open(RULES_FILE, "r", encoding="utf-8") as f:
+        with open(LIBRARY_INDEX, "r", encoding="utf-8") as f:
             data = json.load(f)
-            return data.get("rules", [])
+            return data.get("characters", {})
     except Exception as e:
-        debug_log("AGENT", f"Ошибка загрузки правил: {e}", "WARNING")
-        return []
+        debug_log("AGENT", f"Ошибка загрузки персонажей: {e}", "ERROR")
+        return {}
 
-def apply_rules(prompt, answer):
-    """Применяет правила к ответу (модифицирует стиль, темп и т.д.)"""
-    rules = load_rules()
-    modified = answer
-    for rule in rules:
-        if not rule.get("enabled", True):
-            continue
-        condition = rule.get("condition", "")
-        action = rule.get("action", "")
-        
-        # Простая проверка условия (можно расширить)
-        if any(word in prompt.lower() for word in condition.lower().split()):
-            debug_log("AGENT", f"Применено правило: {rule.get('id')} | {action[:50]}", "INFO")
-            # Применяем действие (пока заглушка, можно расширить)
-            if "ритм" in action.lower() or "темп" in action.lower():
-                modified = modified + " [ритм 0,8 Гц]"
-            elif "метафор" in action.lower():
-                modified = "🌱 " + modified
-    return modified
+def detect_character(prompt):
+    """Определяет персонажа по триггерам из schema.json"""
+    characters = load_characters()
+    if not characters:
+        return None
+    
+    best_match = None
+    max_hits = 0
+    
+    for char_id, char_data in characters.items():
+        triggers = char_data.get("triggers", [])
+        hits = sum(1 for t in triggers if t.lower() in prompt.lower())
+        if hits > max_hits:
+            max_hits = hits
+            best_match = char_id
+    
+    if max_hits == 0:
+        return None
+    
+    return characters.get(best_match, {})
 
 # ==========================================
-# ЗАГРУЗКА НАСТРОЕК
+# ЗАГРУЗКА КОНТЕКСТА
 # ==========================================
-def _get_settings():
-    from dialogue.agent_settings import get_agent_settings
-    return get_agent_settings()
-
-def _log_to_journal(text):
-    from dialogue.agent_journal import log
-    log(text)
-
-def _remember_phrase(phrase):
-    """Сохраняет важную фразу в память агента"""
-    try:
-        from dialogue.agent_memory import remember_phrase as remember
-        return remember(phrase)
-    except ImportError:
-        return False
-
-def _remember_dialogue(prompt, answer, user_id):
-    """Сохраняет важный диалог в память агента"""
-    try:
-        from dialogue.agent_memory import remember_dialogue as remember_d
-        return remember_d(prompt, answer, user_id)
-    except ImportError:
-        return False
-
-def _add_sediment(prompt, answer, user_id):
-    """Добавляет осадок от диалога для эволюции"""
-    try:
-        from evolve_agent import add_sediment
-        return add_sediment(prompt, answer, user_id)
-    except ImportError:
-        debug_log("AGENT", "evolve_agent не загружен, осадок не сохранён", "WARNING")
-        return False
-
-def _load_context():
+def load_context():
     try:
         with open(CONTEXT_FILE, "r", encoding="utf-8") as f:
             return f.read().strip()
     except:
         return None
 
-def _get_mood_prompt(user_id):
-    from dialogue.user_settings import get_user_mood, get_mood_prompt
-    mood = get_user_mood(user_id) if user_id else "artist"
-    return get_mood_prompt(mood)
-
 # ==========================================
 # ОСНОВНАЯ ФУНКЦИЯ
 # ==========================================
 def ask_agent(prompt, user_id=None):
-    """Основной метод агента — запрос к Yandex GPT с эволюцией"""
+    """Основной метод агента — запрос к Yandex GPT с персонажами и библиотекой"""
     if not YC_API_KEY or not YC_FOLDER_ID:
         return "⚙️ Агент не настроен. Проверь переменные окружения."
 
-    settings = _get_settings()
-    context = _load_context()
-    mood_prompt = _get_mood_prompt(user_id)
+    settings = get_agent_settings()
+    context = load_context()
+    
+    # Определяем персонажа по контексту
+    char = detect_character(prompt)
+    char_name = char.get("name", "Агент") if char else "Агент"
+    char_prompt = f"Ты — {char_name}. " + char.get("prompt", "") if char else ""
+    
+    # Загружаем настроение пользователя
+    mood_prompt = get_mood_prompt(get_user_mood(user_id))
 
     messages = []
     if context:
         messages.append({"role": "system", "text": context})
-    messages.append({"role": "system", "text": mood_prompt})
+    if char_prompt:
+        messages.append({"role": "system", "text": char_prompt})
+    if mood_prompt:
+        messages.append({"role": "system", "text": mood_prompt})
     messages.append({"role": "user", "text": prompt})
 
     payload = {
@@ -136,7 +135,7 @@ def ask_agent(prompt, user_id=None):
     }
 
     try:
-        debug_log("AGENT", f"Запрос от user {user_id}: {prompt[:80]}...")
+        debug_log("AGENT", f"Запрос от user {user_id} (персонаж: {char_name}): {prompt[:80]}...")
         r = requests.post(YANDEX_GPT_URL, headers={
             "Authorization": f"Api-Key {YC_API_KEY}",
             "Content-Type": "application/json"
@@ -144,42 +143,44 @@ def ask_agent(prompt, user_id=None):
         r.raise_for_status()
         answer = r.json()['result']['alternatives'][0]['message']['text']
         
-        # Применяем правила эволюции
+        # Применяем правила эволюции (из evolve_agent.py)
         answer = apply_rules(prompt, answer)
         
         # Логируем в дневник
-        _log_to_journal(f"User {user_id} | Q: {prompt[:80]} | A: {answer[:80]}")
+        log_to_journal(f"User {user_id} | {char_name} | Q: {prompt[:80]} | A: {answer[:80]}")
         
         # Сохраняем осадок для эволюции
-        _add_sediment(prompt, answer, user_id)
+        add_sediment(prompt, answer, user_id)
         
         # Запоминаем важные фразы и диалоги (опционально)
         if len(prompt) > 20 and len(answer) > 20:
-            _remember_dialogue(prompt, answer, user_id)
+            remember_dialogue(prompt, answer, user_id)
         
         return answer.strip()
     except Exception as e:
         debug_log("AGENT", f"Ошибка: {e}", "ERROR")
-        _log_to_journal(f"Ошибка: {e}")
+        log_to_journal(f"Ошибка: {e}")
         return "🌙 Сеть шумит. Повтори позже."
 
 def get_agent_status():
     """Возвращает статус агента для админки"""
-    from dialogue.agent_settings import get_agent_settings
-    from dialogue.agent_journal import get_journal_lines
+    settings = get_agent_settings()
+    journal_lines = 0
     try:
-        from dialogue.agent_memory import get_memory_stats
-        memory_stats = get_memory_stats()
+        from dialogue.agent_journal import get_journal_lines
+        journal_lines = get_journal_lines()
     except ImportError:
-        memory_stats = {"phrases_count": 0, "dialogues_count": 0}
+        pass
     
-    s = get_agent_settings()
+    memory_stats = get_memory_stats()
+    
     return {
-        "temperature": s.get("temperature", 0.7),
-        "max_tokens": s.get("max_tokens", 500),
-        "journal_lines": get_journal_lines(),
+        "temperature": settings.get("temperature", 0.7),
+        "max_tokens": settings.get("max_tokens", 500),
+        "journal_lines": journal_lines,
         "memory_phrases": memory_stats.get("phrases_count", 0),
-        "memory_dialogues": memory_stats.get("dialogues_count", 0)
+        "memory_dialogues": memory_stats.get("dialogues_count", 0),
+        "character": "auto-detected"
     }
 
 # ==========================================
