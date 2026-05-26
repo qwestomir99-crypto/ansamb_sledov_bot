@@ -218,6 +218,27 @@ def api_set_theme():
     return jsonify({"status": "ok", "theme": theme})
 
 # ==========================================
+# УПРАВЛЕНИЕ АЛИСОЙ (через веб-морду)
+# ==========================================
+@web_api.route('/toggle_alice', methods=['POST'])
+@login_required
+def api_toggle_alice():
+    """Включает/выключает Алису через config.json"""
+    try:
+        from Alice.alice_admin import load_config, save_config
+        config = load_config()
+        if "alice" not in config:
+            config["alice"] = {}
+        config["alice"]["enabled"] = not config.get("alice", {}).get("enabled", False)
+        save_config(config)
+        new_status = "включена ✅" if config["alice"]["enabled"] else "выключена ❌"
+        log_web("INFO", f"Алиса {new_status} (через веб-морду)")
+        return jsonify({"status": "ok", "enabled": config["alice"]["enabled"]})
+    except Exception as e:
+        log_web("ERROR", f"Ошибка переключения Алисы: {e}")
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+# ==========================================
 # АУДИТ И ИНДЕКС
 # ==========================================
 @web_api.route('/audit/run', methods=['POST'])
