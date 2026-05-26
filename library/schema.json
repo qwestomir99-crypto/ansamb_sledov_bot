@@ -1,0 +1,155 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-05-26",
+  "characters": {
+    "engineer": {
+      "name": "Инженер",
+      "triggers": [
+        "станок",
+        "чпу",
+        "g-код",
+        "фрезеровка",
+        "глубина",
+        "скорость",
+        "подача",
+        "траектория",
+        "ошибка",
+        "баг",
+        "фикс",
+        "аудит"
+      ],
+      "library_files": [
+        "protocol_da.md",
+        "spiral.md",
+        "glossary.md",
+        "oath.md"
+      ],
+      "priority": 4
+    },
+    "artist": {
+      "name": "Художник",
+      "triggers": [
+        "фото",
+        "картина",
+        "композиция",
+        "свет",
+        "цвет",
+        "кадрирование",
+        "фильтр",
+        "закат",
+        "пейзаж",
+        "портрет",
+        "тень"
+      ],
+      "library_files": [
+        "rituals.md",
+        "manifest.md",
+        "dualism.md",
+        "smelting.md"
+      ],
+      "priority": 3
+    },
+    "sema": {
+      "name": "Сёма",
+      "triggers": [
+        "текст",
+        "подпись",
+        "хештеги",
+        "публикация",
+        "инстаграм",
+        "пост",
+        "юмор",
+        "мем",
+        "одесса",
+        "кофе"
+      ],
+      "library_files": [
+        "glossary.md",
+        "rituals.md",
+        "links.md"
+      ],
+      "priority": 3
+    },
+    "kraken": {
+      "name": "Кракен",
+      "triggers": [
+        "стих",
+        "песня",
+        "suno",
+        "ритм",
+        "бас",
+        "рифма",
+        "глубина",
+        "волна",
+        "тление"
+      ],
+      "library_files": [
+        "timeline.md",
+        "links.md",
+        "spiral.md"
+      ],
+      "priority": 3
+    },
+    "librarian": {
+      "name": "Библиотекарь",
+      "triggers": [
+        "библиотека",
+        "индекс",
+        "справка",
+        "файл",
+        "раздел",
+        "навигация",
+        "что есть",
+        "где найти"
+      ],
+      "library_files": [
+        "index.md",
+        "archivist.md",
+        "characters.md"
+      ],
+      "priority": 5
+    },
+    "archivist": {
+      "name": "Архивариус",
+      "triggers": [
+        "обновление",
+        "добавление",
+        "изменение",
+        "заметка",
+        "метаданные",
+        "версия",
+        "архив",
+        "история"
+      ],
+      "library_files": [
+        "archivist.md",
+        "index.md",
+        "characters.md"
+      ],
+      "priority": 2
+    }
+  },
+  "library_structure": {
+    "manifest.md": "философия, заповеди",
+    "glossary.md": "термины, словарь",
+    "rituals.md": "ритуалы, баги, фичи",
+    "timeline.md": "история, таймлайн",
+    "links.md": "ссылки, треки, картины, код",
+    "context.txt": "системный промпт агента",
+    "protocol_da.md": "протокол, сотворчество",
+    "spiral.md": "развитие, рекурсия, спираль",
+    "official.md": "легальность, вид на жительство",
+    "dualism.md": "двойственная оптика",
+    "oath.md": "клятва сапёра",
+    "bridge.md": "мост между мирами",
+    "smelting.md": "состояние тления, 0.8 Гц",
+    "index.md": "индекс библиотеки",
+    "archivist.md": "заметки архивариуса",
+    "characters.md": "персонажи, триггеры, доступ"
+  },
+  "rules": {
+    "max_active_characters": 2,
+    "priority_based": true,
+    "librarian_always_available": true
+  }
+}
