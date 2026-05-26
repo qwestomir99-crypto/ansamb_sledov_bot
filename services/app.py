@@ -1,15 +1,16 @@
 # ==========================================
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
-# Задача: единый веб-интерфейс (маршруты + WebSocket + YouTube)
+# Задача: маршруты страниц, YouTube-прокси, WebSocket
 # Комментарий: всё API вынесено в web_api.py, vk_api.py, tg_api.py
-#              Добавлены API для аудита и индекса дебаггера
-# Зависит от: flask, flask-socketio, yt-dlp
+#              Тема определяется через services.theme
+# Зависит от: flask, flask-socketio, yt-dlp, pytz
 # Вызывается из: Render (web service, start command: gunicorn app:app)
 # ==========================================
 
 import os
 import datetime
+import pytz
 from threading import Thread
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, Response, send_from_directory
 from flask_socketio import SocketIO, emit
@@ -27,8 +28,14 @@ if not ADMIN_PASSWORD:
 
 SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "secret_traces_key_6")
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-THEME_CSS = os.environ.get("WEB_THEME", "macos.css")
 ADMIN_USER_ID = int(os.environ.get("ADMIN_USER_ID", 0))
+
+# ==========================================
+# ОПРЕДЕЛЕНИЕ ТЕМЫ (через модуль theme.py)
+# ==========================================
+from services.theme import get_current_theme
+
+THEME_CSS = os.environ.get("WEB_THEME") or get_current_theme()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = SECRET_KEY
@@ -123,36 +130,6 @@ def get_youtube_info(url):
 def youtube_page():
     log_web("INFO", "Страница YouTube загружена")
     return render_template('youtube.html', theme=THEME_CSS)
-
-@app.route('/youtube_search', methods=['GET'])
-@login_required
-def youtube_search():
-    query = request.args.get('q', '').strip()
-    if not query:
-        return jsonify({'error': 'Empty query'}), 400
-    invidious_api = "https://yewtu.be/api/v1/search"
-    try:
-        resp = requests.get(invidious_api, params={
-            'q': query,
-            'type': 'video',
-            'sort': 'relevance',
-            'fields': 'videoId,title,author,viewCount,lengthSeconds,publishedText'
-        }, timeout=10)
-        data = resp.json()
-        videos = []
-        for item in data.get('items', []):
-            videos.append({
-                'video_url': f"https://youtube.com/watch?v={item.get('videoId')}",
-                'title': item.get('title', 'Без названия'),
-                'author': item.get('author', 'Неизвестный канал'),
-                'views_short': item.get('viewCount', '0'),
-                'duration': item.get('lengthSeconds', 0)
-            })
-        log_web("INFO", f"YouTube поиск: {query} -> {len(videos)} видео")
-        return jsonify(videos[:20])
-    except Exception as e:
-        log_web("ERROR", f"YouTube поиск ошибка: {e}")
-        return jsonify({'error': str(e)}), 500
 
 @app.route('/youtube_info', methods=['POST'])
 @login_required
@@ -346,93 +323,6 @@ def send_reply():
             return jsonify({"status": "error", "error": str(e)}), 500
     else:
         return jsonify({"status": "error", "error": "Unknown source"}), 400
-
-# ==========================================
-# ДЕБАГГЕР API
-# ==========================================
-@app.route('/api/debug/logs', methods=['GET'])
-@login_required
-def api_debug_logs():
-    limit = request.args.get('limit', 100, type=int)
-    logs = get_logs_as_dict(limit)
-    log_web("INFO", f"Запрошены логи (limit={limit})")
-    return jsonify({"logs": logs, "count": len(logs)})
-
-@app.route('/api/debug/send', methods=['POST'])
-@login_required
-def api_debug_send():
-    try:
-        if bot and ADMIN_USER_ID:
-            send_debug_report(bot, ADMIN_USER_ID, 100)
-            log_web("INFO", "Отчёт с логами отправлен в Telegram")
-            return jsonify({"status": "ok", "message": "Отчёт отправлен"})
-        else:
-            return jsonify({"status": "error", "message": "Бот не настроен"})
-    except Exception as e:
-        log_web("ERROR", f"Ошибка отправки отчёта: {e}")
-        return jsonify({"status": "error", "message": str(e)})
-
-@app.route('/api/debug/log', methods=['POST'])
-@login_required
-def api_debug_log():
-    data = request.json
-    level = data.get('level', 'INFO')
-    module = data.get('module', 'FRONTEND')
-    message = data.get('message', '')
-    debug_log(module, message, level)
-    return jsonify({"status": "ok"})
-
-# ==========================================
-# АУДИТ И ИНДЕКС (НОВЫЕ API)
-# ==========================================
-@app.route('/api/audit/run', methods=['POST'])
-@login_required
-def api_audit_run():
-    """Запускает аудит (проверка REDMI-шапок, библиотеки, импортов)"""
-    try:
-        from debug_audit import run_audit
-        result = run_audit()
-        if result:
-            return jsonify({"status": "ok", "message": "Аудит выполнен", "results": result})
-        else:
-            return jsonify({"status": "error", "message": "Ошибка выполнения аудита"}), 500
-    except ImportError:
-        return jsonify({"status": "error", "message": "debug_audit.py не найден"}), 500
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/api/audit/status', methods=['GET'])
-@login_required
-def api_audit_status():
-    """Возвращает статус последнего аудита"""
-    from debug_utils import get_audit_status
-    return jsonify(get_audit_status())
-
-@app.route('/api/audit/index', methods=['GET'])
-@login_required
-def api_audit_index():
-    """Возвращает содержимое debug_index.json (база знаний)"""
-    index_file = "debug_index.json"
-    if not os.path.exists(index_file):
-        return jsonify({"status": "error", "message": "Индекс не найден"}), 404
-    try:
-        with open(index_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return jsonify({"status": "ok", "index": data})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/api/audit/logs/stats', methods=['GET'])
-@login_required
-def api_audit_log_stats():
-    """Возвращает статистику по логам (количество ошибок по модулям)"""
-    try:
-        from debug_audit import analyze_logs
-        return jsonify(analyze_logs())
-    except ImportError:
-        return jsonify({"status": "error", "message": "debug_audit.py не найден"}), 500
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
 
 # ==========================================
 # ЗАПУСК
