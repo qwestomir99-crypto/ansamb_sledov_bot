@@ -2,8 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, маршруты страниц, WebSocket, подключение blueprint'ов
-# Комментарий: вся логика вынесена во внешние модули: web_api.py, tg_api.py,
-#              vk_api.py, youtube_api.py, debug_utils.py, theme.py
+# Комментарий: вся логика вынесена во внешние модули
 # Зависит от: flask, flask-socketio, debug_utils, theme
 # Вызывается из: Render (web service, start command: gunicorn app:app)
 # ==========================================
@@ -13,7 +12,7 @@ import datetime
 import threading
 import time
 from functools import wraps
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory, Response
 from flask_socketio import SocketIO, emit
 
 # ==========================================
@@ -21,7 +20,7 @@ from flask_socketio import SocketIO, emit
 # ==========================================
 from debug_utils import debug_log
 from services.theme import get_current_theme
-from services.youtube_api import get_youtube_info, stream_video, search_youtube
+from services.youtube_api import get_youtube_info, youtube_search, youtube_stream_generator
 from services.web_api import web_api
 from services.tg_api import tg_api_bp
 from services.vk_api import vk_api_bp
@@ -34,8 +33,6 @@ if not ADMIN_PASSWORD:
     raise ValueError("ADMIN_PASSWORD не задан")
 
 SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "secret_traces_key_6")
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-ADMIN_USER_ID = int(os.environ.get("ADMIN_USER_ID", 0))
 
 # ==========================================
 # ИНИЦИАЛИЗАЦИЯ
@@ -92,7 +89,7 @@ def serve_static(filename):
     return send_from_directory('static', filename)
 
 # ==========================================
-# YOUTUBE (через внешний модуль)
+# YOUTUBE (через внешний модуль youtube_api.py)
 # ==========================================
 @app.route('/youtube')
 @login_required
@@ -130,7 +127,7 @@ def youtube_stream():
         info = get_youtube_info(url)
         if not info or not info.get('video_url'):
             return "Не удалось получить видео", 500
-        return Response(stream_video(info['video_url']), content_type='video/mp4')
+        return Response(youtube_stream_generator(info['video_url']), content_type='video/mp4')
     except Exception as e:
         log_web("ERROR", f"YouTube stream ошибка: {e}")
         return f"Ошибка потока: {e}", 500
@@ -142,7 +139,7 @@ def youtube_search():
     if not query:
         return jsonify({'error': 'Поисковый запрос пуст'}), 400
     try:
-        results = search_youtube(query)
+        results = youtube_search(query)
         return jsonify(results)
     except Exception as e:
         log_web("ERROR", f"YouTube search ошибка: {e}")
