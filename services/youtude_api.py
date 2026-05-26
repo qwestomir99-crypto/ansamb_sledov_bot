@@ -1,5 +1,5 @@
 # ==========================================
-# Файл: services/youtube_proxy.py
+# Файл: services/youtube_api.py
 # Справка: README.md → Веб-морда / YouTube прокси
 # Задача: поиск, получение информации, потоковая передача YouTube видео
 # Комментарий: используется в app.py для маршрутов /youtube, /youtube_search, /youtube_info, /youtube_stream
