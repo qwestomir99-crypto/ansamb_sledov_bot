@@ -1,16 +1,18 @@
 /* ==========================================
    Файл: static/css/dark.css
    Справка: README.md → Веб-морда / Тёмная тема
-   Задача: тёмная тема оформления (ночной режим)
+   Задача: тёмная тема оформления в стиле macOS (ночной режим)
+   Комментарий: используется веб-мордой, переключается автоматически по времени или вручную
    Зависит от: переменные CSS
+   Вызывается из: templates/*.html (через переменную THEME_CSS или переключение)
    ========================================== */
 
 :root {
     --bg: #1a1a1e;
-    --card-bg: rgba(30, 30, 35, 0.9);
+    --card-bg: rgba(30, 30, 35, 0.95);
     --text: #e5e5e7;
     --text-secondary: #8e8e93;
-    --border: rgba(255, 255, 255, 0.1);
+    --border: rgba(255, 255, 255, 0.08);
     --accent: #0a84ff;
     --accent-hover: #0066cc;
     --shadow: 0 8px 20px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.1);
@@ -19,4 +21,298 @@
     --warning: #ff9f0a;
 }
 
-/* Остальное — как в macos.css, но с тёмными цветами */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: var(--bg);
+    font-family: -apple-system, 'Inter', 'SF Pro Text', 'Segoe UI', sans-serif;
+    color: var(--text);
+    padding: 2rem;
+    line-height: 1.4;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* ==========================================
+   КАРТОЧКИ
+   ========================================== */
+.card {
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* ==========================================
+   ЗАГОЛОВКИ
+   ========================================== */
+h1 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-size: 1.8rem;
+    margin-bottom: 0.25rem;
+}
+
+h2 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-size: 1.3rem;
+    margin-bottom: 0.75rem;
+}
+
+/* ==========================================
+   КНОПКИ, ИНПУТЫ, СЕЛЕКТЫ
+   ========================================== */
+button, input, textarea, select {
+    background: #2c2c2e;
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+button:hover {
+    background: var(--accent-hover);
+    transform: scale(0.98);
+}
+
+input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.3);
+}
+
+textarea {
+    width: 100%;
+    resize: vertical;
+}
+
+/* ==========================================
+   СООБЩЕНИЯ (VK / TELEGRAM / АДМИН)
+   ========================================== */
+.messages {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+}
+
+.message {
+    background: #2c2c2e;
+    border-radius: 16px;
+    padding: 12px;
+    margin: 8px 0;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    transition: 0.1s;
+}
+
+.message.own {
+    background: var(--accent);
+    color: white;
+    border: none;
+}
+
+.message-telegram {
+    border-left: 4px solid #26a5e4;
+}
+
+.message-vk {
+    border-left: 4px solid #4c75a3;
+}
+
+.message small {
+    font-size: 0.7rem;
+    opacity: 0.7;
+}
+
+.message-actions button {
+    font-size: 0.7rem;
+    padding: 4px 10px;
+    margin-right: 8px;
+    background: #3a3a3c;
+    color: var(--text);
+}
+
+.message-actions button:hover {
+    background: var(--accent);
+    color: white;
+    transform: none;
+}
+
+/* ==========================================
+   ССЫЛКИ
+   ========================================== */
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* ==========================================
+   ГРУППЫ КНОПОК
+   ========================================== */
+.button-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.button-group button {
+    flex: 1;
+    min-width: 80px;
+}
+
+/* ==========================================
+   СТАТУСЫ
+   ========================================== */
+.status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    background: var(--accent);
+    color: white;
+}
+
+/* ==========================================
+   СКРЫТЫЕ БЛОКИ
+   ========================================== */
+.hidden {
+    display: none;
+}
+
+/* ==========================================
+   ЛОГИ (PRE)
+   ========================================== */
+pre {
+    background: #1c1c1e;
+    padding: 0.5rem;
+    border-radius: 12px;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    border: 1px solid var(--border);
+    color: var(--text);
+}
+
+/* ==========================================
+   ДЕБАГГЕР
+   ========================================== */
+#debug-report {
+    margin-top: 1rem;
+    font-size: 0.8rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+#debug-report details {
+    background: #1c1c1e;
+    border-radius: 12px;
+    padding: 0.5rem;
+}
+
+/* ==========================================
+   АУДИТ И ИНДЕКС
+   ========================================== */
+#audit-result details,
+#index-result details {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+#audit-result pre,
+#index-result pre {
+    background: #1c1c1e;
+    padding: 0.5rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 0.7rem;
+    font-family: monospace;
+}
+
+/* ==========================================
+   ФУТЕР (ССЫЛКИ)
+   ========================================== */
+.footer-links {
+    margin-top: 2rem;
+    text-align: center;
+    font-size: 0.8rem;
+    border-top: 1px solid var(--border);
+    padding-top: 1rem;
+}
+
+.footer-links a {
+    margin: 0 10px;
+}
+
+/* ==========================================
+   АДАПТИВНОСТЬ
+   ========================================== */
+@media (max-width: 768px) {
+    body {
+        padding: 1rem;
+    }
+    
+    .container {
+        max-width: 100%;
+    }
+    
+    .button-group button {
+        min-width: 60px;
+        padding: 6px 12px;
+    }
+    
+    .message-actions button {
+        padding: 2px 6px;
+        font-size: 0.65rem;
+    }
+    
+    .footer-links a {
+        margin: 0 5px;
+        font-size: 0.7rem;
+    }
+}
+
+/* ==========================================
+   АНИМАЦИИ
+   ========================================== */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.card, .message, .video-card {
+    animation: fadeIn 0.3s ease;
+   }
