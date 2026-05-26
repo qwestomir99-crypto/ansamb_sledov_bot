@@ -4,13 +4,14 @@
 # Задача: единая система логирования для всех модулей
 # Комментарий: ротация логов (1 МБ, 1 бэкап), отправка отчётов в Telegram и веб-морду
 #              Поддерживает логирование из bot.py, app.py, agent.py, services/*.py, dialogue/*.py
-# Зависит от: logging, os, datetime, traceback
+#              Добавлена интеграция с debug_audit.py
+# Зависит от: logging, os, datetime, traceback, json
 # Вызывается из: bot.py, app.py, agent.py, services/*.py, dialogue/*.py
 # ==========================================
 
-import logging
 import os
-import sys
+import json
+import logging
 import traceback
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
@@ -179,7 +180,39 @@ def send_debug_report(bot, chat_id, limit=100):
             bot.send_message(chat_id, f"```\n{part}\n```", parse_mode='Markdown')
 
 # ==========================================
-# 7. ТЕСТОВЫЙ ЗАПУСК
+# 7. ИНТЕГРАЦИЯ С АУДИТОМ
+# ==========================================
+
+def run_audit():
+    """Запускает аудит (обёртка для debug_audit.py)"""
+    try:
+        from debug_audit import run_audit as audit
+        return audit()
+    except ImportError:
+        debug_log("DEBUG", "debug_audit.py не найден, аудит недоступен", "WARNING")
+        return None
+    except Exception as e:
+        log_exception("DEBUG", e)
+        return None
+
+def get_audit_status():
+    """Возвращает результат последнего аудита из debug_index.json"""
+    index_file = "debug_index.json"
+    if not os.path.exists(index_file):
+        return {"audit_exists": False}
+    try:
+        with open(index_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return {
+                "audit_exists": True,
+                "last_audit": data.get("last_audit", "никогда"),
+                "results": data.get("audit_results", {})
+            }
+    except Exception as e:
+        return {"audit_exists": False, "error": str(e)}
+
+# ==========================================
+# 8. ТЕСТ
 # ==========================================
 if __name__ == "__main__":
     print("=== ТЕСТ ДЕБАГГЕРА ===\n")
@@ -191,6 +224,5 @@ if __name__ == "__main__":
     print("\n=== Последние 10 строк лога ===")
     print(get_logs(10))
     
-    print("\n=== Логи в формате JSON ===")
-    import json
-    print(json.dumps(get_logs_as_dict(5), indent=2, ensure_ascii=False))
+    print("\n=== Статус аудита ===")
+    print(get_audit_status())
