@@ -57,6 +57,7 @@
             <button onclick="setMode('вечер')">🌙 Вечер</button>
             <button onclick="setMode('ночь')">🌌 Ночь</button>
             <button onclick="togglePing()">🔄 Пинг</button>
+            <button onclick="toggleAlice()">Старший брат</button>
         </div>
         <div style="margin-top: 0.5rem;">Текущий режим: <span id="current-mode" class="status-badge">день</span></div>
     </div>
@@ -131,14 +132,12 @@ async function toggleThemeManually() {
     const isDark = currentLink.href.includes('dark.css');
     const newTheme = isDark ? 'macos.css' : 'dark.css';
     
-    // Сохраняем на сервере
     try {
         await fetch('/api/set_theme', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ theme: newTheme })
         });
-        // Меняем тему на странице
         currentLink.href = `/static/css/${newTheme}`;
         localStorage.setItem('web_theme', newTheme);
     } catch (e) {
@@ -146,7 +145,6 @@ async function toggleThemeManually() {
     }
 }
 
-// Загружаем сохранённую тему при загрузке (если есть в localStorage)
 document.addEventListener('DOMContentLoaded', () => {
     const savedTheme = localStorage.getItem('web_theme');
     if (savedTheme) {
@@ -157,7 +155,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 </script>
-
-<!-- Остальные функции (fetchDebugLogs, sendDebugReport, runAudit, showAuditStatus, showDebugIndex, sendReply, sendComment, createPost, setMode, setMood, togglePing, addQuote, sendPost) должны быть в static/js/main.js -->
 </body>
 </html>
