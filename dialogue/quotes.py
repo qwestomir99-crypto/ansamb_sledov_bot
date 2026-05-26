@@ -3,7 +3,7 @@
 # Справка: README.md → Цитаты
 # Задача: публикация цитат по расписанию + случайный пост из VK
 # Комментарий: интервал цитат зависит от настроения пользователя (если задано)
-#              Исправлена ошибка слишком длинной подписи в Telegram (limit 1024)
+#              Исправлена логика: текст поста — приоритет №1, цитата — опциональна.
 # Зависит от: config.json, activity_modes.py, user_settings.py, services.photo_reader
 # Вызывается из: bot.py
 # ==========================================
@@ -92,25 +92,30 @@ def set_quotes_interval_minutes(minutes):
 quote_thread_running = False
 quote_thread = None
 
-def truncate_caption(text, limit=1024):
-    """Обрезает текст до лимита Telegram (1024 символа)"""
-    if len(text) <= limit:
-        return text
-    return text[:limit-3] + "..."
-
 def send_quote_with_photo(bot, chat_id, quote):
-    """Отправляет цитату с фото из VK (если есть)"""
+    """Отправляет цитату с фото из VK (приоритет — текст поста)"""
     try:
         from services.photo_reader import get_random_post
         
         post = get_random_post()
         if post and post.get('photo_url'):
-            # Собираем подпись
-            full_caption = f"{post['text']}\n\n📜 {quote}\n\n{' '.join(post.get('tags', [])[:3])}"
-            # Обрезаем до лимита Telegram
-            caption = truncate_caption(full_caption, 1024)
+            # Текст поста — главный
+            caption = post['text']
+            
+            # Добавляем цитату, если влезает
+            if len(caption) + len(quote) + 50 < 1024:
+                caption += f"\n\n📜 {quote}"
+            
+            # Добавляем хештеги, если влезают
+            tags = ' '.join(post.get('tags', [])[:3])
+            if len(caption) + len(tags) + 10 < 1024:
+                caption += f"\n\n{tags}"
+            
+            # Обрезаем до лимита Telegram на всякий случай
+            caption = caption[:1024]
+            
             bot.send_photo(chat_id, post['photo_url'], caption=caption, parse_mode='Markdown')
-            debug_log("QUOTES", f"Цитата отправлена с фото (длина подписи: {len(caption)} симв.)")
+            debug_log("QUOTES", f"Цитата отправлена с фото (приоритет — текст поста, длина: {len(caption)} симв.)")
             return True
         else:
             bot.send_message(chat_id, f"📜 *Цитата дня* • {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n{quote}\n\n#ЦитатаДня #СапёрыАутентичности", parse_mode='Markdown')
@@ -172,3 +177,7 @@ def quotes_loop(bot, TG_CHAT_ID):
     quote_thread = threading.Thread(target=_run, daemon=True)
     quote_thread.start()
     debug_log("QUOTES", "Цитаты запущены")
+
+if __name__ == "__main__":
+    print("📜 Цитаты — приоритет текста поста.")
+    print("Запусти через bot.py, а не напрямую.")
