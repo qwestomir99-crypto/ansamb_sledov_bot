@@ -2,8 +2,13 @@
    Файл: static/css/admin.css
    Справка: README.md → Веб-морда / Стили
    Задача: стили для главной страницы веб-морды
+   Комментарий: использует переменные из темы (macos.css)
    Зависит от: macos.css (тема)
    Вызывается из: templates/admin.html
+   ========================================== */
+
+/* ==========================================
+   1. ОСНОВНЫЕ КОМПОНЕНТЫ
    ========================================== */
 
 .admin-grid {
@@ -33,6 +38,10 @@
     color: white;
 }
 
+/* ==========================================
+   2. СООБЩЕНИЯ (ЛЕНТА)
+   ========================================== */
+
 .messages {
     max-height: 400px;
     overflow-y: auto;
@@ -59,6 +68,10 @@
     border-left: 4px solid #4c75a3;
 }
 
+.message-actions {
+    margin-top: 8px;
+}
+
 .message-actions button {
     font-size: 0.7rem;
     padding: 2px 6px;
@@ -75,9 +88,39 @@
     color: white;
 }
 
+/* ==========================================
+   3. АУДИТ И ИНДЕКС
+   ========================================== */
+
+#audit-result details,
+#index-result details {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+#audit-result pre,
+#index-result pre {
+    background: #f0f0f0;
+    padding: 0.5rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 0.7rem;
+    font-family: monospace;
+}
+
+/* ==========================================
+   4. СКРЫТЫЕ ЭЛЕМЕНТЫ
+   ========================================== */
+
 .hidden {
     display: none;
 }
+
+/* ==========================================
+   5. ФУТЕР (ССЫЛКИ)
+   ========================================== */
 
 .footer-links {
     margin-top: 2rem;
@@ -97,25 +140,10 @@
     text-decoration: underline;
 }
 
-/* Аудит и индекс */
-#audit-result details,
-#index-result details {
-    background: var(--card-bg);
-    border-radius: 12px;
-    padding: 0.5rem;
-    margin-top: 0.5rem;
-}
+/* ==========================================
+   6. АДАПТИВНОСТЬ
+   ========================================== */
 
-#audit-result pre,
-#index-result pre {
-    background: #f0f0f0;
-    padding: 0.5rem;
-    border-radius: 8px;
-    overflow-x: auto;
-    font-size: 0.7rem;
-}
-
-/* Адаптивность */
 @media (max-width: 768px) {
     .button-group button {
         min-width: 60px;
