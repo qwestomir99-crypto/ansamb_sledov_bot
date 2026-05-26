@@ -1,0 +1,135 @@
+/* ==========================================
+   Файл: static/css/admin.css
+   Справка: README.md → Веб-морда / Стили
+   Задача: стили для главной страницы веб-морды
+   Зависит от: macos.css (тема)
+   Вызывается из: templates/admin.html
+   ========================================== */
+
+.admin-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.button-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.button-group button {
+    flex: 1;
+    min-width: 80px;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    background: var(--accent);
+    color: white;
+}
+
+.messages {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+}
+
+.message {
+    border-bottom: 1px solid var(--border);
+    padding: 8px;
+    margin: 5px 0;
+}
+
+.message.own {
+    background: var(--accent);
+    color: white;
+    border: none;
+}
+
+.message-telegram {
+    border-left: 4px solid #26a5e4;
+}
+
+.message-vk {
+    border-left: 4px solid #4c75a3;
+}
+
+.message-actions button {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    margin-right: 5px;
+    background: var(--border);
+    color: var(--text);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.message-actions button:hover {
+    background: var(--accent);
+    color: white;
+}
+
+.hidden {
+    display: none;
+}
+
+.footer-links {
+    margin-top: 2rem;
+    text-align: center;
+    font-size: 0.8rem;
+    border-top: 1px solid var(--border);
+    padding-top: 1rem;
+}
+
+.footer-links a {
+    margin: 0 10px;
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.footer-links a:hover {
+    text-decoration: underline;
+}
+
+/* Аудит и индекс */
+#audit-result details,
+#index-result details {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+#audit-result pre,
+#index-result pre {
+    background: #f0f0f0;
+    padding: 0.5rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 0.7rem;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .button-group button {
+        min-width: 60px;
+        padding: 6px 12px;
+        font-size: 0.8rem;
+    }
+    
+    .message-actions button {
+        padding: 2px 6px;
+        font-size: 0.6rem;
+    }
+    
+    .footer-links a {
+        margin: 0 5px;
+        font-size: 0.7rem;
+    }
+}
