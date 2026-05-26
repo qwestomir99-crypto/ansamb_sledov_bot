@@ -4,6 +4,7 @@
 # Задача: обработка нажатий на инлайн-кнопки (callback_data)
 # Комментарий: использует button_map.py для единого управления callback'ами
 #              Добавлены обработчики для «Настроение», «Диалог», «Назад», «Вход в админку»
+#              Добавлен обработчик для кнопки «Старший брат» (toggle_alice)
 # Зависит от: telebot, button_map, admin_commands, quotes, publisher
 # Вызывается из: bot.py (регистрация через register_callback_handlers)
 # ==========================================
@@ -184,6 +185,17 @@ def register_callback_handlers(bot, config):
         send_report(bot, call.message.chat.id, f"🔄 Пинг {'включён' if new_state else 'выключён'}", 5)
         bot.answer_callback_query(call.id)
         show_admin_panel(call, bot)
+    
+    # ==========================================
+    # 3.5. КНОПКА УПРАВЛЕНИЯ АЛИСОЙ (СТАРШИЙ БРАТ)
+    # ==========================================
+    
+    @bot.callback_query_handler(func=lambda call: call.data == get_callback("toggle_alice"))
+    def callback_toggle_alice(call):
+        debug_log("CALLBACK", f"Переключение Алисы от {call.from_user.id}")
+        from Alice.alice_admin import toggle_alice
+        toggle_alice(call, bot)
+        bot.answer_callback_query(call.id)
     
     # ==========================================
     # 4. КНОПКИ ДИАГНОСТИКИ
