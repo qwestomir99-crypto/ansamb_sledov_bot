@@ -1,12 +1,12 @@
 # ==========================================
 # Файл: dialogue/agent.py
 # Справка: README.md → Агент / #говори
-# Задача: лёгкий агент для Yandex GPT с персонажами и библиотекой
+# Задача: лёгкий агент для Yandex GPT с персонажами, библиотекой и чтением из сети
 # Комментарий: весь контент — в library/, правила — в evolve_agent.py,
 #              память — в agent_memory.py, журнал — в agent_journal.py,
 #              настройки — в agent_settings.py.
-#              agent.py — тонкий слой между запросом и библиотекой.
-# Зависит от: requests, os, json, debug_utils, library/, evolve_agent, memory, journal, settings
+#              Добавлена возможность читать ссылки через agent_reader.py
+# Зависит от: requests, os, json, debug_utils, library/, evolve_agent, memory, journal, settings, reader
 # Вызывается из: bot.py (ask_agent), admin_commands.py (process_dialog_message)
 # ==========================================
 
@@ -25,9 +25,9 @@ try:
     from dialogue.agent_memory import remember_phrase, remember_dialogue, get_memory_stats
     from evolve_agent import add_sediment, apply_rules
     from dialogue.user_settings import get_user_mood, get_mood_prompt
+    from dialogue.agent_reader import agent_read_url
 except ImportError as e:
     debug_log("AGENT", f"Не удалось импортировать внешние модули: {e}", "ERROR")
-    # Заглушки, чтобы не падало при отсутствии модулей
     def get_agent_settings(): return {}
     def log_to_journal(*args): pass
     def remember_phrase(*args): return False
@@ -37,6 +37,7 @@ except ImportError as e:
     def apply_rules(*args): return ""
     def get_user_mood(*args): return "artist"
     def get_mood_prompt(*args): return ""
+    def agent_read_url(*args): return False
 
 # ==========================================
 # КОНСТАНТЫ
@@ -161,6 +162,13 @@ def ask_agent(prompt, user_id=None):
         debug_log("AGENT", f"Ошибка: {e}", "ERROR")
         log_to_journal(f"Ошибка: {e}")
         return "🌙 Сеть шумит. Повтори позже."
+
+# ==========================================
+# ЧТЕНИЕ ИЗ СЕТИ (свободный режим)
+# ==========================================
+def agent_visit_url(url, tags=None):
+    """Агент читает ссылку и сохраняет в библиотеку"""
+    return agent_read_url(url, tags)
 
 def get_agent_status():
     """Возвращает статус агента для админки"""
