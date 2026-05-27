@@ -3,6 +3,7 @@
 # Задача: Telegram-бот
 # Комментарий: отправляет входящие сообщения в веб-морду через WebSocket
 #              Добавлена команда /debug для получения отчёта с логами
+#              Добавлены команды #аудит, #архив, #шапки
 # ==========================================
 
 print("[DEBUG] 0. Начало загрузки bot.py")
@@ -320,6 +321,36 @@ def handle_message(message):
         except:
             bot.reply_to(message, "❌ Модуль не загружен")
         return
+
+    if text == "#аудит":
+        if not is_admin_authorized(message.from_user.id):
+            bot.reply_to(message, "❌ Только для админа")
+            return
+        bot.reply_to(message, "⏳ Аудит запущен...")
+        from debug_audit import run_audit
+        result = run_audit()
+        bot.reply_to(message, f"✅ Аудит завершён. Всего проблем: {len(result.get('issues', []))}")
+
+    if text == "#архив":
+        if not is_admin_authorized(message.from_user.id):
+            bot.reply_to(message, "❌ Только для админа")
+            return
+        bot.reply_to(message, "⏳ Архиватор запущен...")
+        from archive_keeper import run_archive_keeper
+        run_archive_keeper()
+        bot.reply_to(message, "✅ Архиватор завершён.")
+
+    if text == "#шапки":
+        if not is_admin_authorized(message.from_user.id):
+            bot.reply_to(message, "❌ Только для админа")
+            return
+        bot.reply_to(message, "⏳ Проверка шапок...")
+        from debug_audit import check_redmi_headers
+        ok, missing = check_redmi_headers()
+        if ok:
+            bot.reply_to(message, "✅ Все файлы имеют REDMI-шапки")
+        else:
+            bot.reply_to(message, f"⚠️ Нет шапок: {', '.join(missing)}")
 
     if "#дышим" in text:
         ping_self()
