@@ -22,7 +22,7 @@ async def main():
     client = TelegramClient(SESSION_NAME, DUMMY_API_ID, DUMMY_API_HASH)
     
     try:
-        await client.start(phone=phone)
+        await client.start(phone=phone, code_callback=lambda: input("Введите код из Telegram: "))
         
         real_api_id = client.api_id
         real_api_hash = client.api_hash
@@ -43,7 +43,6 @@ async def main():
         
     except Exception as e:
         print(f"\n❌ Ошибка: {e}")
-        print("   Проверь, что номер телефона в TG_PHONE правильный")
     finally:
         await client.disconnect()
         if os.path.exists(f"{SESSION_NAME}.session"):
