@@ -1,11 +1,11 @@
 # ==========================================
-# Модуль: dialogue/quotes.py
+# Модуль: dialogue/quotes_supabase.py
 # Справка: README.md → Цитаты
 # Задача: публикация цитат по расписанию + случайный пост из VK
 # Комментарий: интервал цитат зависит от настроения пользователя (если задано)
 #              Исправлена логика: текст поста — приоритет №1, цитата — опциональна.
-#              Поддержка Supabase с фоллбэком на файлы.
-# Зависит от: config.json, activity_modes.py, user_settings.py, services.photo_reader, services.supabase_client
+#              Добавлена поддержка Supabase с фоллбэком на файлы.
+# Зависит от: config.json, activity_modes.py, user_settings.py, services.photo_reader
 # Вызывается из: bot.py
 # ==========================================
 
@@ -20,9 +20,12 @@ from dialogue.activity_modes import should_publish_quotes, get_quotes_interval, 
 from dialogue.user_settings import get_user_quotes_interval
 from services.supabase_client import db_insert, db_select
 
+# ==========================================
+# КОНСТАНТЫ
+# ==========================================
 CONFIG_FILE = "config.json"
-QUOTES_TABLE = "quotes"
 QUOTES_FALLBACK_FILE = "dialogue/data/quotes.txt"
+QUOTES_TABLE = "quotes"
 
 # ==========================================
 # РАБОТА С ЦИТАТАМИ
@@ -35,6 +38,7 @@ def get_quotes(limit=10):
     # Попытка из базы
     result = db_select(QUOTES_TABLE, limit=limit, fallback_file=None)
     if result:
+        # Если из базы получилось, возвращаем
         return [row.get("text") for row in result]
     
     # Фоллбэк на файл
@@ -49,6 +53,7 @@ def add_quote(text):
     Сначала пытается записать в Supabase, при ошибке — в файл.
     """
     data = {"text": text, "created_at": datetime.now().isoformat()}
+    # Попытка в базу
     db_insert(QUOTES_TABLE, data, fallback_file=QUOTES_FALLBACK_FILE)
     return True
 
@@ -175,7 +180,3 @@ def quotes_loop(bot, TG_CHAT_ID):
     quote_thread = threading.Thread(target=_run, daemon=True)
     quote_thread.start()
     debug_log("QUOTES", "Цитаты запущены")
-
-if __name__ == "__main__":
-    print("📜 Цитаты — приоритет текста поста.")
-    print("Запусти через bot.py, а не напрямую.")
