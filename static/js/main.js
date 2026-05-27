@@ -7,6 +7,22 @@
 const socket = io();
 
 // ==========================================
+// ПЛЮШКИ: TOAST-УВЕДОМЛЕНИЯ
+// ==========================================
+function showToast(message, type='info', duration=3000) {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+}
+
+// ==========================================
 // СОКЕТ: ВХОДЯЩИЕ СООБЩЕНИЯ
 // ==========================================
 socket.on('message_history', function(messages) {
@@ -130,10 +146,10 @@ async function sendReply() {
             document.getElementById('reply-text').value = '';
             closeReply();
         } else {
-            alert('Ошибка: ' + (data.error || 'неизвестная ошибка'));
+            showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
         }
     } catch(e) {
-        alert('Ошибка отправки: ' + e.message);
+        showToast('Ошибка отправки: ' + e.message, 'error');
     }
 }
 
@@ -167,10 +183,10 @@ async function sendComment() {
             document.getElementById('comment-text').value = '';
             closeComment();
         } else {
-            alert('Ошибка: ' + (data.error || 'неизвестная ошибка'));
+            showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
         }
     } catch(e) {
-        alert('Ошибка комментария: ' + e.message);
+        showToast('Ошибка комментария: ' + e.message, 'error');
     }
 }
 
@@ -189,12 +205,12 @@ function createPost(platform) {
     .then(resp => resp.json())
     .then(data => {
         if (data.status === 'ok') {
-            alert(`✅ Пост опубликован в ${platform === 'telegram' ? 'Telegram' : 'VK'}`);
+            showToast(`✅ Пост опубликован в ${platform === 'telegram' ? 'Telegram' : 'VK'}`, 'success');
         } else {
-            alert('❌ Ошибка: ' + (data.error || 'неизвестная ошибка'));
+            showToast('❌ Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
         }
     })
-    .catch(e => alert('Ошибка: ' + e.message));
+    .catch(e => showToast('Ошибка: ' + e.message, 'error'));
 }
 
 // ==========================================
@@ -211,10 +227,10 @@ async function setMode(mode) {
         if (data.status === 'ok') {
             document.getElementById('current-mode').textContent = mode;
         } else {
-            alert('Ошибка: ' + (data.error || 'неизвестная ошибка'));
+            showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
         }
     } catch(e) {
-        alert('Ошибка: ' + e.message);
+        showToast('Ошибка: ' + e.message, 'error');
     }
 }
 
@@ -223,12 +239,12 @@ async function togglePing() {
         const resp = await fetch('/api/ping_bot');
         const data = await resp.json();
         if (data.status === 'ok') {
-            alert('✅ Бот отвечает: ' + data.message);
+            showToast('✅ Бот отвечает: ' + data.message, 'success');
         } else {
-            alert('❌ Бот не отвечает: ' + (data.error || 'неизвестная ошибка'));
+            showToast('❌ Бот не отвечает: ' + (data.error || 'неизвестная ошибка'), 'error');
         }
     } catch(e) {
-        alert('Ошибка: ' + e.message);
+        showToast('Ошибка: ' + e.message, 'error');
     }
 }
 
@@ -243,12 +259,12 @@ async function toggleAlice() {
         });
         const data = await resp.json();
         if (data.status === 'ok') {
-            alert(`Алиса ${data.enabled ? 'включена ✅' : 'выключена ❌'}`);
+            showToast(`Алиса ${data.enabled ? 'включена ✅' : 'выключена ❌'}`, 'success');
         } else {
-            alert('Ошибка: ' + (data.error || 'неизвестная ошибка'));
+            showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
         }
     } catch(e) {
-        alert('Ошибка: ' + e.message);
+        showToast('Ошибка: ' + e.message, 'error');
     }
 }
 
@@ -266,10 +282,10 @@ async function setMood(mood) {
         if (data.status === 'ok') {
             document.getElementById('current-mood').textContent = mood;
         } else {
-            alert('Ошибка: ' + (data.error || 'неизвестная ошибка'));
+            showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
         }
     } catch(e) {
-        alert('Ошибка: ' + e.message);
+        showToast('Ошибка: ' + e.message, 'error');
     }
 }
 
@@ -300,10 +316,10 @@ async function addQuote() {
                 quotesList.appendChild(li);
             });
         } else {
-            alert('Ошибка: ' + (data.error || 'неизвестная ошибка'));
+            showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
         }
     } catch(e) {
-        alert('Ошибка: ' + e.message);
+        showToast('Ошибка: ' + e.message, 'error');
     }
 }
 
@@ -328,10 +344,10 @@ async function sendPost() {
             statusSpan.innerHTML = `✅ <a href="${data.url}" target="_blank">Пост опубликован</a>`;
             document.getElementById('post-text').value = '';
         } else {
-            statusSpan.textContent = '❌ ' + (data.error || 'Ошибка');
+            showToast('❌ ' + (data.error || 'Ошибка'), 'error');
         }
     } catch(e) {
-        statusSpan.textContent = '❌ Ошибка: ' + e.message;
+        showToast('❌ Ошибка: ' + e.message, 'error');
     }
 }
 
@@ -347,7 +363,7 @@ async function fetchDebugLogs() {
         const data = await resp.json();
         reportDiv.innerHTML = `<pre style="max-height: 300px; overflow-y: auto; background: #f8f8fa; padding: 1rem; border-radius: 12px;">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
     } catch(e) {
-        reportDiv.innerHTML = '❌ Ошибка загрузки логов: ' + e.message;
+        showToast('❌ Ошибка загрузки логов: ' + e.message, 'error');
     }
 }
 
@@ -361,10 +377,10 @@ async function sendDebugReport() {
         if (data.status === 'ok') {
             reportDiv.innerHTML = '✅ Отчёт отправлен в Telegram';
         } else {
-            reportDiv.innerHTML = '❌ Ошибка: ' + (data.error || 'неизвестная ошибка');
+            showToast('❌ Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
         }
     } catch(e) {
-        reportDiv.innerHTML = '❌ Ошибка: ' + e.message;
+        showToast('❌ Ошибка: ' + e.message, 'error');
     }
 }
 
@@ -378,10 +394,10 @@ async function runAudit() {
         if (data.status === 'ok') {
             resultDiv.innerHTML = '✅ Аудит завершён. Проверьте README.md';
         } else {
-            resultDiv.innerHTML = '❌ Ошибка аудита: ' + (data.error || 'неизвестная ошибка');
+            showToast('❌ Ошибка аудита: ' + (data.error || 'неизвестная ошибка'), 'error');
         }
     } catch(e) {
-        resultDiv.innerHTML = '❌ Ошибка: ' + e.message;
+        showToast('❌ Ошибка: ' + e.message, 'error');
     }
 }
 
@@ -395,10 +411,10 @@ async function showAuditStatus() {
         if (data.status === 'ok') {
             resultDiv.innerHTML = `<pre style="max-height: 300px; overflow-y: auto; background: #f8f8fa; padding: 1rem; border-radius: 12px;">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
         } else {
-            resultDiv.innerHTML = '❌ Ошибка: ' + (data.error || 'неизвестная ошибка');
+            showToast('❌ Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
         }
     } catch(e) {
-        resultDiv.innerHTML = '❌ Ошибка: ' + e.message;
+        showToast('❌ Ошибка: ' + e.message, 'error');
     }
 }
 
@@ -412,10 +428,10 @@ async function showDebugIndex() {
         if (data.status === 'ok') {
             resultDiv.innerHTML = `<pre style="max-height: 300px; overflow-y: auto; background: #f8f8fa; padding: 1rem; border-radius: 12px;">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
         } else {
-            resultDiv.innerHTML = '❌ Ошибка: ' + (data.error || 'неизвестная ошибка');
+            showToast('❌ Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
         }
     } catch(e) {
-        resultDiv.innerHTML = '❌ Ошибка: ' + e.message;
+        showToast('❌ Ошибка: ' + e.message, 'error');
     }
 }
 
