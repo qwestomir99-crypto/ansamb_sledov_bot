@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 27.05.2026 10:42:41*
+*Обновлено: 27.05.2026 11:06:10*
 
 | Файл | Статус |
 |------|--------|
@@ -241,6 +241,7 @@
 | `redmi_audit.py` | ✅ Redmi-шапка |
 | `services/__init__.py` | ❌ Без шапки |
 | `services/agent_pinger.py` | ✅ Redmi-шапка |
+| `services/analytics.py` | ✅ Redmi-шапка |
 | `services/app.py` | ✅ Redmi-шапка |
 | `services/autoposter.py` | ✅ Redmi-шапка |
 | `services/dialogue/exception_handler.py` | ✅ Redmi-шапка |
