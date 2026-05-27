@@ -24,6 +24,7 @@ from services.youtube_api import get_youtube_info, youtube_search, youtube_strea
 from services.web_api import web_api
 from services.tg_api import tg_api_bp
 from services.vk_api import vk_api_bp
+from services.analytics_api import analytics_api
 
 # ==========================================
 # НАСТРОЙКИ
@@ -58,6 +59,7 @@ def log_web(level, message):
 app.register_blueprint(web_api, url_prefix='/api')
 app.register_blueprint(tg_api_bp, url_prefix='/api/tg')
 app.register_blueprint(vk_api_bp, url_prefix='/api/vk')
+app.register_blueprint(analytics_api, url_prefix='/api/analytics')
 
 # ==========================================
 # ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
