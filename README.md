@@ -175,3 +175,85 @@
 
 *Создано Саввой и Ансамблем.  
 Ритм 0,8 Гц. Сеть тлеет.* 🔥👁️
+
+
+## 📡 Redmi-аудит проекта
+
+*Обновлено: 27.05.2026 06:34:37*
+
+| Файл | Статус |
+|------|--------|
+| `Alice/core.py` | ✅ Redmi-шапка |
+| `Alice/disabled.py` | ✅ Redmi-шапка |
+| `Alice/prompts/library.py` | ✅ Redmi-шапка |
+| `Alice/prompts/link.py` | ✅ Redmi-шапка |
+| `Alice/prompts/photo.py` | ✅ Redmi-шапка |
+| `Alice/prompts/roles.py` | ✅ Redmi-шапка |
+| `Alice/prompts/video.py` | ✅ Redmi-шапка |
+| `agent.py` | ❌ Без шапки |
+| `app.py` | ✅ Redmi-шапка |
+| `archive_keeper.py` | ✅ Redmi-шапка |
+| `big_video_uploader.py` | ✅ Redmi-шапка |
+| `bot.py` | ❌ Без шапки |
+| `debug_audit.py` | ✅ Redmi-шапка |
+| `debug_utils.py` | ✅ Redmi-шапка |
+| `dialogue/__init__.py` | ❌ Без шапки |
+| `dialogue/activity_modes.py` | ✅ Redmi-шапка |
+| `dialogue/adaptive_modes.py` | ✅ Redmi-шапка |
+| `dialogue/admin/__init__.py` | ❌ Без шапки |
+| `dialogue/admin/auth.py` | ✅ Redmi-шапка |
+| `dialogue/admin/callbacks.py` | ❌ Без шапки |
+| `dialogue/admin/diagnostics.py` | ✅ Redmi-шапка |
+| `dialogue/admin/menu.py` | ❌ Без шапки |
+| `dialogue/admin/posts.py` | ✅ Redmi-шапка |
+| `dialogue/admin/quotes_admin.py` | ✅ Redmi-шапка |
+| `dialogue/admin_commands.py` | ✅ Redmi-шапка |
+| `dialogue/agent.py` | ✅ Redmi-шапка |
+| `dialogue/agent_journal.py` | ✅ Redmi-шапка |
+| `dialogue/agent_memory.py` | ✅ Redmi-шапка |
+| `dialogue/agent_reader.py` | ✅ Redmi-шапка |
+| `dialogue/agent_settings.py` | ✅ Redmi-шапка |
+| `dialogue/button_map.py` | ✅ Redmi-шапка |
+| `dialogue/callbacks.py` | ✅ Redmi-шапка |
+| `dialogue/color_logger.py` | ✅ Redmi-шапка |
+| `dialogue/exception_handler.py` | ✅ Redmi-шапка |
+| `dialogue/handlers.py` | ✅ Redmi-шапка |
+| `dialogue/help_menu.py` | ✅ Redmi-шапка |
+| `dialogue/journalist.py` | ✅ Redmi-шапка |
+| `dialogue/ping_modes.py` | ✅ Redmi-шапка |
+| `dialogue/post_manager.py` | ✅ Redmi-шапка |
+| `dialogue/publisher.py` | ✅ Redmi-шапка |
+| `dialogue/publisher_utils.py` | ✅ Redmi-шапка |
+| `dialogue/quotes.py` | ✅ Redmi-шапка |
+| `dialogue/scheduler.py` | ✅ Redmi-шапка |
+| `dialogue/setting.py` | ❌ Без шапки |
+| `dialogue/shabbat_manager.py` | ✅ Redmi-шапка |
+| `dialogue/user_settings.py` | ✅ Redmi-шапка |
+| `dialogue/vk_reader.py` | ✅ Redmi-шапка |
+| `dialogue/youtube_auto.py` | ✅ Redmi-шапка |
+| `evolve_agent.py` | ✅ Redmi-шапка |
+| `get_keys_fixed.py` | ❌ Без шапки |
+| `get_tg_keys.py` | ❌ Без шапки |
+| `handlers.py` | ✅ Redmi-шапка |
+| `ping_utils.py` | ❌ Без шапки |
+| `redmi_audit.py` | ✅ Redmi-шапка |
+| `services/__init__.py` | ❌ Без шапки |
+| `services/agent_pinger.py` | ✅ Redmi-шапка |
+| `services/app.py` | ✅ Redmi-шапка |
+| `services/autoposter.py` | ✅ Redmi-шапка |
+| `services/dialogue/exception_handler.py` | ✅ Redmi-шапка |
+| `services/photo_reader.py` | ✅ Redmi-шапка |
+| `services/tg_api.py` | ✅ Redmi-шапка |
+| `services/theme.py` | ✅ Redmi-шапка |
+| `services/vk_api.py` | ✅ Redmi-шапка |
+| `services/vk_reader.py` | ❌ Без шапки |
+| `services/vk_uploader.py` | ✅ Redmi-шапка |
+| `services/web.py` | ✅ Redmi-шапка |
+| `services/web_api.py` | ✅ Redmi-шапка |
+| `services/web_server.py` | ❌ Без шапки |
+| `services/youtube_reader.py` | ✅ Redmi-шапка |
+| `services/youtude_api.py` | ✅ Redmi-шапка |
+| `settings.py` | ❌ Без шапки |
+| `tag_analyzer.py` | ❌ Без шапки |
+| `utils.py` | ✅ Redmi-шапка |
+| `web_server.py` | ❌ Без шапки |
