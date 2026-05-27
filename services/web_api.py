@@ -239,6 +239,42 @@ def api_toggle_alice():
         return jsonify({"status": "error", "error": str(e)}), 500
 
 # ==========================================
+# АНАЛИТИКА
+# ==========================================
+@web_api.route('/analytics/activity', methods=['GET'])
+@login_required
+def api_analytics_activity():
+    """Возвращает активность по часам"""
+    try:
+        from services.analytics import get_activity_by_hour
+        data = get_activity_by_hour(hours=24)
+        return jsonify({"status": "ok", "data": data})
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+@web_api.route('/analytics/top_errors', methods=['GET'])
+@login_required
+def api_analytics_top_errors():
+    """Возвращает топ ошибок по модулям"""
+    try:
+        from services.analytics import get_top_errors
+        data = get_top_errors(limit=5)
+        return jsonify({"status": "ok", "data": data})
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+@web_api.route('/analytics/summary', methods=['GET'])
+@login_required
+def api_analytics_summary():
+    """Возвращает сводку активности"""
+    try:
+        from services.analytics import get_activity_summary
+        data = get_activity_summary()
+        return jsonify({"status": "ok", "data": data})
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+# ==========================================
 # АУДИТ И ИНДЕКС
 # ==========================================
 @web_api.route('/audit/run', methods=['POST'])
