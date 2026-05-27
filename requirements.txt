@@ -40,3 +40,6 @@ colorlog>=6.8.0
 
 # Парсинг HTML для агента (чтение ссылок)
 beautifulsoup4>=4.12.0
+
+# Клиент Supabase (база данных)
+supabase>=2.0.0
