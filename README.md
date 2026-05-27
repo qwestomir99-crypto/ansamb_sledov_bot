@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 27.05.2026 10:41:48*
+*Обновлено: 27.05.2026 10:42:41*
 
 | Файл | Статус |
 |------|--------|
@@ -223,6 +223,7 @@
 | `dialogue/journalist.py` | ✅ Redmi-шапка |
 | `dialogue/ping_modes.py` | ✅ Redmi-шапка |
 | `dialogue/post_manager.py` | ✅ Redmi-шапка |
+| `dialogue/post_manager_supabase.py` | ✅ Redmi-шапка |
 | `dialogue/publisher.py` | ✅ Redmi-шапка |
 | `dialogue/publisher_utils.py` | ✅ Redmi-шапка |
 | `dialogue/quotes.py` | ✅ Redmi-шапка |
