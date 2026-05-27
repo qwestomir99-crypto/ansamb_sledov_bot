@@ -1,0 +1,30 @@
+name: Получить ключи Telegram
+
+on:
+  workflow_dispatch:
+
+jobs:
+  get_keys:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install telethon
+
+      - name: Запустить скрипт получения ключей
+        env:
+          TG_PHONE: ${{ secrets.TG_PHONE }}
+        run: python get_tg_keys.py
+
+      - name: Upload keys.txt
+        uses: actions/upload-artifact@v4
+        with:
+          name: tg-keys
+          path: keys.txt
