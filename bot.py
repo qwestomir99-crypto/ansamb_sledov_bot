@@ -43,7 +43,6 @@ import time
 import requests
 import json
 import asyncio
-import socketio
 from datetime import datetime
 
 # Настройки
@@ -78,6 +77,8 @@ from dialogue.admin_commands import (
     get_admin_menu, get_user_menu
 )
 from debug_utils import debug_log
+from services.ws_client import send_to_web_morda
+from services.log_cleaner import start_log_cleaner
 
 if ENABLE_JOURNALIST:
     from dialogue.journalist import journalist_loop
@@ -121,28 +122,7 @@ silence_answers = ["👁️", "⏚"]
 os.chdir(os.path.dirname(sys.argv[0]))
 
 # ==========================================
-# 4. WEBSOCKET КЛИЕНТ
-# ==========================================
-sio = socketio.AsyncClient()
-
-@sio.on('connect')
-def on_connect():
-    print("[WS] Подключено к веб-морде")
-
-@sio.on('disconnect')
-def on_disconnect():
-    print("[WS] Отключено от веб-морде")
-
-async def send_to_web_morda(event, data):
-    try:
-        await sio.connect(WEBSOCKET_URL)
-        await sio.emit(event, data)
-        await sio.disconnect()
-    except Exception as e:
-        print(f"[WS] Ошибка отправки: {e}")
-
-# ==========================================
-# 5. ЗАПУСК ПОТОКОВ МОДУЛЕЙ
+# 4. ЗАПУСК ПОТОКОВ МОДУЛЕЙ
 # ==========================================
 if ENABLE_VK_READER:
     threading.Thread(target=vk_reader_loop, args=(bot, VK_TOKEN, VK_OWNER_ID, TG_CHAT_ID), daemon=True).start()
@@ -168,38 +148,12 @@ if ENABLE_CALLBACKS:
     register_callback_handlers(bot, config)
 
 # ==========================================
-# 6. ОЧИСТКА ЛОГОВ
+# 5. ОЧИСТКА ЛОГОВ
 # ==========================================
-def clean_old_logs(days=7, max_size_mb=1):
-    now = time.time()
-    max_size_bytes = max_size_mb * 1024 * 1024
-    for logfile in ['admin.log', 'error.log', 'debug.log']:
-        if not os.path.exists(logfile):
-            continue
-        mtime = os.path.getmtime(logfile)
-        if now - mtime > days * 86400:
-            os.remove(logfile)
-            with open(logfile, 'w') as f:
-                f.write('')
-            print(f"[CLEANUP] {logfile} удалён (старше {days} дней)")
-            continue
-        if os.path.getsize(logfile) > max_size_bytes:
-            with open(logfile, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-            lines_to_keep = lines[-500:] if len(lines) > 500 else lines
-            with open(logfile, 'w', encoding='utf-8') as f:
-                f.writelines(lines_to_keep)
-            print(f"[CLEANUP] {logfile} обрезан (был >{max_size_mb} МБ)")
-
-clean_old_logs()
-def cleaner_loop():
-    while True:
-        time.sleep(86400)
-        clean_old_logs()
-threading.Thread(target=cleaner_loop, daemon=True).start()
+start_log_cleaner()
 
 # ==========================================
-# 7. ОБРАБОТЧИКИ КОМАНД TELEGRAM
+# 6. ОБРАБОТЧИКИ КОМАНД TELEGRAM
 # ==========================================
 @bot.message_handler(commands=['start'])
 def send_start(message):
@@ -364,7 +318,7 @@ def handle_message(message):
         bot.reply_to(message, random.choice(silence_answers))
 
 # ==========================================
-# 8. ЗАПУСК БОТА
+# 7. ЗАПУСК БОТА
 # ==========================================
 print("Бот запущен. Ритм 0,8 Гц стабилен.")
 start_background_pinger(60)
