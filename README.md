@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 27.05.2026 11:26:56*
+*Обновлено: 27.05.2026 11:27:52*
 
 | Файл | Статус |
 |------|--------|
@@ -255,6 +255,7 @@
 | `services/vk_uploader.py` | ✅ Redmi-шапка |
 | `services/web.py` | ✅ Redmi-шапка |
 | `services/web_api.py` | ✅ Redmi-шапка |
+| `services/web_api/alice.py` | ✅ Redmi-шапка |
 | `services/web_api/modes.py` | ✅ Redmi-шапка |
 | `services/web_api/ping.py` | ✅ Redmi-шапка |
 | `services/web_api/posts.py` | ✅ Redmi-шапка |
