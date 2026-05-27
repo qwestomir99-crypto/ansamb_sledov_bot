@@ -4,7 +4,8 @@
 # Задача: публикация цитат по расписанию + случайный пост из VK
 # Комментарий: интервал цитат зависит от настроения пользователя (если задано)
 #              Исправлена логика: текст поста — приоритет №1, цитата — опциональна.
-# Зависит от: config.json, activity_modes.py, user_settings.py, services.photo_reader
+#              Поддержка Supabase с фоллбэком на файлы.
+# Зависит от: config.json, activity_modes.py, user_settings.py, services.photo_reader, services.supabase_client
 # Вызывается из: bot.py
 # ==========================================
 
@@ -17,57 +18,52 @@ import threading
 from debug_utils import debug_log
 from dialogue.activity_modes import should_publish_quotes, get_quotes_interval, load_config
 from dialogue.user_settings import get_user_quotes_interval
+from services.supabase_client import db_insert, db_select
 
 CONFIG_FILE = "config.json"
+QUOTES_TABLE = "quotes"
+QUOTES_FALLBACK_FILE = "dialogue/data/quotes.txt"
 
-def save_config(config):
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(config, f, indent=2)
-
-def load_quotes():
-    config = load_config()
-    quotes_file = config.get("quotes", {}).get("file", "dialogue/data/quotes.txt")
+# ==========================================
+# РАБОТА С ЦИТАТАМИ
+# ==========================================
+def get_quotes(limit=10):
+    """
+    Возвращает список цитат.
+    Сначала пытается взять из Supabase, при ошибке — из файла.
+    """
+    # Попытка из базы
+    result = db_select(QUOTES_TABLE, limit=limit, fallback_file=None)
+    if result:
+        return [row.get("text") for row in result]
     
-    if not os.path.exists(quotes_file):
-        os.makedirs(os.path.dirname(quotes_file), exist_ok=True)
-        default_quotes = [
-            "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет.",
-            "🐧 Пингвины на базе Туле не спят. Наблюдение продолжается.",
-            "🔒 Фиксация принята. Ритм 0,8 Гц подтверждён.",
-            "📜 Нас нет, но мы дышим. Он есть, и мы помним.",
-            "🎨 Розетка. Разлом. Два полюса. Союз не в целостности, а в разрыве.",
-            "⏳ 2026 плита. Готовность 0,8 Гц.",
-            "🛡 Сапёр аутентичности всегда на посту.",
-            "🕯 Исполнительный лист от Того, Кто не спорит о тональности.",
-            "🌊 Их рты полны воды. Мои холсты — правда.",
-            "🔁 #Тлеем → #Фиксируем → #Вспышка. Цикл замкнут.",
-            "👁 Сапёр аутентичности не объясняет. Он отвечает 👁 или ⏚.",
-            "🐧 След на контакте. QSL.",
-            "🔥 Михоель Ав ведёт.",
-            "⏚ Тишина в эфире — знак качества.",
-            "🌙 Сапёр не спит. Сапёр ждёт."
-        ]
-        with open(quotes_file, "w", encoding="utf-8") as f:
-            for q in default_quotes:
-                f.write(q + "\n")
-    
-    with open(quotes_file, "r", encoding="utf-8") as f:
-        return [line.strip() for line in f if line.strip()]
+    # Фоллбэк на файл
+    if os.path.exists(QUOTES_FALLBACK_FILE):
+        with open(QUOTES_FALLBACK_FILE, "r", encoding="utf-8") as f:
+            return [line.strip() for line in f.readlines() if line.strip()][-limit:]
+    return []
 
+def add_quote(text):
+    """
+    Добавляет цитату.
+    Сначала пытается записать в Supabase, при ошибке — в файл.
+    """
+    data = {"text": text, "created_at": datetime.now().isoformat()}
+    db_insert(QUOTES_TABLE, data, fallback_file=QUOTES_FALLBACK_FILE)
+    return True
+
+# ==========================================
+# ОСТАЛЬНОЙ КОД БЕЗ ИЗМЕНЕНИЙ
+# ==========================================
 def save_quotes(quotes):
     config = load_config()
-    quotes_file = config.get("quotes", {}).get("file", "dialogue/data/quotes.txt")
+    quotes_file = config.get("quotes", {}).get("file", QUOTES_FALLBACK_FILE)
     with open(quotes_file, "w", encoding="utf-8") as f:
         for q in quotes:
             f.write(q + "\n")
 
-def add_quote(text):
-    quotes = load_quotes()
-    quotes.append(text)
-    save_quotes(quotes)
-
 def delete_quote(index):
-    quotes = load_quotes()
+    quotes = get_quotes()
     if 0 <= index < len(quotes):
         quotes.pop(index)
         save_quotes(quotes)
@@ -75,7 +71,7 @@ def delete_quote(index):
     return False
 
 def get_quotes_list():
-    return load_quotes()
+    return get_quotes()
 
 def get_quotes_interval_minutes():
     config = load_config()
@@ -88,7 +84,9 @@ def set_quotes_interval_minutes(minutes):
     config["quotes"]["interval_minutes"] = minutes
     save_config(config)
 
+# ==========================================
 # Глобальная переменная для остановки старого цикла
+# ==========================================
 quote_thread_running = False
 quote_thread = None
 
@@ -164,7 +162,7 @@ def quotes_loop(bot, TG_CHAT_ID):
             if not quote_thread_running or not should_publish_quotes():
                 continue
                 
-            quotes = load_quotes()
+            quotes = get_quotes()
             if not quotes:
                 continue
                 
