@@ -2,9 +2,9 @@
 # Файл: services/supabase_client.py
 # Справка: README.md → База данных
 # Задача: клиент для работы с Supabase (с фоллбэком на файлы)
-# Комментарий: использует ядро (файлы) как резерв при отказе базы
+# Комментарий: добавлена таблица analytics
 # Зависит от: supabase, os, json, datetime, debug_utils
-# Вызывается из: quotes.py, memory.py, posts.py
+# Вызывается из: quotes.py, memory.py, posts.py, sql_analytics.py
 # ==========================================
 
 import os
@@ -106,3 +106,11 @@ def db_select(table, limit=10, fallback_file=None, filter_by=None):
         except Exception as e:
             debug_log("SUPABASE", f"Ошибка чтения из fallback: {e}", "ERROR")
     return []
+
+# ==========================================
+# ТАБЛИЦЫ (уже созданы через дашборд Supabase)
+# ==========================================
+# quotes
+# memory
+# posts
+# analytics (новый)
