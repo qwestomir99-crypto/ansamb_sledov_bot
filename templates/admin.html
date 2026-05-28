@@ -115,14 +115,16 @@
         <div id="index-result" style="margin-top: 1rem;"></div>
     </div>
 
-    <!-- Диалог с агентом -->
+    <!-- Черновики -->
     <div class="card">
-        <h2>🗣 Диалог с агентом</h2>
-        <div id="chat-history" style="max-height: 300px; overflow-y: auto; margin-bottom: 10px;"></div>
-        <div style="display: flex; gap: 10px;">
-            <textarea id="chat-input" rows="2" placeholder="Напишите агенту..." style="flex: 1;"></textarea>
-            <button onclick="sendToAgent()">Отправить</button>
+        <h2>📝 Черновики</h2>
+        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+            <input type="text" id="draft-title" placeholder="Заголовок черновика" style="flex: 1;">
+            <textarea id="draft-content" rows="3" placeholder="Содержание черновика" style="flex: 2;"></textarea>
+            <input type="hidden" id="draft-id" value="">
+            <button onclick="saveDraft()">💾 Сохранить</button>
         </div>
+        <div id="drafts-list"></div>
     </div>
 
     <!-- Футер -->
@@ -166,6 +168,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
+
+// Подключаем черновики
+import { initDrafts } from './drafts.js';
+initDrafts();
 </script>
 </body>
 </html>
