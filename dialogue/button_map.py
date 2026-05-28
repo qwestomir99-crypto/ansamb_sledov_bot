@@ -5,6 +5,7 @@
 # Комментарий: замена "магических строк" в admin_commands.py и callbacks.py
 #              Добавлены кнопки "Настроение", "Начать диалог" (для всех), "Назад"
 #              Добавлена кнопка управления Алисой (Старший брат)
+#              Добавлена кнопка "Почта"
 # Зависит от: телеграм-бота (используется в клавиатурах)
 # Вызывается из: dialogue/admin_commands.py, dialogue/callbacks.py
 # ==========================================
@@ -62,6 +63,9 @@ BUTTONS = {
     
     # Кнопка управления Алисой
     "toggle_alice":   {"text": "Старший брат ✅/❌", "callback": "toggle_alice"},
+    
+    # Кнопка Почта
+    "mail":           {"text": "📧 Почта",          "callback": "mail"},
 }
 
 # ==========================================
@@ -107,6 +111,9 @@ def get_admin_menu_keyboard():
     )
     keyboard.add(
         InlineKeyboardButton(get_text("toggle_alice"), callback_data=get_callback("toggle_alice")),
+    )
+    keyboard.add(
+        InlineKeyboardButton(get_text("mail"), callback_data=get_callback("mail")),
     )
     return keyboard
 
