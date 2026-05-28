@@ -1,12 +1,9 @@
 # ==========================================
 # Файл: Alice/core.py
 # Справка: README.md → Алиса / Ядро
-# Задача: генерация ответов Алисы (с фоллбэком на ask_agent)
-# Комментарий: Алиса — главный голос. Если она недоступна — отвечает Старший брат.
-#              Добавлена возможность предлагать изменения кода.
-#              Алиса может делегировать задачи Старшему брату.
-#              Добавлен метод reconfigure_agent.
-# Зависит от: dialogue.agent, debug_utils, config.json, services.suggestion_engine
+# Задача: генерация ответов Алисы (с зеркалом контекста и фоллбэком на ask_agent)
+# Комментарий: использует context_mirror для отслеживания интонаций
+# Зависит от: dialogue.agent, debug_utils, config.json, services.suggestion_engine, context_mirror
 # Вызывается из: bot.py (обработчик #говори)
 # ==========================================
 
@@ -17,6 +14,7 @@ from dialogue.agent import ask_agent
 from services.suggestion_engine import create_suggestion
 from Alice.prompts.library import get_context
 from Alice.prompts.roles import get_role_context
+from Alice.context_mirror import update_mirror, get_context_hint
 
 def log_alice(level, message):
     debug_log("ALICE", message, level)
@@ -52,23 +50,29 @@ def generate_alice_response(user_message, user_id=None):
         # Загружаем контекст библиотеки
         library_context = get_context()
         
-        # Формируем базовый промпт
-        base_prompt = f"{role_context}\n\n{library_context}\n\nПользователь: {user_message}\n\nАлиса:"
+        # Загружаем подсказку из зеркала контекста
+        mirror_hint = get_context_hint()
+        
+        # Формируем полный промпт
+        full_prompt = f"{role_context}\n\n{library_context}\n\n{mirror_hint}\n\nПользователь: {user_message}\n\nАлиса:"
         
         if is_technical:
             # Делегируем техническую задачу Старшему брату
             task = f"Выполни техническую задачу: {user_message}"
             response = ask_agent(task, user_id=user_id)
+            update_mirror(user_message, response)
             log_alice("INFO", f"Алиса делегировала задачу Старшему брату: {response[:50]}...")
             return f"🗣 *Алиса:* Я передала задачу Старшему брату.\n\n{response}"
         elif is_creative:
             # Алиса отвечает сама (творческая задача)
-            response = ask_agent(base_prompt, user_id=user_id)
+            response = ask_agent(full_prompt, user_id=user_id)
+            update_mirror(user_message, response)
             log_alice("INFO", f"Алиса ответила: {response[:50]}...")
             return response
         else:
             # Обычный запрос — отвечаем через полный промпт
-            response = ask_agent(base_prompt, user_id=user_id)
+            response = ask_agent(full_prompt, user_id=user_id)
+            update_mirror(user_message, response)
             log_alice("INFO", f"Алиса ответила: {response[:50]}...")
             return response
     except Exception as e:
