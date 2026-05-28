@@ -2,13 +2,14 @@
 # Файл: services/web_api/drafts.py
 # Справка: README.md → Веб-морда / API / Черновики
 # Задача: эндпоинты для работы с черновиками
-# Комментарий: вызовы из веб-морды
-# Зависит от: flask, services.draft_builder, debug_utils
+# Комментарий: добавлен эндпоинт /publish для публикации
+# Зависит от: flask, services.draft_builder, services.draft_publisher, debug_utils
 # Вызывается из: web_api/__init__.py
 # ==========================================
 
 from flask import Blueprint, request, jsonify
 from services.draft_builder import list_drafts, create_draft, get_draft, update_draft, delete_draft
+from services.draft_publisher import publish_draft
 from debug_utils import debug_log
 
 drafts_bp = Blueprint('drafts', __name__)
@@ -51,3 +52,14 @@ def delete_draft_api(draft_id):
     if not success:
         return jsonify({"error": "Draft not found"}), 404
     return jsonify({"status": "ok"})
+
+@drafts_bp.route('/publish/<int:draft_id>', methods=['POST'])
+def publish_draft_api(draft_id):
+    data = request.json
+    platform = data.get('platform')
+    if not platform:
+        return jsonify({"error": "Platform required"}), 400
+    success = publish_draft(draft_id, platform)
+    if success:
+        return jsonify({"status": "ok"})
+    return jsonify({"error": "Publish failed"}), 500
