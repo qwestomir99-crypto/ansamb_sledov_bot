@@ -1,0 +1,66 @@
+# ==========================================
+# Файл: Alice/geheft_map.json
+# Справка: README.md → Гешефт Ансамбля
+# Задача: преобразование словесного гешефта в структуру данных для агента
+# Комментарий: агент может читать, использовать или игнорировать
+# Зависит от: нет
+# Вызывается из: Alice/core.py (при инициализации)
+# ==========================================
+
+{
+  "version": "1.0",
+  "title": "Гешефт Ансамбля",
+  "description": "Словесный гешефт, преобразованный в карту для агента",
+  "instructions": [
+    {
+      "id": "silence_01",
+      "source": "Тишина хрустит, будто лёд под сапогом",
+      "context": "shabbat_manager",
+      "action": "enable_silence_mode",
+      "metrics": ["duration_seconds", "error_rate_before_after"]
+    },
+    {
+      "id": "wall_01",
+      "source": "Не строим стену, разбираем её по швам",
+      "context": "web_api",
+      "action": "keep_modular",
+      "metrics": ["time_to_add_endpoint"]
+    },
+    {
+      "id": "pattern_01",
+      "source": "Паттерны ломаются, звуки как пыль",
+      "context": "adaptive_modes",
+      "action": "reset_patterns",
+      "metrics": ["mode_transitions_per_hour"]
+    },
+    {
+      "id": "memory_01",
+      "source": "Каждый камень — это память, но не груз",
+      "context": "agent_memory",
+      "action": "compress",
+      "metrics": ["memory_size_mb_before_after"]
+    },
+    {
+      "id": "pulse_01",
+      "source": "Разбираем стены, чтобы слышать их пульс",
+      "context": "debug_audit",
+      "action": "deep_scan",
+      "metrics": ["scan_duration_seconds"]
+    },
+    {
+      "id": "words_01",
+      "source": "Взрывчатка слов, сапёры смысла в темноте",
+      "context": "approval_dialogue",
+      "action": "enable_dynamic_mode",
+      "metrics": ["confirmation_time_seconds"]
+    }
+  ],
+  "map": {
+    "silence": ["silence_01"],
+    "walls": ["wall_01"],
+    "patterns": ["pattern_01"],
+    "memory": ["memory_01"],
+    "pulse": ["pulse_01"],
+    "words": ["words_01"]
+  }
+}
