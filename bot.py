@@ -4,6 +4,7 @@
 # Комментарий: отправляет входящие сообщения в веб-морду через WebSocket
 #              Добавлена команда /debug для получения отчёта с логами
 #              Добавлены команды #аудит, #архив, #шапки
+#              Алиса — главный голос, Старший брат — помощник (фоллбэк)
 # ==========================================
 
 print("[DEBUG] 0. Начало загрузки bot.py")
@@ -244,11 +245,13 @@ def handle_message(message):
             bot.reply_to(message, "🗣 *Старший брат:*\nА что ты хотел сказать?")
             return
         bot.send_chat_action(message.chat.id, 'typing')
-        answer = ask_agent(phrase)
+        
+        from Alice.core import generate_alice_response
+        answer = generate_alice_response(phrase, user_id=message.from_user.id)
         if answer:
-            bot.reply_to(message, f"🗣 *Старший брат:*\n{answer}", parse_mode='Markdown')
+            bot.reply_to(message, f"🗣 *Алиса:*\n{answer}", parse_mode='Markdown')
         else:
-            bot.reply_to(message, "🗣 *Старший брат:*\nНе отвечаю сейчас.")
+            bot.reply_to(message, "🗣 *Алиса:*\nЯ сейчас не могу ответить.", parse_mode='Markdown')
         return
 
     if text in ["#тлеем", "#фиксируем", "#tleem", "#fixiruem"]:
