@@ -17,6 +17,8 @@ from services.app_modules.youtube import youtube_bp
 from services.app_modules.socket import socketio, messages
 from services.app_modules.routes import routes_bp
 from services.app_modules.background import background_bp, start_background_thread
+from services.web_api import web_api
+from services.analytics_api import analytics_api
 
 # Настройки
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
@@ -36,6 +38,8 @@ app.register_blueprint(static_bp, url_prefix='/static')
 app.register_blueprint(youtube_bp, url_prefix='/youtube')
 app.register_blueprint(routes_bp, url_prefix='/')
 app.register_blueprint(background_bp, url_prefix='/bg')
+app.register_blueprint(web_api, url_prefix='/api')
+app.register_blueprint(analytics_api, url_prefix='/api/analytics')
 
 # Запуск фонового потока
 start_background_thread()
