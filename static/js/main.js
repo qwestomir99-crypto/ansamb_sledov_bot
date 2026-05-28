@@ -9,7 +9,7 @@
 
 import { initSocket } from './socket.js';
 import { initReplies } from './replies.js';
-import { createPost, sendPost } from './posts.js';
+import { createPost, sendPost, createPostWithMedia } from './posts.js';
 import { setMode, togglePing, toggleAlice } from './bot.js';
 import { addQuote } from './quotes.js';
 import { fetchDebugLogs, sendDebugReport, runAudit, showAuditStatus, showDebugIndex } from './debug.js';
@@ -19,6 +19,7 @@ import { escapeHtml } from './helpers.js';
 // Подключаем глобальные переменные для доступа из HTML
 window.createPost = createPost;
 window.sendPost = sendPost;
+window.createPostWithMedia = createPostWithMedia;
 window.setMode = setMode;
 window.togglePing = togglePing;
 window.toggleAlice = toggleAlice;
