@@ -5,6 +5,7 @@
 # Комментарий: Алиса — главный голос. Если она недоступна — отвечает Старший брат.
 #              Добавлена возможность предлагать изменения кода.
 #              Алиса может делегировать задачи Старшему брату.
+#              Добавлен метод reconfigure_agent.
 # Зависит от: dialogue.agent, debug_utils, config.json, services.suggestion_engine
 # Вызывается из: bot.py (обработчик #говори)
 # ==========================================
@@ -80,3 +81,9 @@ def suggest_change(description, code_snippet, target_file):
     Возвращает ID предложения.
     """
     return create_suggestion(description, code_snippet, target_file)
+
+def reconfigure_agent(new_rules):
+    """
+    Алиса перенастраивает агента через предложение.
+    """
+    return suggest_change("Перенастройка агента", new_rules, "Alice/agent_rules.txt")
