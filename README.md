@@ -179,13 +179,14 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 28.05.2026 09:43:13*
+*Обновлено: 28.05.2026 09:44:45*
 
 | Файл | Статус |
 |------|--------|
 | `Alice/alice_admin.py` | ✅ Redmi-шапка |
 | `Alice/core.py` | ✅ Redmi-шапка |
 | `Alice/disabled.py` | ✅ Redmi-шапка |
+| `Alice/post_builder.py` | ✅ Redmi-шапка |
 | `Alice/prompts/library.py` | ✅ Redmi-шапка |
 | `Alice/prompts/link.py` | ✅ Redmi-шапка |
 | `Alice/prompts/photo.py` | ✅ Redmi-шапка |
