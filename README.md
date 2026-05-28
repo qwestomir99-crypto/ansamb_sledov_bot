@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 28.05.2026 10:15:55*
+*Обновлено: 28.05.2026 10:29:55*
 
 | Файл | Статус |
 |------|--------|
@@ -262,6 +262,7 @@
 | `services/draft_bulder.py` | ✅ Redmi-шапка |
 | `services/draft_publisher.py` | ✅ Redmi-шапка |
 | `services/exception_handler.py` | ✅ Redmi-шапка |
+| `services/gmail_client.py` | ✅ Redmi-шапка |
 | `services/iternal_line.py` | ✅ Redmi-шапка |
 | `services/log_cleaner.py` | ✅ Redmi-шапка |
 | `services/photo_reader.py` | ✅ Redmi-шапка |
