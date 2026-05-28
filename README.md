@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 28.05.2026 15:55:08*
+*Обновлено: 28.05.2026 15:56:36*
 
 | Файл | Статус |
 |------|--------|
@@ -245,6 +245,7 @@
 | `dialogue/callbacks/mood.py` | ✅ Redmi-шапка |
 | `dialogue/callbacks/quotes.py` | ✅ Redmi-шапка |
 | `dialogue/callbacks/user.py` | ✅ Redmi-шапка |
+| `dialogue/callbacks/youtube_upload.py` | ✅ Redmi-шапка |
 | `dialogue/color_logger.py` | ✅ Redmi-шапка |
 | `dialogue/exception_handler.py` | ✅ Redmi-шапка |
 | `dialogue/handlers.py` | ✅ Redmi-шапка |
