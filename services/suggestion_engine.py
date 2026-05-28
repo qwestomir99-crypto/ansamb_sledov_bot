@@ -71,3 +71,18 @@ def reject_suggestion(suggestion_id):
 
 def list_pending_suggestions():
     return load_suggestions()["pending"]
+
+def get_last_pending():
+    suggestions = load_suggestions()
+    if suggestions["pending"]:
+        return suggestions["pending"][-1]
+    return None
+
+def confirm_last_pending(confirm=True):
+    last = get_last_pending()
+    if not last:
+        return False
+    if confirm:
+        return approve_suggestion(last["id"])
+    else:
+        return reject_suggestion(last["id"])
