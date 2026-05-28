@@ -3,7 +3,7 @@
 // Справка: README.md → Веб-морда / Точка входа
 // Задача: инициализация всех модулей веб-морды
 // Комментарий: импортирует все функции из модулей
-// Зависит от: socket.js, replies.js, posts.js, bot.js, quotes.js, debug.js, ui.js, helpers.js, dialogue.js
+// Зависит от: socket.js, replies.js, posts.js, bot.js, quotes.js, debug.js, ui.js, helpers.js, dialogue.js, drafts.js, mail.js
 // Вызывается из: templates/admin.html
 // ==========================================
 
@@ -16,6 +16,8 @@ import { fetchDebugLogs, sendDebugReport, runAudit, showAuditStatus, showDebugIn
 import { showToast } from './ui.js';
 import { escapeHtml } from './helpers.js';
 import { initDialogue } from './dialogue.js';
+import { initDrafts } from './drafts.js';
+import { initMail } from './mail.js';
 
 // Подключаем глобальные переменные для доступа из HTML
 window.createPost = createPost;
@@ -38,4 +40,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initSocket();
     initReplies();
     initDialogue();
+    initDrafts();
+    initMail();
 });
