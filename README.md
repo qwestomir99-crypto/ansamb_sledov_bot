@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 28.05.2026 06:08:09*
+*Обновлено: 28.05.2026 06:10:29*
 
 | Файл | Статус |
 |------|--------|
@@ -260,6 +260,7 @@
 | `services/supabase_client.py` | ✅ Redmi-шапка |
 | `services/tg_api.py` | ✅ Redmi-шапка |
 | `services/theme.py` | ✅ Redmi-шапка |
+| `services/tracking.py` | ✅ Redmi-шапка |
 | `services/vk_api.py` | ✅ Redmi-шапка |
 | `services/vk_reader.py` | ❌ Без шапки |
 | `services/vk_uploader.py` | ✅ Redmi-шапка |
