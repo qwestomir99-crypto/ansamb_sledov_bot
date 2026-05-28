@@ -1,9 +1,9 @@
 # ==========================================
 # Файл: Alice/core.py
 # Справка: README.md → Алиса / Ядро
-# Задача: генерация ответов Алисы (с кэшем и фоллбэком на ask_agent)
-# Комментарий: использует response_cache для ускорения ответов
-# Зависит от: dialogue.agent, debug_utils, config.json, services.suggestion_engine, context_mirror, response_cache
+# Задача: генерация ответов Алисы (с кэшем и зеркалом)
+# Комментарий: добавлена интеграция с аналитикой
+# Зависит от: dialogue.agent, debug_utils, config.json, services.suggestion_engine, context_mirror, response_cache, sql_analytics
 # Вызывается из: bot.py (обработчик #говори)
 # ==========================================
 
@@ -16,6 +16,7 @@ from Alice.prompts.library import get_context
 from Alice.prompts.roles import get_role_context
 from Alice.context_mirror import update_mirror, get_context_hint
 from Alice.response_cache import get_cached_response, save_cached_response
+from services.sql_analytics import record_activity
 
 def log_alice(level, message):
     debug_log("ALICE", message, level)
@@ -39,6 +40,9 @@ def generate_alice_response(user_message, user_id=None):
     if not alice_enabled:
         log_alice("INFO", "Алиса выключена, отвечает Старший брат")
         return ask_agent(user_message, user_id)
+    
+    # Записываем активность в аналитику
+    record_activity("alice", "request", {"user_message": user_message[:50]})
     
     # Определяем роль и настроение (временно заглушка)
     role = "default"
