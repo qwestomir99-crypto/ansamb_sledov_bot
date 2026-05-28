@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 28.05.2026 10:44:10*
+*Обновлено: 28.05.2026 10:45:24*
 
 | Файл | Статус |
 |------|--------|
@@ -217,6 +217,7 @@
 | `dialogue/agent_settings.py` | ✅ Redmi-шапка |
 | `dialogue/approve_commands.py` | ✅ Redmi-шапка |
 | `dialogue/button_map.py` | ✅ Redmi-шапка |
+| `dialogue/callbacks/__init__.py` | ✅ Redmi-шапка |
 | `dialogue/color_logger.py` | ✅ Redmi-шапка |
 | `dialogue/exception_handler.py` | ✅ Redmi-шапка |
 | `dialogue/handlers.py` | ✅ Redmi-шапка |
