@@ -2,7 +2,7 @@
 // Файл: static/js/drafts.js
 // Справка: README.md → Веб-морда / Черновики
 // Задача: интерфейс для управления черновиками в веб-морде
-// Комментарий: создание, просмотр, редактирование черновиков
+// Комментарий: создание, просмотр, редактирование, публикация черновиков
 // Зависит от: ui.js (showToast)
 // Вызывается из: main.js (импорт)
 // ==========================================
@@ -26,8 +26,10 @@ async function loadDraftsList() {
             <div class="draft-item">
                 <strong>${escapeHtml(d.title)}</strong>
                 <p>${escapeHtml(d.content.slice(0, 100))}...</p>
-                <button onclick="editDraft(${d.id})">✏️</button>
-                <button onclick="deleteDraft(${d.id})">🗑️</button>
+                <button onclick="editDraft(${d.id})">✏️ Редактировать</button>
+                <button onclick="publishDraft(${d.id}, 'telegram')">📱 Telegram</button>
+                <button onclick="publishDraft(${d.id}, 'vk')">📘 VK</button>
+                <button onclick="deleteDraft(${d.id})">🗑️ Удалить</button>
             </div>
         `).join('');
     } catch (e) {
@@ -83,5 +85,20 @@ window.saveDraft = async function() {
         loadDraftsList();
     } catch (e) {
         showToast('Ошибка сохранения', 'error');
+    }
+};
+
+window.publishDraft = async function(id, platform) {
+    if (!confirm(`Опубликовать черновик в ${platform === 'telegram' ? 'Telegram' : 'VK'}?`)) return;
+    try {
+        await fetch(`/api/drafts/publish/${id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ platform })
+        });
+        showToast(`Черновик опубликован в ${platform}`, 'success');
+        loadDraftsList();
+    } catch (e) {
+        showToast('Ошибка публикации', 'error');
     }
 };
