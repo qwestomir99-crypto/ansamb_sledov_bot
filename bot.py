@@ -80,6 +80,7 @@ from dialogue.admin_commands import (
 from debug_utils import debug_log
 from services.ws_client import send_to_web_morda
 from services.log_cleaner import start_log_cleaner
+from services.agent_config import apply_rules
 
 if ENABLE_JOURNALIST:
     from dialogue.journalist import journalist_loop
