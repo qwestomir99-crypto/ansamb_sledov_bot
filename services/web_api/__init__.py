@@ -15,6 +15,7 @@ from .posts import posts_bp
 from .theme import theme_bp
 from .alice import alice_bp
 from .audit import audit_bp
+from .youtube_upload import youtube_upload_bp
 
 web_api = Blueprint('web_api', __name__)
 
@@ -25,3 +26,4 @@ web_api.register_blueprint(posts_bp, url_prefix='/posts')
 web_api.register_blueprint(theme_bp, url_prefix='/theme')
 web_api.register_blueprint(alice_bp, url_prefix='/alice')
 web_api.register_blueprint(audit_bp, url_prefix='/audit')
+web_api.register_blueprint(youtube_upload_bp, url_prefix='/youtube_upload')
