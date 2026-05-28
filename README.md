@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 28.05.2026 12:03:48*
+*Обновлено: 28.05.2026 12:04:33*
 
 | Файл | Статус |
 |------|--------|
@@ -211,6 +211,7 @@
 | `bot/handlers/rituals.py` | ❌ Без шапки |
 | `bot/handlers/start.py` | ❌ Без шапки |
 | `bot/handlers/talk.py` | ❌ Без шапки |
+| `bot/handlers/unknown.py` | ❌ Без шапки |
 | `bot/handlers/youtube_test.py` | ❌ Без шапки |
 | `bot/main.py` | ❌ Без шапки |
 | `debug_audit.py` | ✅ Redmi-шапка |
