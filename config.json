@@ -59,5 +59,8 @@
     "settings": {
         "REPOST_ENABLED": false,
         "REPOST_QUOTE_CHANCE": 50
+    },
+    "alice": {
+        "enabled": true
     }
 }
