@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 28.05.2026 10:29:55*
+*Обновлено: 28.05.2026 10:31:20*
 
 | Файл | Статус |
 |------|--------|
@@ -279,6 +279,7 @@
 | `services/web_api/alice.py` | ✅ Redmi-шапка |
 | `services/web_api/audit.py` | ✅ Redmi-шапка |
 | `services/web_api/drafts.py` | ✅ Redmi-шапка |
+| `services/web_api/mail.py` | ✅ Redmi-шапка |
 | `services/web_api/modes.py` | ✅ Redmi-шапка |
 | `services/web_api/ping.py` | ✅ Redmi-шапка |
 | `services/web_api/posts.py` | ✅ Redmi-шапка |
