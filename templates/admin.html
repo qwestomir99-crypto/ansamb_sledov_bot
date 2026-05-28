@@ -7,6 +7,7 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='10' y='65' font-family='monospace' font-size='50' fill='%2300ffcc'%3E0.8%3C/text%3E%3C/svg%3E">
     <link rel="stylesheet" href="/static/css/{{ theme }}">
     <link rel="stylesheet" href="/static/css/admin.css">
+    <link rel="stylesheet" href="/static/css/visuals.css">
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <script type="module" src="/static/js/main.js"></script>
 </head>
@@ -114,6 +115,16 @@
         <div id="index-result" style="margin-top: 1rem;"></div>
     </div>
 
+    <!-- Диалог с агентом -->
+    <div class="card">
+        <h2>🗣 Диалог с агентом</h2>
+        <div id="chat-history" style="max-height: 300px; overflow-y: auto; margin-bottom: 10px;"></div>
+        <div style="display: flex; gap: 10px;">
+            <textarea id="chat-input" rows="2" placeholder="Напишите агенту..." style="flex: 1;"></textarea>
+            <button onclick="sendToAgent()">Отправить</button>
+        </div>
+    </div>
+
     <!-- Футер -->
     <div class="footer-links">
         <a href="/timeline">📅 Таймлайн Ансамбля</a>
@@ -145,6 +156,7 @@ async function toggleThemeManually() {
     }
 }
 
+// Загружаем сохранённую тему при загрузке
 document.addEventListener('DOMContentLoaded', () => {
     const savedTheme = localStorage.getItem('web_theme');
     if (savedTheme) {
