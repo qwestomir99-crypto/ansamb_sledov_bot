@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 28.05.2026 08:23:27*
+*Обновлено: 28.05.2026 08:45:02*
 
 | Файл | Статус |
 |------|--------|
@@ -192,7 +192,6 @@
 | `Alice/prompts/roles.py` | ✅ Redmi-шапка |
 | `Alice/prompts/video.py` | ✅ Redmi-шапка |
 | `agent.py` | ❌ Без шапки |
-| `app.py` | ✅ Redmi-шапка |
 | `archive_keeper.py` | ✅ Redmi-шапка |
 | `big_video_uploader.py` | ✅ Redmi-шапка |
 | `bot.py` | ❌ Без шапки |
