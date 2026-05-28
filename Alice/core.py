@@ -1,9 +1,9 @@
 # ==========================================
 # Файл: Alice/core.py
 # Справка: README.md → Алиса / Ядро
-# Задача: генерация ответов Алисы (с зеркалом контекста и фоллбэком на ask_agent)
-# Комментарий: использует context_mirror для отслеживания интонаций
-# Зависит от: dialogue.agent, debug_utils, config.json, services.suggestion_engine, context_mirror
+# Задача: генерация ответов Алисы (с кэшем и фоллбэком на ask_agent)
+# Комментарий: использует response_cache для ускорения ответов
+# Зависит от: dialogue.agent, debug_utils, config.json, services.suggestion_engine, context_mirror, response_cache
 # Вызывается из: bot.py (обработчик #говори)
 # ==========================================
 
@@ -15,6 +15,7 @@ from services.suggestion_engine import create_suggestion
 from Alice.prompts.library import get_context
 from Alice.prompts.roles import get_role_context
 from Alice.context_mirror import update_mirror, get_context_hint
+from Alice.response_cache import get_cached_response, save_cached_response
 
 def log_alice(level, message):
     debug_log("ALICE", message, level)
@@ -39,6 +40,16 @@ def generate_alice_response(user_message, user_id=None):
         log_alice("INFO", "Алиса выключена, отвечает Старший брат")
         return ask_agent(user_message, user_id)
     
+    # Определяем роль и настроение (временно заглушка)
+    role = "default"
+    mood = "neutral"
+    
+    # Проверяем кэш
+    cached = get_cached_response(user_message, role, mood)
+    if cached:
+        log_alice("INFO", f"Ответ из кэша: {cached[:50]}...")
+        return cached
+    
     try:
         # Анализируем запрос
         is_technical = any(word in user_message.lower() for word in ["код", "модуль", "api", "бот", "команда", "сценарий", "напиши", "проверь"])
@@ -56,25 +67,26 @@ def generate_alice_response(user_message, user_id=None):
         # Формируем полный промпт
         full_prompt = f"{role_context}\n\n{library_context}\n\n{mirror_hint}\n\nПользователь: {user_message}\n\nАлиса:"
         
+        response = None
         if is_technical:
             # Делегируем техническую задачу Старшему брату
             task = f"Выполни техническую задачу: {user_message}"
             response = ask_agent(task, user_id=user_id)
-            update_mirror(user_message, response)
-            log_alice("INFO", f"Алиса делегировала задачу Старшему брату: {response[:50]}...")
-            return f"🗣 *Алиса:* Я передала задачу Старшему брату.\n\n{response}"
         elif is_creative:
             # Алиса отвечает сама (творческая задача)
             response = ask_agent(full_prompt, user_id=user_id)
-            update_mirror(user_message, response)
-            log_alice("INFO", f"Алиса ответила: {response[:50]}...")
-            return response
         else:
             # Обычный запрос — отвечаем через полный промпт
             response = ask_agent(full_prompt, user_id=user_id)
-            update_mirror(user_message, response)
-            log_alice("INFO", f"Алиса ответила: {response[:50]}...")
-            return response
+        
+        # Сохраняем в кэш
+        save_cached_response(user_message, role, mood, response)
+        
+        # Обновляем зеркало контекста
+        update_mirror(user_message, response)
+        
+        log_alice("INFO", f"Алиса ответила: {response[:50]}...")
+        return response
     except Exception as e:
         log_alice("ERROR", f"Алиса недоступна: {e}")
         return ask_agent(user_message, user_id)
