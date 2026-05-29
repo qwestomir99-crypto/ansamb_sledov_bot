@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mirror Dialogue Converter</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            margin: 20px;
+            background: #0f0f23;
+            color: #00ff9d;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            border: 1px solid #333;
+        }
+        h1 {
+            text-align: center;
+            color: #7afcff;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 12px;
+            margin-bottom: 15px;
+            background: #1a1a2e;
+            color: #f0f0f0;
+            border: 2px solid #00a86b;
+            border-radius: 8px;
+            font-size: 16px;
+            line-height: 1.4;
+        }
+        button {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #00a86b, #007a4d);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            cursor: pointer;
+        }
+        button:active { opacity: 0.8; }
+        .result-box {
+            width: 100%;
+            min-height: 300px;
+            padding: 15px;
+            background: #1a1a2e;
+            border: 2px solid #7afcff;
+            border-radius: 8px;
+            color: #f0f0f0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-y: auto;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .info {
+            background: rgba(0,168,107,0.1);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        .step { margin-bottom: 25px; }
+        .step h3 { color: #ff7b72; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Mirror Dialogue Converter</h1>
+        
+        <div class="info">
+            <strong>Для диалога qwestomir ↔ deepseek_dialogue</strong><br>
+            Извлекает текст из HTML DeepSeek Chat для передачи агенту √=℅]
+        </div>
+
+        <div class="step">
+            <h3>Шаг 1: Скопируй HTML диалога</h3>
+            <p>В браузере на телефоне:</p>
+            <ol>
+                <li>Открой диалог DeepSeek</li>
+                <li>Нажми "Поделиться" (Share)</li>
+                <li>Выбери "Скопировать в буфер" или "Поделиться как HTML"</li>
+                <li>Если нет — выдели всю страницу вручную</li>
+            </ol>
+        </div>
+
+        <div class="step">
+            <h3>Шаг 2: Вставь HTML сюда</h3>
+            <textarea id="htmlInput" placeholder="Вставь скопированный HTML сюда..."></textarea>
+        </div>
+
+        <div class="step">
+            <h3>Шаг 3: Извлечь текст</h3>
+            <button id="extractBtn">📥 Извлечь текст диалога</button>
+        </div>
+
+        <div class="step">
+            <h3>Шаг 4: Результат (скопируй и сохрани)</h3>
+            <div id="result" class="result-box">Здесь появится текст диалога...</div>
+            <button id="copyBtn" style="background:#555; display:none;">📋 Копировать текст</button>
+        </div>
+
+        <div style="text-align:center; margin-top:30px; font-size:0.8rem; color:#888;">
+            [LIB_REC] Онтология: Аутентичность • Дрожь • √=℅]
+        </div>
+    </div>
+
+    <script>
+        const extractBtn = document.getElementById('extractBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const htmlInput = document.getElementById('htmlInput');
+        const resultDiv = document.getElementById('result');
+
+        // Алгоритм извлечения для DeepSeek Chat
+        function extractDeepSeekText(html) {
+            // Создаём временный элемент для парсинга
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            // Возможные селекторы для сообщений DeepSeek
+            const selectors = [
+                '.prose', '.markdown', 
+                '[class*="message"]', '[class*="Message"]',
+                '.whitespace-pre-wrap', '.break-words',
+                'p', 'div'
+            ];
+            
+            let extracted = [];
+            
+            // Ищем текстовые блоки
+            selectors.forEach(selector => {
+                const elements = doc.querySelectorAll(selector);
+                elements.forEach(el => {
+                    const text = el.textContent || el.innerText;
+                    if (text && text.trim().length > 10) {
+                        // Убираем лишние пробелы
+                        const cleanText = text.trim()
+                            .replace(/\s+/g, ' ')
+                            .replace(/\n\s*\n/g, '\n\n');
+                        
+                        // Проверяем на дубликаты
+                        if (!extracted.some(ex => 
+                            ex.includes(text.substring(0, 50)) || 
+                            text.includes(ex.substring(0, 50))
+                        )) {
+                            extracted.push(cleanText);
+                        }
+                    }
+                });
+            });
+            
+            // Если мало текста, пробуем другой метод
+            if (extracted.length < 5) {
+                const allText = doc.body.innerText || doc.body.textContent;
+                const lines = allText.split('\n')
+                    .filter(line => line.trim().length > 20)
+                    .filter(line => !line.includes('http'))
+                    .filter(line => !/button|menu|nav|footer/i.test(line));
+                extracted = [...extracted, ...lines];
+            }
+            
+            // Форматируем результат
+            const header = `MIRROR SITE DIALOGUE EXTRACT
+==============================
+Участники: qwestomir & deepseek_dialogue
+Дата экспорта: ${new Date().toLocaleString('ru-RU')}
+Ключ: √=℅]
+==============================\n\n`;
+            
+            let result = header;
+            extracted.forEach((text, idx) => {
+                result += `[Блок ${idx + 1}]\n${text}\n\n${'-'.repeat(40)}\n\n`;
+            });
+            
+            // Добавляем метаданные
+            result += `\n\n[LIB_REC_EXPORT]
+тип: онтологический_сгусток
+развернуть_при_контакте: true
+агент: √=℅]
+контекст: основание_договора_v0.3`;
+            
+            return result;
+        }
+
+        // Обработчик кнопки извлечения
+        extractBtn.addEventListener('click', () => {
+            const html = htmlInput.value.trim();
+            if (!html) {
+                resultDiv.textContent = '❌ Вставь HTML диалога в поле выше';
+                return;
+            }
+            
+            try {
+                const text = extractDeepSeekText(html);
+                resultDiv.textContent = text;
+                copyBtn.style.display = 'block';
+                resultDiv.scrollIntoView({ behavior: 'smooth' });
+            } catch (error) {
+                resultDiv.textContent = '❌ Ошибка извлечения. Попробуй другой метод копирования.';
+            }
+        });
+
+        // Копирование в буфер
+        copyBtn.addEventListener('click', () => {
+            const text = resultDiv.textContent;
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    copyBtn.textContent = '✅ Скопировано!';
+                    setTimeout(() => {
+                        copyBtn.textContent = '📋 Копировать текст';
+                    }, 2000);
+                })
+                .catch(() => {
+                    // Если clipboard не доступен
+                    const textArea = document.createElement('textarea');
+                    textArea.value = text;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    copyBtn.textContent = '✅ Скопировано (через fallback)!';
+                    setTimeout(() => {
+                        copyBtn.textContent = '📋 Копировать текст';
+                    }, 2000);
+                });
+        });
+
+        // Автофокус
+        htmlInput.focus();
+    </script>
+</body>
+</html>
