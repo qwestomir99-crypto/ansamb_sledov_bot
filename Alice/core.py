@@ -2,9 +2,9 @@
 # Файл: Alice/core.py
 # Справка: README.md → Алиса / Ядро
 # Задача: генерация ответов Алисы (с кэшем и зеркалом)
-# Комментарий: добавлена интеграция с аналитикой
+# Комментарий: добавлена интеграция с аналитикой и маршрутизацией
 # Зависит от: dialogue.agent, debug_utils, config.json, services.suggestion_engine, context_mirror, response_cache, sql_analytics
-# Вызывается из: bot.py (обработчик #говори)
+# Вызывается из: bot.py (обработчик #говори), routing_engine.py
 # ==========================================
 
 import os
@@ -27,6 +27,15 @@ def load_config():
             return json.load(f)
     except:
         return {}
+
+def get_alice_context_for_routing():
+    """Возвращает контекст Алисы для маршрутизации"""
+    mirror = load_mirror()
+    return {
+        "tempo": mirror.get("tempo", "normal"),
+        "mood": "creative" if len(mirror.get("metaphors", [])) > 3 else "neutral",
+        "last_update": mirror.get("last_update", "")
+    }
 
 def generate_alice_response(user_message, user_id=None):
     """
