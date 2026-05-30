@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 30.05.2026 18:04:11*
+*Обновлено: 30.05.2026 18:07:18*
 
 | Файл | Статус |
 |------|--------|
@@ -294,6 +294,7 @@
 | `services/iternal_line.py` | ✅ Redmi-шапка |
 | `services/log_cleaner.py` | ✅ Redmi-шапка |
 | `services/photo_reader.py` | ✅ Redmi-шапка |
+| `services/publisher.py` | ✅ Redmi-шапка |
 | `services/routing_engine.py` | ✅ Redmi-шапка |
 | `services/sql_analytics.py` | ✅ Redmi-шапка |
 | `services/suggestion_engine.py` | ✅ Redmi-шапка |
