@@ -27,6 +27,30 @@ def record_activity(module, action, metadata=None):
     db_insert(ANALYTICS_TABLE, data)
     log_sql("INFO", f"Активность записана: {module}.{action}")
 
+def get_routing_context():
+    """Возвращает контекст для маршрутизации на основе аналитики"""
+    # Получаем активность за последний час
+    result = db_select(
+        ANALYTICS_TABLE,
+        limit=100,
+        filter_by={"module": "web"}
+    )
+    activity_count = len(result)
+    
+    # Определяем уровень активности
+    if activity_count > 50:
+        level = "high"
+    elif activity_count > 10:
+        level = "medium"
+    else:
+        level = "low"
+    
+    return {
+        "activity": activity_count,
+        "level": level,
+        "last_update": datetime.now().isoformat()
+    }
+
 def get_activity_by_hour(hours=24):
     """Возвращает активность по часам (из SQL)"""
     result = db_select(
@@ -34,10 +58,9 @@ def get_activity_by_hour(hours=24):
         limit=1000,
         filter_by={"module": "web"}
     )
-    # Группировка по часам (упрощённо)
     hourly = {}
     for row in result:
-        hour = row["timestamp"][:13]  # 2026-05-28T15
+        hour = row["timestamp"][:13]
         hourly[hour] = hourly.get(hour, 0) + 1
     return sorted(hourly.items())
 
