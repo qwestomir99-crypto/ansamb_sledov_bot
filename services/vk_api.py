@@ -2,7 +2,7 @@
 # Файл: services/vk_api.py
 # Справка: README.md → Веб-морда / VK API
 # Задача: API для комментариев, ответов и постинга в VK
-# Комментарий: используется веб-мордой для отправки комментариев и ответов
+# Комментарий: добавлена функция get_vk_messages() для фонового потока
 # Зависит от: flask, requests, debug_utils
 # Вызывается из: services/app.py (blueprint)
 # ==========================================
@@ -183,6 +183,45 @@ def api_vk_repost():
     except Exception as e:
         log_vk("ERROR", f"Исключение: {e}")
         return jsonify({"status": "error", "error": str(e)}), 500
+
+# ==========================================
+# ФУНКЦИЯ ДЛЯ ФОНОВОГО ПОТОКА
+# ==========================================
+
+def get_vk_messages(limit=10):
+    """
+    Получение последних сообщений из VK.
+    Возвращает список сообщений в формате:
+    [{'chat_id': 123, 'text': 'текст', 'timestamp': '2026-06-01T12:00:00', 'source': 'vk'}]
+    """
+    if not VK_TOKEN or not VK_GROUP_ID:
+        log_vk("ERROR", "VK_TOKEN или VK_GROUP_ID не заданы")
+        return []
+    
+    try:
+        # Получаем последние сообщения из чатов
+        params = {
+            "access_token": VK_TOKEN,
+            "v": "5.199",
+            "count": limit,
+            "filter": "all"
+        }
+        r = requests.get("https://api.vk.com/method/messages.get", params=params, timeout=30)
+        data = r.json()
+        
+        messages = []
+        if 'response' in data and 'items' in data['response']:
+            for item in data['response']['items']:
+                messages.append({
+                    'chat_id': item.get('peer_id', 0),
+                    'text': item.get('text', ''),
+                    'timestamp': item.get('date', ''),
+                    'source': 'vk'
+                })
+        return messages
+    except Exception as e:
+        log_vk("ERROR", f"Ошибка получения сообщений: {e}")
+        return []
 
 # ==========================================
 # ДЛЯ ТЕСТА
