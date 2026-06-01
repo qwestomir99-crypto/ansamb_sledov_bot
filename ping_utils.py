@@ -1,9 +1,11 @@
 # ==========================================
 # Файл: ping_utils.py
+# Справка: README.md → Пинг
 # Задача: keep-alive пинг для Render (бот и агент)
 # Комментарий: запускается из bot.py в потоках.
 #              Пинг бота — раз в 60 секунд, агента — раз в 9 минут.
 # ==========================================
+
 import requests
 import threading
 import time
@@ -46,3 +48,9 @@ def start_background_pinger(interval=60):
 
 def start_agent_pinger():
     threading.Thread(target=ping_agent, daemon=True).start()
+
+def toggle_ping():
+    """Включает/выключает пинг бота (заглушка для совместимости)"""
+    # Здесь может быть логика включения/выключения пинга
+    # Сейчас просто возвращаем True
+    return True
