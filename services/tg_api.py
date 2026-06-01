@@ -2,9 +2,7 @@
 # Файл: services/tg_api.py
 # Справка: README.md → Веб-морда / Telegram API
 # Задача: API для комментариев, ответов и постинга в Telegram
-# Комментарий: переписано на requests вместо telebot (убираем 409)
-# Зависит от: flask, requests, debug_utils
-# Вызывается из: services/app.py (blueprint)
+# Комментарий: без telebot
 # ==========================================
 
 import os
@@ -210,23 +208,6 @@ def api_tg_get_chat_id():
         return jsonify({"status": "ok", "chat_id": result.get("id"), "title": result.get("title")})
     else:
         return jsonify({"status": "error", "error": "Ошибка получения"}), 500
-
-# ==========================================
-# ФУНКЦИЯ ДЛЯ ФОНОВОГО ПОТОКА (пока оставляем, но она не используется)
-# ==========================================
-
-def get_telegram_messages(limit=10):
-    """
-    Получение последних сообщений из Telegram.
-    Возвращает список сообщений в формате:
-    [{'chat_id': 123, 'text': 'текст', 'timestamp': '2026-06-01T12:00:00', 'source': 'tg'}]
-    """
-    if not BOT_TOKEN:
-        log_tg("ERROR", "BOT_TOKEN не задан")
-        return []
-    
-    # Здесь мог бы быть вызов getUpdates, но мы его не используем во избежание 409
-    return []
 
 # ==========================================
 # ДЛЯ ТЕСТА
