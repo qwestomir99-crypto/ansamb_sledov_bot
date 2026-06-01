@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, WebSocket
-# Комментарий: ПРАВИЛЬНЫЙ ПУТЬ К СТАТИКЕ (абсолютный)
+# Комментарий: ФИНАЛЬНАЯ ВЕРСИЯ — ВСЕ ПУТИ ПРАВИЛЬНЫЕ, БОТА НЕТ
 # ==========================================
 
 import os
@@ -12,10 +12,10 @@ from flask_socketio import SocketIO
 from debug_utils import debug_log
 
 # ==========================================
-# КОРЕНЬ ПРОЕКТА
+# КОРЕНЬ ПРОЕКТА (на Render)
 # ==========================================
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = '/opt/render/project/src'
 sys.path.insert(0, PROJECT_ROOT)
 
 # ==========================================
@@ -32,12 +32,12 @@ from services.web_api import web_api
 from services.analytics_api import analytics_api
 
 # ==========================================
-# FLASK ПРИЛОЖЕНИЕ
+# FLASK ПРИЛОЖЕНИЕ С ПРАВИЛЬНЫМИ ПУТЯМИ
 # ==========================================
 
 app = Flask(__name__,
     template_folder=os.path.join(PROJECT_ROOT, 'templates'),
-    static_folder='/opt/render/project/src/static'  # ← ВОТ ЭТА СТРОКА ВСЁ РЕШАЕТ
+    static_folder=os.path.join(PROJECT_ROOT, 'static')
 )
 
 app.config['SECRET_KEY'] = os.environ.get("FLASK_SECRET_KEY")
@@ -48,7 +48,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 socketio.init_app(app, cors_allowed_origins="*")
 
 # ==========================================
-# РЕГИСТРАЦИЯ
+# РЕГИСТРАЦИЯ BLUEPRINT'ОВ
 # ==========================================
 
 app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -60,13 +60,13 @@ app.register_blueprint(web_api, url_prefix='/api')
 app.register_blueprint(analytics_api, url_prefix='/api/analytics')
 
 # ==========================================
-# ЗАПУСК ФОНОВОГО ПОТОКА
+# ЗАПУСК ФОНОВОГО ПОТОКА СООБЩЕНИЙ
 # ==========================================
 
 start_background_thread()
 
 # ==========================================
-# ЗАПУСК
+# ЗАПУСК (для локальной разработки)
 # ==========================================
 
 if __name__ == '__main__':
