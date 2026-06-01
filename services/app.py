@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, WebSocket
-# Комментарий: ВЕРСИЯ ДЛЯ ЗАПУСКА ИЗ bot.py
+# Комментарий: ВЕРСИЯ С АГЕНТОМ (полная)
 # ==========================================
 
 import os
@@ -30,6 +30,7 @@ from services.app_modules.routes import routes_bp
 from services.app_modules.background import background_bp, start_background_thread
 from services.web_api import web_api
 from services.analytics_api import analytics_api
+from services.agent import agent_bp  # ← агент
 
 # ==========================================
 # FLASK ПРИЛОЖЕНИЕ С ПРАВИЛЬНЫМИ ПУТЯМИ
@@ -58,9 +59,18 @@ app.register_blueprint(routes_bp, url_prefix='/')
 app.register_blueprint(background_bp, url_prefix='/bg')
 app.register_blueprint(web_api, url_prefix='/api')
 app.register_blueprint(analytics_api, url_prefix='/api/analytics')
+app.register_blueprint(agent_bp, url_prefix='/agent')  # ← регистрация агента
 
 # ==========================================
 # ЗАПУСК ФОНОВОГО ПОТОКА СООБЩЕНИЙ
 # ==========================================
 
 start_background_thread()
+
+# ==========================================
+# ЗАПУСК (для локальной разработки)
+# ==========================================
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 10000))
+    socketio.run(app, host='0.0.0.0', port=port, debug=False)
