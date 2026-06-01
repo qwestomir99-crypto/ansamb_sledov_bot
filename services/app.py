@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, WebSocket
-# Комментарий: запускает веб-морду и бота в фоновом потоке
+# Комментарий: исправлены пути к шаблонам и статике (services/templates/, services/static/)
 # Зависит от: flask, flask-socketio, debug_utils, threading
 # Вызывается из: Render (web service, start command: gunicorn services.app:app)
 # ==========================================
@@ -15,20 +15,25 @@ from flask_socketio import SocketIO
 from debug_utils import debug_log
 
 # ==========================================
-# 1. Корень проекта (относительно app.py)
+# 1. Корень services/ (где лежит app.py)
 # ==========================================
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PROJECT_ROOT = os.path.dirname(BASE_DIR)  # ← поднимаемся на уровень выше, к корню
 
 # ==========================================
-# 2. Добавляем корень в sys.path для импортов
+# 2. Корень проекта (где лежат bot/, services/, library/)
+# ==========================================
+
+PROJECT_ROOT = os.path.dirname(BASE_DIR)
+
+# ==========================================
+# 3. Добавляем корень в sys.path для импортов
 # ==========================================
 
 sys.path.insert(0, PROJECT_ROOT)
 
 # ==========================================
-# 3. Импорты модулей
+# 4. Импорты модулей
 # ==========================================
 
 from services.app_modules.auth import auth_bp
@@ -41,12 +46,12 @@ from services.web_api import web_api
 from services.analytics_api import analytics_api
 
 # ==========================================
-# 4. Создаём Flask приложение
+# 5. Создаём Flask приложение
 # ==========================================
 
 app = Flask(__name__,
-    template_folder=os.path.join(PROJECT_ROOT, 'templates'),  # ← корень/templates
-    static_folder=os.path.join(BASE_DIR, 'static')  # ← services/static
+    template_folder=os.path.join(BASE_DIR, 'templates'),  # ← services/templates/
+    static_folder=os.path.join(BASE_DIR, 'static')        # ← services/static/
 )
 
 app.config['SECRET_KEY'] = os.environ.get("FLASK_SECRET_KEY")
@@ -57,7 +62,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 socketio.init_app(app, cors_allowed_origins="*")
 
 # ==========================================
-# 5. Регистрация blueprint'ов
+# 6. Регистрация blueprint'ов
 # ==========================================
 
 app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -69,7 +74,7 @@ app.register_blueprint(web_api, url_prefix='/api')
 app.register_blueprint(analytics_api, url_prefix='/api/analytics')
 
 # ==========================================
-# 6. Запуск бота в фоновом потоке
+# 7. Запуск бота в фоновом потоке
 # ==========================================
 
 def run_bot():
@@ -83,19 +88,18 @@ def run_bot():
     except Exception as e:
         debug_log("APP", f"Ошибка при запуске бота: {e}", "ERROR")
 
-# Запускаем бота в фоновом потоке, если не в режиме тестирования
 if os.environ.get("RUN_BOT", "1") == "1":
     bot_thread = threading.Thread(target=run_bot, daemon=True)
     bot_thread.start()
 
 # ==========================================
-# 7. Запуск фонового потока сообщений
+# 8. Запуск фонового потока сообщений
 # ==========================================
 
 start_background_thread()
 
 # ==========================================
-# 8. Запуск (для локальной разработки)
+# 9. Запуск (для локальной разработки)
 # ==========================================
 
 if __name__ == '__main__':
