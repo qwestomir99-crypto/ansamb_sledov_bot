@@ -2,13 +2,13 @@
 # Файл: services/app_modules/auth.py
 # Справка: README.md → Веб-морда / Авторизация
 # Задача: логин, логаут, проверка сессии
-# Комментарий: исправлен путь к templates
-# Зависит от: flask, debug_utils, os
+# Комментарий: исправлен путь к шаблонам (BASE_DIR)
+# Зависит от: flask, debug_utils
 # Вызывается из: app_modules/__init__.py
 # ==========================================
 
 import os
-from flask import Blueprint, request, session, redirect, url_for, render_template
+from flask import Blueprint, request, session, redirect, url_for, render_template, jsonify
 from functools import wraps
 from debug_utils import debug_log
 
@@ -52,4 +52,4 @@ def login():
 def logout():
     session.clear()
     log_auth("INFO", "Админ вышел")
-    return redirect(url_for('auth.login'))
+    return redirect(url_for('login'))
