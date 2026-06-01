@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, WebSocket
-# Комментарий: ПРОСТО ПРОЛОЖЕНЫ ПУТИ К ФАЙЛАМ (корень проекта)
+# Комментарий: ИСПРАВЛЕН ПУТЬ К СТАТИКЕ (static/ в корне проекта)
 # Зависит от: flask, flask-socketio, debug_utils, threading
 # Вызывается из: Render (web service, start command: gunicorn services.app:app)
 # ==========================================
@@ -21,7 +21,7 @@ from debug_utils import debug_log
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # ==========================================
-# 2. Корень проекта (где лежат bot/, services/, static/, templates/)
+# 2. Корень проекта (где лежат bot/, services/, library/, static/, templates/)
 # ==========================================
 
 PROJECT_ROOT = os.path.dirname(BASE_DIR)
@@ -50,8 +50,8 @@ from services.analytics_api import analytics_api
 # ==========================================
 
 app = Flask(__name__,
-    template_folder=os.path.join(PROJECT_ROOT, 'templates'),  # ← ПУТЬ К ШАБЛОНАМ
-    static_folder=os.path.join(PROJECT_ROOT, 'static')        # ← ПУТЬ К СТАТИКЕ
+    template_folder=os.path.join(PROJECT_ROOT, 'templates'),  # ← корень/templates/
+    static_folder=os.path.join(PROJECT_ROOT, 'static')        # ← ПРАВИЛЬНО: корень/static/
 )
 
 app.config['SECRET_KEY'] = os.environ.get("FLASK_SECRET_KEY")
