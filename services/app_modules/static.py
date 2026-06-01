@@ -13,7 +13,7 @@ import os
 static_bp = Blueprint('static', __name__)
 
 # Абсолютный путь к папке static на Render
-STATIC_DIR = '/opt/render/project/src/services/static'
+STATIC_DIR = '/opt/render/project/src/static'
 
 # Диагностика: печатаем путь в логи
 print(f"=== ДИАГНОСТИКА STATIC ===")
