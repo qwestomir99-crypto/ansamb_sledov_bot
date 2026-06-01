@@ -2,7 +2,7 @@
 # Файл: services/app_modules/auth.py
 # Справка: README.md → Веб-морда / Авторизация
 # Задача: логин, логаут, проверка сессии
-# Комментарий: исправлен путь к шаблонам (BASE_DIR)
+# Комментарий: исправлен redirect на routes.index
 # Зависит от: flask, debug_utils
 # Вызывается из: app_modules/__init__.py
 # ==========================================
@@ -42,7 +42,7 @@ def login():
             session['authenticated'] = True
             session.permanent = True
             log_auth("INFO", "Админ авторизован")
-            return redirect(url_for('index'))
+            return redirect(url_for('routes.index'))
         else:
             error = 'Неверный пароль'
             log_auth("WARNING", "Неудачная попытка входа")
@@ -52,4 +52,4 @@ def login():
 def logout():
     session.clear()
     log_auth("INFO", "Админ вышел")
-    return redirect(url_for('login'))
+    return redirect(url_for('auth.login'))
