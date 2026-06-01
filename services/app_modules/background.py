@@ -2,7 +2,7 @@
 # Файл: services/app_modules/background.py
 # Справка: README.md → Веб-морда / Фоновые потоки
 # Задача: фоновый поток для получения сообщений из VK и TG
-# Комментарий: исправлены пути, добавлены импорты socketio и messages
+# Комментарий: ИСПРАВЛЕН — убраны вызовы TG_API для избежания 409
 # Зависит от: flask, debug_utils, threading, time, sys
 # Вызывается из: app_modules/__init__.py
 # ==========================================
@@ -36,18 +36,18 @@ def fetch_messages_periodically():
     
     while True:
         try:
-            # Telegram
-            tg_msgs = tg_api.get_telegram_messages(10)
-            for msg in tg_msgs:
-                if not any(m.get('chat_id') == msg['chat_id'] and m.get('text') == msg['text'] and m.get('timestamp') == msg['timestamp'] for m in messages):
-                    socketio.emit('message_updated', msg)
-                    messages.append(msg)
             # VK
             vk_msgs = vk_api.get_vk_messages(10)
             for msg in vk_msgs:
                 if not any(m.get('chat_id') == msg['chat_id'] and m.get('text') == msg['text'] and m.get('timestamp') == msg['timestamp'] for m in messages):
                     socketio.emit('message_updated', msg)
                     messages.append(msg)
+            # Telegram — отключено, чтобы избежать 409
+            # tg_msgs = tg_api.get_telegram_messages(10)
+            # for msg in tg_msgs:
+            #     if not any(m.get('chat_id') == msg['chat_id'] and m.get('text') == msg['text'] and m.get('timestamp') == msg['timestamp'] for m in messages):
+            #         socketio.emit('message_updated', msg)
+            #         messages.append(msg)
             # Ограничение размера списка
             if len(messages) > 200:
                 messages[:] = messages[-200:]
