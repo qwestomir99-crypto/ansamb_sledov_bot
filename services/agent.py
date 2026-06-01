@@ -1,9 +1,7 @@
 # ==========================================
-# Файл: agent.py
+# Файл: services/agent.py
 # Задача: агент для обработки #говори через Yandex GPT
-# Комментарий: отдельный микросервис, работает на Render.
-#              Принимает POST /ask, отвечает через Yandex GPT API.
-#              Добавлен keep-alive пинг каждые 60 секунд.
+# Комментарий: теперь blueprint
 # ==========================================
 
 import os
@@ -11,13 +9,13 @@ import logging
 import requests
 import threading
 import time
-from flask import Flask, request, jsonify
+from flask import Blueprint, request, jsonify
 from datetime import datetime
 
-app = Flask(__name__)
+agent_bp = Blueprint('agent', __name__)
 
 # ==========================================
-# 1. НАСТРОЙКА ЛОГИРОВАНИЯ
+# НАСТРОЙКА ЛОГИРОВАНИЯ
 # ==========================================
 
 LOG_DIR = "logs"
@@ -34,7 +32,7 @@ logging.basicConfig(
 logger = logging.getLogger("yandex_gpt_agent")
 
 # ==========================================
-# 2. КОНФИГУРАЦИЯ YANDEX GPT
+# КОНФИГУРАЦИЯ YANDEX GPT
 # ==========================================
 
 API_KEY = os.environ.get("YC_API_KEY")
@@ -72,10 +70,10 @@ def log_error_details(error, response=None):
     logger.error("=" * 60)
 
 # ==========================================
-# 3. ОСНОВНАЯ ЛОГИКА АГЕНТА
+# ОСНОВНАЯ ЛОГИКА АГЕНТА
 # ==========================================
 
-@app.route('/ask', methods=['POST'])
+@agent_bp.route('/ask', methods=['POST'])
 def ask():
     try:
         data = request.get_json()
@@ -134,7 +132,7 @@ def ask():
         log_error_details(e)
         return jsonify({"error": f"Internal error: {str(e)}"}), 500
 
-@app.route('/health', methods=['GET'])
+@agent_bp.route('/health', methods=['GET'])
 def health():
     return jsonify({
         "status": "ok",
@@ -145,7 +143,7 @@ def health():
         }
     }), 200
 
-@app.route('/logs', methods=['GET'])
+@agent_bp.route('/logs', methods=['GET'])
 def get_logs():
     secret = request.args.get('secret')
     if secret != os.environ.get("LOGS_SECRET", "tleem2026"):
@@ -159,7 +157,7 @@ def get_logs():
         return jsonify({"error": str(e)}), 500
 
 # ==========================================
-# 4. ВНУТРЕННИЙ ПИНГ (keep-alive)
+# ВНУТРЕННИЙ ПИНГ (keep-alive)
 # ==========================================
 
 def keep_alive():
@@ -167,21 +165,10 @@ def keep_alive():
     while True:
         time.sleep(60)
         try:
-            requests.get('http://127.0.0.1:10000/', timeout=5)
+            requests.get('http://127.0.0.1:10000/agent/health', timeout=5)
             logger.debug("AGENT: Внутренний пинг успешен")
         except Exception as e:
             logger.debug(f"AGENT: Ошибка пинга: {e}")
 
 # Запускаем поток с пингом
 threading.Thread(target=keep_alive, daemon=True).start()
-
-# ==========================================
-# 5. ЗАПУСК
-# ==========================================
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 10000))
-    logger.info(f"🚀 Запуск агента на порту {port}")
-    logger.info(f"📁 Логи будут сохраняться в {os.path.join(LOG_DIR, 'agent.log')}")
-    logger.info("🔄 Внутренний пинг запущен (каждые 60 секунд)")
-    app.run(host='0.0.0.0', port=port, debug=False)
