@@ -44,3 +44,8 @@ def fetch_messages_periodically():
         except Exception as e:
             log_bg("ERROR", str(e))
             time.sleep(30)
+
+def start_background_thread():
+    """Запускает фоновый поток для получения сообщений"""
+    threading.Thread(target=fetch_messages_periodically, daemon=True).start()
+    log_bg("INFO", "Фоновый поток сообщений запущен")
