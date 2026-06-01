@@ -2,7 +2,7 @@
 # Файл: services/tg_api.py
 # Справка: README.md → Веб-морда / Telegram API
 # Задача: API для комментариев, ответов и постинга в Telegram
-# Комментарий: используется веб-мордой для отправки комментариев и ответов
+# Комментарий: добавлена функция get_telegram_messages() для фонового потока
 # Зависит от: flask, telebot, debug_utils
 # Вызывается из: services/app.py (blueprint)
 # ==========================================
@@ -199,6 +199,36 @@ def api_tg_get_chat_id():
     except Exception as e:
         log_tg("ERROR", f"Ошибка: {e}")
         return jsonify({"status": "error", "error": str(e)}), 500
+
+# ==========================================
+# ФУНКЦИЯ ДЛЯ ФОНОВОГО ПОТОКА
+# ==========================================
+
+def get_telegram_messages(limit=10):
+    """
+    Получение последних сообщений из Telegram.
+    Возвращает список сообщений в формате:
+    [{'chat_id': 123, 'text': 'текст', 'timestamp': '2026-06-01T12:00:00', 'source': 'tg'}]
+    """
+    if not bot:
+        log_tg("ERROR", "Telegram бот не настроен")
+        return []
+    
+    try:
+        updates = bot.get_updates(limit=limit)
+        messages = []
+        for update in updates:
+            if update.message:
+                messages.append({
+                    'chat_id': update.message.chat.id,
+                    'text': update.message.text or '',
+                    'timestamp': update.message.date.strftime('%Y-%m-%d %H:%M:%S'),
+                    'source': 'tg'
+                })
+        return messages
+    except Exception as e:
+        log_tg("ERROR", f"Ошибка получения сообщений: {e}")
+        return []
 
 # ==========================================
 # ДЛЯ ТЕСТА
