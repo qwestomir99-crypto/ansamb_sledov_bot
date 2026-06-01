@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, WebSocket
-# Комментарий: ФИНАЛЬНАЯ ВЕРСИЯ (все пути правильные)
+# Комментарий: ПРОСТО ПРОЛОЖЕНЫ ПУТИ К ФАЙЛАМ (корень проекта)
 # Зависит от: flask, flask-socketio, debug_utils, threading
 # Вызывается из: Render (web service, start command: gunicorn services.app:app)
 # ==========================================
@@ -21,7 +21,7 @@ from debug_utils import debug_log
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # ==========================================
-# 2. Корень проекта (где лежат bot/, services/, library/)
+# 2. Корень проекта (где лежат bot/, services/, static/, templates/)
 # ==========================================
 
 PROJECT_ROOT = os.path.dirname(BASE_DIR)
@@ -37,7 +37,7 @@ sys.path.insert(0, PROJECT_ROOT)
 # ==========================================
 
 from services.app_modules.auth import auth_bp
-from services.app_modules.static import static_bp  # ← оставляем, он нужен
+from services.app_modules.static import static_bp
 from services.app_modules.youtube import youtube_bp
 from services.app_modules.socket import socketio, messages
 from services.app_modules.routes import routes_bp
@@ -50,8 +50,8 @@ from services.analytics_api import analytics_api
 # ==========================================
 
 app = Flask(__name__,
-    template_folder=os.path.join(BASE_DIR, 'templates'),  # ← services/templates/
-    static_folder=os.path.join(BASE_DIR, 'static')        # ← services/static/
+    template_folder=os.path.join(PROJECT_ROOT, 'templates'),  # ← ПУТЬ К ШАБЛОНАМ
+    static_folder=os.path.join(PROJECT_ROOT, 'static')        # ← ПУТЬ К СТАТИКЕ
 )
 
 app.config['SECRET_KEY'] = os.environ.get("FLASK_SECRET_KEY")
@@ -66,7 +66,7 @@ socketio.init_app(app, cors_allowed_origins="*")
 # ==========================================
 
 app.register_blueprint(auth_bp, url_prefix='/auth')
-app.register_blueprint(static_bp, url_prefix='/static')  # ← оставляем, но он будет переопределять?
+app.register_blueprint(static_bp, url_prefix='/static')
 app.register_blueprint(youtube_bp, url_prefix='/youtube')
 app.register_blueprint(routes_bp, url_prefix='/')
 app.register_blueprint(background_bp, url_prefix='/bg')
