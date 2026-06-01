@@ -42,6 +42,8 @@ def login():
             session['authenticated'] = True
             session.permanent = True
             log_auth("INFO", "Админ авторизован")
+            
+            # ✅ ИСПРАВЛЕНО: редирект на routes.index вместо index
             return redirect(url_for('routes.index'))
         else:
             error = 'Неверный пароль'
