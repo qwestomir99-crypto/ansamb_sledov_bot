@@ -2,17 +2,17 @@
 # Файл: services/app_modules/routes.py
 # Справка: README.md → Веб-морда / Маршруты
 # Задача: основные маршруты (index, timeline, ping)
-# Комментарий: вынесено из app.py
-# Зависит от: flask, debug_utils, services.theme
+# Комментарий: исправлен импорт THEME_CSS → get_current_theme
+# Зависит от: flask, debug_utils
 # Вызывается из: app_modules/__init__.py
 # ==========================================
 
 from flask import Blueprint, render_template, jsonify
 from debug_utils import debug_log
 from .auth import login_required
-from services.theme import THEME_CSS
 import os
 import datetime
+from services.theme import get_current_theme
 
 routes_bp = Blueprint('routes', __name__)
 
@@ -35,7 +35,7 @@ def index():
     return render_template('admin.html', 
         time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
         quotes=get_quotes(),
-        theme=THEME_CSS
+        theme=get_current_theme()
     )
 
 @routes_bp.route('/timeline')
@@ -50,7 +50,7 @@ def timeline():
     return render_template('timeline.html', 
         time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
         content=content,
-        theme=THEME_CSS
+        theme=get_current_theme()
     )
 
 @routes_bp.route('/ping')
