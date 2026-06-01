@@ -2,19 +2,22 @@
 # Файл: services/app_modules/auth.py
 # Справка: README.md → Веб-морда / Авторизация
 # Задача: логин, логаут, проверка сессии
-# Комментарий: вынесено из app.py
-# Зависит от: flask, debug_utils
+# Комментарий: исправлен путь к templates
+# Зависит от: flask, debug_utils, os
 # Вызывается из: app_modules/__init__.py
 # ==========================================
 
+import os
 from flask import Blueprint, request, session, redirect, url_for, render_template
 from functools import wraps
 from debug_utils import debug_log
-import os
 
 auth_bp = Blueprint('auth', __name__)
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
+
+# Определяем базовую директорию проекта
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def log_auth(level, message):
     debug_log("APP_AUTH", message, level)
@@ -39,7 +42,7 @@ def login():
             session['authenticated'] = True
             session.permanent = True
             log_auth("INFO", "Админ авторизован")
-            return redirect(url_for('auth.index'))
+            return redirect(url_for('index'))
         else:
             error = 'Неверный пароль'
             log_auth("WARNING", "Неудачная попытка входа")
