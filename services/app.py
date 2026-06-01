@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, WebSocket
-# Комментарий: ФИНАЛЬНАЯ ВЕРСИЯ (только веб-морда, правильные пути)
+# Комментарий: ТОЛЬКО ВЕБ-МОРДА, ПРАВИЛЬНЫЕ ПУТИ
 # ==========================================
 
 import os
@@ -32,12 +32,12 @@ from services.web_api import web_api
 from services.analytics_api import analytics_api
 
 # ==========================================
-# FLASK ПРИЛОЖЕНИЕ (ПРАВИЛЬНЫЕ ПУТИ)
+# FLASK ПРИЛОЖЕНИЕ С ПРАВИЛЬНЫМИ ПУТЯМИ
 # ==========================================
 
 app = Flask(__name__,
-    template_folder=os.path.join(PROJECT_ROOT, 'templates'),  # ← корень/templates/
-    static_folder=os.path.join(PROJECT_ROOT, 'static')        # ← корень/static/
+    template_folder=os.path.join(PROJECT_ROOT, 'templates'),
+    static_folder=os.path.join(PROJECT_ROOT, 'static')
 )
 
 app.config['SECRET_KEY'] = os.environ.get("FLASK_SECRET_KEY")
