@@ -1,70 +1,82 @@
 # ==========================================
 # Файл: big_video_uploader.py
 # Справка: README.md → Автопостинг / Большие видео
-# Задача: отправка видео (>50 МБ) через пользовательский API (Telethon)
-# Комментарий: требует TG_API_ID и TG_API_HASH из переменных окружения.
-#              Работает через прокси (если задан PROXY_URL).
-#              Функция send_big_video вызывается из bot.py и autoposter.py.
-# Зависит от: telethon, os, asyncio
-# Вызывается из: bot.py (команда /bigvideo), services/autoposter.py (после 1 июня)
+# Задача: загрузка видео (>50 МБ) в VK через vk_api
+# Комментарий: переписано с telethon на vk_api, чтобы избежать 409
+# Зависит от: vk_api, os, requests
+# Вызывается из: bot.py (команда /bigvideo), services/autoposter.py
 # ==========================================
+
 import os
-import asyncio
-from telethon import TelegramClient
-from telethon.errors import RPCError
+import vk_api
+from vk_api.upload import VkUpload
+from debug_utils import debug_log
 
-API_ID = int(os.environ.get("TG_API_ID", 0))
-API_HASH = os.environ.get("TG_API_HASH", "")
-TARGET_CHAT_ID = os.environ.get("PUBLISH_CHANNEL", "@qwestomir")
-PROXY_URL = os.environ.get("PROXY_URL")
+VK_TOKEN = os.environ.get("VK_TOKEN")
+VK_OWNER_ID = int(os.environ.get("VK_OWNER_ID", 0))
 
-def _parse_proxy(proxy_url: str):
-    if not proxy_url:
+def log_bv(level, message):
+    debug_log("BIG_VIDEO", message, level)
+
+def upload_video_to_vk(file_path: str, caption: str = ""):
+    """
+    Загружает видео в VK.
+    Возвращает ссылку на видео или None в случае ошибки.
+    """
+    if not VK_TOKEN:
+        log_bv("ERROR", "VK_TOKEN не задан")
         return None
-    if proxy_url.startswith("socks5://"):
-        without_proto = proxy_url[9:]
-        if "@" in without_proto:
-            auth, addr = without_proto.split("@")
-            login, password = auth.split(":", 1)
-            host, port = addr.split(":")
-            return {
-                "proxy_type": "socks5",
-                "addr": host,
-                "port": int(port),
-                "username": login,
-                "password": password
-            }
-        else:
-            host, port = without_proto.split(":")
-            return {
-                "proxy_type": "socks5",
-                "addr": host,
-                "port": int(port)
-            }
-    return None
-
-async def send_big_video(file_path: str, caption: str = ""):
-    if not API_ID or not API_HASH:
-        print("[BIG_VIDEO] Ошибка: TG_API_ID или TG_API_HASH не заданы")
-        return False
     
     if not os.path.exists(file_path):
-        print(f"[BIG_VIDEO] Ошибка: файл {file_path} не найден")
-        return False
-    
-    proxy = _parse_proxy(PROXY_URL)
-    client = TelegramClient("user_session", API_ID, API_HASH, proxy=proxy)
+        log_bv("ERROR", f"Файл {file_path} не найден")
+        return None
     
     try:
-        await client.start()
-        await client.send_file(TARGET_CHAT_ID, file_path, caption=caption)
-        print(f"[BIG_VIDEO] Файл {file_path} отправлен в {TARGET_CHAT_ID}")
-        return True
-    except RPCError as e:
-        print(f"[BIG_VIDEO] RPC ошибка: {e}")
-        return False
+        vk_session = vk_api.VkApi(token=VK_TOKEN)
+        upload = VkUpload(vk_session)
+        
+        # Загружаем видео
+        log_bv("INFO", f"Загрузка видео {file_path} в VK...")
+        video_data = upload.video(file_path)
+        
+        # Получаем ссылку на видео
+        video_id = video_data.get('video_id')
+        owner_id = video_data.get('owner_id')
+        video_url = f"https://vk.com/video{owner_id}_{video_id}"
+        
+        log_bv("INFO", f"Видео загружено: {video_url}")
+        
+        # Если есть подпись — добавляем её к посту
+        if caption:
+            from services.vk_api import api_vk_comment
+            post_data = {
+                "post_id": video_id,
+                "text": caption
+            }
+            # Здесь можно вызвать API для постинга или просто вернуть ссылку
+        
+        return video_url
     except Exception as e:
-        print(f"[BIG_VIDEO] Ошибка: {e}")
+        log_bv("ERROR", f"Ошибка загрузки видео: {e}")
+        return None
+
+def send_big_video(file_path: str, caption: str = ""):
+    """
+    Отправляет видео в VK (обёртка для upload_video_to_vk).
+    """
+    url = upload_video_to_vk(file_path, caption)
+    if url:
+        log_bv("INFO", f"Успешно: {url}")
+        return True
+    else:
+        log_bv("ERROR", "Ошибка отправки видео")
         return False
-    finally:
-        await client.disconnect()
+
+# ==========================================
+# ТЕСТ
+# ==========================================
+if __name__ == "__main__":
+    print("=== ТЕСТ BIG_VIDEO ===")
+    print("VK_TOKEN:", "есть" if VK_TOKEN else "нет")
+    print("VK_OWNER_ID:", VK_OWNER_ID)
+    print("Для теста передайте файл через командную строку.")
