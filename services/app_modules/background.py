@@ -2,7 +2,7 @@
 # Файл: services/app_modules/background.py
 # Справка: README.md → Веб-морда / Фоновые потоки
 # Задача: фоновый поток для получения сообщений из SQLite
-# Комментарий: читает из SQLite, автоматически чистит базу
+# Комментарий: читает из SQLite, автоматически чистит базу, интервал 30 сек
 # ==========================================
 
 import sys
@@ -38,7 +38,8 @@ def fetch_messages_periodically():
             # Ограничиваем размер списка в памяти
             if len(messages) > 200:
                 messages[:] = messages[-200:]
-            time.sleep(10)
+            # Интервал 30 секунд
+            time.sleep(30)
         except Exception as e:
             log_bg("ERROR", f"Ошибка в фоновом потоке: {e}")
             time.sleep(30)
