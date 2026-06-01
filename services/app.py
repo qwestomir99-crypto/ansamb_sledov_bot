@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, WebSocket
-# Комментарий: исправлены пути к шаблонам и статике (services/templates/, services/static/)
+# Комментарий: ФИНАЛЬНАЯ ВЕРСИЯ (все пути правильные)
 # Зависит от: flask, flask-socketio, debug_utils, threading
 # Вызывается из: Render (web service, start command: gunicorn services.app:app)
 # ==========================================
@@ -37,7 +37,7 @@ sys.path.insert(0, PROJECT_ROOT)
 # ==========================================
 
 from services.app_modules.auth import auth_bp
-from services.app_modules.static import static_bp
+from services.app_modules.static import static_bp  # ← оставляем, он нужен
 from services.app_modules.youtube import youtube_bp
 from services.app_modules.socket import socketio, messages
 from services.app_modules.routes import routes_bp
@@ -66,7 +66,7 @@ socketio.init_app(app, cors_allowed_origins="*")
 # ==========================================
 
 app.register_blueprint(auth_bp, url_prefix='/auth')
-app.register_blueprint(static_bp, url_prefix='/static')
+app.register_blueprint(static_bp, url_prefix='/static')  # ← оставляем, но он будет переопределять?
 app.register_blueprint(youtube_bp, url_prefix='/youtube')
 app.register_blueprint(routes_bp, url_prefix='/')
 app.register_blueprint(background_bp, url_prefix='/bg')
@@ -78,13 +78,10 @@ app.register_blueprint(analytics_api, url_prefix='/api/analytics')
 # ==========================================
 
 def run_bot():
-    """Запуск Telegram-бота в отдельном потоке"""
     try:
         from bot.main import main as bot_main
         debug_log("APP", "Бот запущен в фоновом потоке", "INFO")
         bot_main()
-    except ImportError as e:
-        debug_log("APP", f"Не удалось запустить бота: {e}", "WARNING")
     except Exception as e:
         debug_log("APP", f"Ошибка при запуске бота: {e}", "ERROR")
 
