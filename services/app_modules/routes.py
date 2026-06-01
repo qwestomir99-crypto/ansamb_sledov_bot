@@ -3,13 +3,14 @@
 # Справка: README.md → Веб-морда / Маршруты
 # Задача: основные маршруты (index, timeline, ping)
 # Комментарий: вынесено из app.py
-# Зависит от: flask, debug_utils
+# Зависит от: flask, debug_utils, services.theme
 # Вызывается из: app_modules/__init__.py
 # ==========================================
 
 from flask import Blueprint, render_template, jsonify
 from debug_utils import debug_log
 from .auth import login_required
+from services.theme import THEME_CSS
 import os
 import datetime
 
