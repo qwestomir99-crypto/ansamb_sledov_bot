@@ -2,7 +2,7 @@
 # Файл: services/app_modules/static.py
 # Справка: README.md → Веб-морда / Статика
 # Задача: раздача статических файлов
-# Комментарий: исправлен путь к папке static (на уровень выше)
+# Комментарий: ИСПРАВЛЕН путь к папке static (АБСОЛЮТНЫЙ ПУТЬ на Render) + ДИАГНОСТИКА
 # Зависит от: flask
 # Вызывается из: app_modules/__init__.py
 # ==========================================
@@ -12,19 +12,32 @@ import os
 
 static_bp = Blueprint('static', __name__)
 
+# Абсолютный путь к папке static на Render
+STATIC_DIR = '/opt/render/project/src/services/static'
+
+# Диагностика: печатаем путь в логи
+print(f"=== ДИАГНОСТИКА STATIC ===")
+print(f"STATIC_DIR = {STATIC_DIR}")
+print(f"Папка существует? {os.path.exists(STATIC_DIR)}")
+if os.path.exists(STATIC_DIR):
+    print(f"Содержимое: {os.listdir(STATIC_DIR)}")
+    css_dir = os.path.join(STATIC_DIR, 'css')
+    if os.path.exists(css_dir):
+        print(f"CSS содержит: {os.listdir(css_dir)}")
+    js_dir = os.path.join(STATIC_DIR, 'js')
+    if os.path.exists(js_dir):
+        print(f"JS содержит: {os.listdir(js_dir)}")
+print(f"==========================")
+
 @static_bp.route('/<path:filename>')
 def serve_static(filename):
     """
     Раздача статических файлов из папки services/static/
-    Путь вычисляется динамически относительно расположения этого файла.
+    Используется абсолютный путь для надёжности.
     """
-    # Папка static находится на уровень выше, чем app_modules/
-    static_dir = os.path.join(os.path.dirname(__file__), '..', 'static')
-    
-    # Добавляем отладочный лог (опционально)
-    # print(f"DEBUG: Serving static file: {filename} from {static_dir}")
-    
-    return send_from_directory(static_dir, filename)
+    print(f"Запрос статики: {filename}")
+    print(f"Полный путь: {os.path.join(STATIC_DIR, filename)}")
+    return send_from_directory(STATIC_DIR, filename)
 
 # ==========================================
 # Дополнительные маршруты для статики (если нужны)
