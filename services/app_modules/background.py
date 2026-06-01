@@ -2,7 +2,7 @@
 # Файл: services/app_modules/background.py
 # Справка: README.md → Веб-морда / Фоновые потоки
 # Задача: фоновый поток для получения сообщений из SQLite
-# Комментарий: читает из SQLite, не вызывает 409
+# Комментарий: читает из SQLite, автоматически чистит базу
 # ==========================================
 
 import sys
@@ -10,7 +10,7 @@ import threading
 import time
 from flask import Blueprint
 from debug_utils import debug_log
-from services.sqlite_client import get_messages
+from services.sqlite_client import get_messages, clean_old_messages
 from services.app_modules.socket import socketio, messages
 
 background_bp = Blueprint('background', __name__)
@@ -33,7 +33,9 @@ def fetch_messages_periodically():
                 ):
                     socketio.emit('message_updated', msg)
                     messages.append(msg)
-            # Ограничиваем размер списка
+            # Очищаем старые сообщения (оставляем последние 100)
+            clean_old_messages(keep=100)
+            # Ограничиваем размер списка в памяти
             if len(messages) > 200:
                 messages[:] = messages[-200:]
             time.sleep(10)
