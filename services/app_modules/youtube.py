@@ -2,14 +2,15 @@
 # Файл: services/app_modules/youtube.py
 # Справка: README.md → Веб-морда / YouTube
 # Задача: YouTube-прокси (поиск, стрим, инфо)
-# Комментарий: вынесено из app.py
-# Зависит от: flask, debug_utils, services.youtube_api
+# Комментарий: исправлена тема (THEME_CSS → get_current_theme())
+# Зависит от: flask, debug_utils, services.youtube_api, services.theme
 # Вызывается из: app_modules/__init__.py
 # ==========================================
 
 from flask import Blueprint, request, jsonify, render_template, Response
 from debug_utils import debug_log
 from services.youtube_api import get_youtube_info, youtube_search, youtube_stream_generator
+from services.theme import get_current_theme  # ← импортируем
 from .auth import login_required
 
 youtube_bp = Blueprint('youtube', __name__)
@@ -21,7 +22,7 @@ def log_y(level, message):
 @login_required
 def youtube_page():
     log_y("INFO", "Страница YouTube загружена")
-    return render_template('youtube.html', theme=THEME_CSS)
+    return render_template('youtube.html', theme=get_current_theme())  # ← исправлено
 
 @youtube_bp.route('/info', methods=['POST'])
 @login_required
