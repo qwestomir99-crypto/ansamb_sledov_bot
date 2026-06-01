@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 01.06.2026 06:15:27*
+*Обновлено: 01.06.2026 07:03:17*
 
 | Файл | Статус |
 |------|--------|
@@ -267,7 +267,6 @@
 | `evolve_agent.py` | ✅ Redmi-шапка |
 | `ping_utils.py` | ❌ Без шапки |
 | `redmi_audit.py` | ✅ Redmi-шапка |
-| `services/__init__.py` | ❌ Без шапки |
 | `services/adaptive_modes.py` | ✅ Redmi-шапка |
 | `services/agent_config.py` | ✅ Redmi-шапка |
 | `services/agent_pinger.py` | ✅ Redmi-шапка |
