@@ -1,7 +1,7 @@
 # ==========================================
 # Файл: services/sqlite_client.py
 # Справка: README.md → SQLite клиент
-# Задача: работа с SQLite (сохранение и чтение сообщений)
+# Задача: работа с SQLite (сохранение, чтение, очистка сообщений)
 # ==========================================
 
 import sqlite3
@@ -70,6 +70,18 @@ def get_messages(limit=10):
     except Exception as e:
         log_sql("ERROR", f"Ошибка чтения: {e}")
         return []
+
+def clean_old_messages(keep=100):
+    """Удаляет сообщения старше keep последних записей"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("DELETE FROM messages WHERE id NOT IN (SELECT id FROM messages ORDER BY id DESC LIMIT ?)", (keep,))
+        conn.commit()
+        conn.close()
+        log_sql("INFO", f"Очищено сообщений (оставлено {keep})")
+    except Exception as e:
+        log_sql("ERROR", f"Ошибка очистки: {e}")
 
 # Инициализация при импорте
 init_db()
