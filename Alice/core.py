@@ -2,14 +2,19 @@
 # Файл: Alice/core.py
 # Справка: README.md → Алиса / Ядро
 # Задача: генерация ответов Алисы (с кэшем и зеркалом)
-# Комментарий: добавлена интеграция с аналитикой и маршрутизацией
+# Комментарий: добавлен sys.path для корректных импортов
 # Зависит от: dialogue.agent, debug_utils, config.json, services.suggestion_engine, context_mirror, response_cache, sql_analytics
 # Вызывается из: bot.py (обработчик #говори), routing_engine.py
 # ==========================================
 
+import sys
 import os
 import json
 from debug_utils import debug_log
+
+# Прокладываем путь к корню проекта
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from dialogue.agent import ask_agent
 from services.suggestion_engine import create_suggestion
 from Alice.prompts.library import get_context
