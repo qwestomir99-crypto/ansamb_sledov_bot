@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 01.06.2026 07:16:56*
+*Обновлено: 01.06.2026 08:28:32*
 
 | Файл | Статус |
 |------|--------|
@@ -315,6 +315,7 @@
 | `services/web_api/modes.py` | ✅ Redmi-шапка |
 | `services/web_api/ping.py` | ✅ Redmi-шапка |
 | `services/web_api/posts.py` | ✅ Redmi-шапка |
+| `services/web_api/quotes.py` | ✅ Redmi-шапка |
 | `services/web_api/theme.py` | ✅ Redmi-шапка |
 | `services/web_api/youtube_upload.py` | ✅ Redmi-шапка |
 | `services/web_server.py` | ❌ Без шапки |
