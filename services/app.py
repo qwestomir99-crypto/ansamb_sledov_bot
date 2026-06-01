@@ -2,7 +2,9 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, WebSocket
-# Комментарий: максимально тонкий
+# Комментарий: максимально тонкий, добавлен template_folder='templates'
+# Зависит от: flask, flask-socketio, debug_utils
+# Вызывается из: Render (web service, start command: gunicorn services.app:app)
 # ==========================================
 
 import os
@@ -24,7 +26,7 @@ from services.analytics_api import analytics_api
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 SECRET_KEY = os.environ.get("FLASK_SECRET_KEY")
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates')
 app.config['SECRET_KEY'] = SECRET_KEY
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SECURE'] = True
