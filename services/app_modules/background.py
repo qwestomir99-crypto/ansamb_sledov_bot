@@ -23,7 +23,7 @@ def fetch_messages_periodically():
     while True:
         try:
             # Читаем последние сообщения из SQLite
-            msgs = get_messages(limit=10)
+            msgs = get_messages(limit=30)
             for msg in msgs:
                 if not any(
                     m.get('chat_id') == msg['chat_id'] and
