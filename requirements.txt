@@ -21,7 +21,7 @@ requests>=2.31.0
 yt-dlp>=2024.12.0
 
 # VK API
-vk-api>=12.0.0
+vk-api>=11.0.0
 
 # Telegram API (большие видео)
 telethon>=1.34.0
