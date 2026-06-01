@@ -2,6 +2,7 @@
 # Файл: services/app_modules/background.py
 # Справка: README.md → Веб-морда / Фоновые потоки
 # Задача: фоновый поток для получения сообщений из SQLite
+# Комментарий: читает из SQLite, не вызывает 409
 # ==========================================
 
 import sys
@@ -10,8 +11,6 @@ import time
 from flask import Blueprint
 from debug_utils import debug_log
 from services.sqlite_client import get_messages
-
-# Импортируем socketio и messages из socket.py
 from services.app_modules.socket import socketio, messages
 
 background_bp = Blueprint('background', __name__)
@@ -20,16 +19,21 @@ def log_bg(level, message):
     debug_log("APP_BACKGROUND", message, level)
 
 def fetch_messages_periodically():
+    """Читает сообщения из SQLite и отправляет в веб-морду"""
     while True:
         try:
-            # Получаем сообщения из SQLite (уже без конфликта 409)
+            # Читаем последние сообщения из SQLite
             msgs = get_messages(limit=10)
             for msg in msgs:
-                # Если это сообщение ещё не в списке — отправляем в веб-морду
-                if not any(m.get('chat_id') == msg['chat_id'] and m.get('text') == msg['text'] and m.get('timestamp') == msg['timestamp'] for m in messages):
+                if not any(
+                    m.get('chat_id') == msg['chat_id'] and
+                    m.get('text') == msg['text'] and
+                    m.get('timestamp') == msg['timestamp']
+                    for m in messages
+                ):
                     socketio.emit('message_updated', msg)
                     messages.append(msg)
-            # Ограничение размера списка
+            # Ограничиваем размер списка
             if len(messages) > 200:
                 messages[:] = messages[-200:]
             time.sleep(10)
