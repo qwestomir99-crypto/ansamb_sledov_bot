@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, WebSocket
-# Комментарий: ТОЛЬКО ВЕБ-МОРДА, ПРАВИЛЬНЫЕ ПУТИ
+# Комментарий: ПРАВИЛЬНЫЙ ПУТЬ К СТАТИКЕ (абсолютный)
 # ==========================================
 
 import os
@@ -32,12 +32,12 @@ from services.web_api import web_api
 from services.analytics_api import analytics_api
 
 # ==========================================
-# FLASK ПРИЛОЖЕНИЕ С ПРАВИЛЬНЫМИ ПУТЯМИ
+# FLASK ПРИЛОЖЕНИЕ
 # ==========================================
 
 app = Flask(__name__,
     template_folder=os.path.join(PROJECT_ROOT, 'templates'),
-    static_folder=os.path.join(PROJECT_ROOT, 'static')
+    static_folder='/opt/render/project/src/static'  # ← ВОТ ЭТА СТРОКА ВСЁ РЕШАЕТ
 )
 
 app.config['SECRET_KEY'] = os.environ.get("FLASK_SECRET_KEY")
@@ -48,7 +48,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 socketio.init_app(app, cors_allowed_origins="*")
 
 # ==========================================
-# РЕГИСТРАЦИЯ BLUEPRINT'ОВ
+# РЕГИСТРАЦИЯ
 # ==========================================
 
 app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -60,13 +60,13 @@ app.register_blueprint(web_api, url_prefix='/api')
 app.register_blueprint(analytics_api, url_prefix='/api/analytics')
 
 # ==========================================
-# ЗАПУСК ФОНОВОГО ПОТОКА СООБЩЕНИЙ
+# ЗАПУСК ФОНОВОГО ПОТОКА
 # ==========================================
 
 start_background_thread()
 
 # ==========================================
-# ЗАПУСК (для локальной разработки)
+# ЗАПУСК
 # ==========================================
 
 if __name__ == '__main__':
