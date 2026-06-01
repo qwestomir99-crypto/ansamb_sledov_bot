@@ -6,12 +6,12 @@
 
 import time
 from .core import load_config, get_bot, global_exception_handler, thread_exception_handler
-from .handlers import register_all_handlers
+from .handlers import register_handlers
 
 def main():
     config = load_config()
     bot = get_bot()
-    register_all_handlers(bot, config)
+    register_handlers(bot, config)
     print("Бот запущен. Ритм 0,8 Гц.")
     bot.polling()
 
