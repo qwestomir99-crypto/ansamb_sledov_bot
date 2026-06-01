@@ -1,8 +1,8 @@
 # ==========================================
 # Файл: services/sql_analytics.py
 # Справка: README.md → Аналитика / SQL
-# Задача: сбор аналитики напрямую в SQLite
-# Комментарий: теперь на SQLite (а не на Supabase), фоллбэк не нужен
+# Задача: сбор аналитики напрямую в SQLite с автоматической очисткой
+# Комментарий: теперь на SQLite, очистка по времени (7 дней)
 # Зависит от: datetime, debug_utils, sqlite3
 # Вызывается из: bot.py, web_api/analytics.py, routing_engine.py
 # ==========================================
@@ -18,7 +18,7 @@ def log_sql(level, message):
     debug_log("SQL_ANALYTICS", message, level)
 
 def init_analytics_db():
-    """Создаёт таблицу analytics, если её нет"""
+    """Создаёт таблицу analytics и индекс, если их нет"""
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
@@ -31,6 +31,9 @@ def init_analytics_db():
                 status TEXT,
                 metadata TEXT
             )
+        ''')
+        c.execute('''
+            CREATE INDEX IF NOT EXISTS idx_analytics_timestamp ON analytics(timestamp);
         ''')
         conn.commit()
         conn.close()
@@ -59,6 +62,19 @@ def record_activity(module, action, metadata=None, status="info"):
         log_sql("INFO", f"Активность записана: {module}.{action} ({status})")
     except Exception as e:
         log_sql("ERROR", f"Ошибка записи: {e}")
+
+def clean_old_analytics(days=7):
+    """Удаляет записи старше days дней"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("DELETE FROM analytics WHERE datetime(timestamp) < datetime('now', '-? day')", (days,))
+        conn.commit()
+        conn.close()
+        log_sql("INFO", f"Очищена аналитика старше {days} дней")
+    except Exception as e:
+        log_sql("ERROR", f"Ошибка очистки аналитики: {e}")
+    return None
 
 def get_routing_context():
     """Возвращает контекст для маршрутизации на основе аналитики"""
