@@ -16,7 +16,7 @@ def register_callback_handlers(bot: telebot.TeleBot, config: dict):
     Вызывается из bot.py.
     """
     from .admin import register_admin_callbacks
-    from .quotes import register_quotes_callbacks
+    # from .quotes import register_quotes_callbacks  # ← Временно отключено
     from .modes import register_modes_callbacks
     from .alice import register_alice_callbacks
     from .mail import register_mail_callbacks
@@ -25,7 +25,7 @@ def register_callback_handlers(bot: telebot.TeleBot, config: dict):
     from .youtube_upload import register_youtube_upload_callbacks
     
     register_admin_callbacks(bot, config)
-    register_quotes_callbacks(bot, config)
+    # register_quotes_callbacks(bot, config)  # ← Временно отключено
     register_modes_callbacks(bot, config)
     register_alice_callbacks(bot, config)
     register_mail_callbacks(bot, config)
