@@ -1,94 +1,67 @@
 // ==========================================
 // Файл: static/js/replies.js
 // Справка: README.md → Веб-морда / Ответы
-// Задача: ответы на сообщения и комментарии
-// Комментарий: функции openReply, sendReply, openComment, sendComment
+// Задача: ответы и комментарии к сообщениям
+// Комментарий: исправлены пути на /api/replies/...
 // Зависит от: ui.js (showToast)
 // Вызывается из: main.js (импорт)
 // ==========================================
 
 import { showToast } from './ui.js';
 
-let currentReplyChatId = null;
-let currentReplySource = null;
-
 export function initReplies() {
-    // Инициализация (если нужна)
+    document.addEventListener('DOMContentLoaded', () => {
+        // Инициализация — пустая, позже можно добавить
+    });
 }
 
-export function openReply(chatId, source) {
-    currentReplyChatId = chatId;
-    currentReplySource = source;
-    document.getElementById('reply-area').classList.remove('hidden');
-    document.getElementById('reply-text').focus();
-    document.getElementById('comment-area').classList.add('hidden');
-}
-
-export function closeReply() {
-    document.getElementById('reply-area').classList.add('hidden');
-    currentReplyChatId = null;
-    currentReplySource = null;
-}
-
-export async function sendReply() {
+window.sendReply = async function() {
     const text = document.getElementById('reply-text').value.trim();
+    const msgId = document.getElementById('reply-target-id')?.value;
     if (!text) return;
-    
     try {
-        const resp = await fetch('/send_reply', {
+        const resp = await fetch('/api/replies/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: currentReplyChatId,
-                text: text,
-                source: currentReplySource
-            })
+            body: JSON.stringify({ text, reply_to: msgId })
         });
         const data = await resp.json();
         if (data.status === 'ok') {
+            showToast('Ответ отправлен', 'success');
             document.getElementById('reply-text').value = '';
-            closeReply();
         } else {
             showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
         }
     } catch(e) {
-        showToast('Ошибка отправки: ' + e.message, 'error');
+        showToast('Ошибка: ' + e.message, 'error');
     }
-}
+};
 
-export function openComment(chatId) {
-    currentReplyChatId = chatId;
-    document.getElementById('comment-area').classList.remove('hidden');
-    document.getElementById('comment-text').focus();
+window.closeReply = function() {
     document.getElementById('reply-area').classList.add('hidden');
-}
+};
 
-export function closeComment() {
-    document.getElementById('comment-area').classList.add('hidden');
-    currentReplyChatId = null;
-}
-
-export async function sendComment() {
+window.sendComment = async function() {
     const text = document.getElementById('comment-text').value.trim();
     if (!text) return;
-    
     try {
-        const resp = await fetch('/api/vk/comment', {
+        const resp = await fetch('/api/replies/comment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                peer_id: currentReplyChatId,
-                text: text
-            })
+            body: JSON.stringify({ text })
         });
         const data = await resp.json();
         if (data.status === 'ok') {
+            showToast('Комментарий отправлен', 'success');
             document.getElementById('comment-text').value = '';
-            closeComment();
         } else {
             showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
         }
     } catch(e) {
-        showToast('Ошибка комментария: ' + e.message, 'error');
+        showToast('Ошибка: ' + e.message, 'error');
     }
-}
+};
+
+window.closeComment = function() {
+    document.getElementById('comment-area').classList.add('hidden');
+};
