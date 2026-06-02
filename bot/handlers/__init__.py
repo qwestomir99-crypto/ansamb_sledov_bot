@@ -3,8 +3,6 @@
 # Справка: README.md → Обработчики команд / Сборка
 # Задача: собирает все модули handlers в единый регистратор
 # Комментарий: импортирует и экспортирует register_handlers
-# Зависит от: .start, .help, .menu, .admin, .debug, .youtube_test, .talk, .rituals, .flash, .reset, .mood, .ping, .unknown
-# Вызывается из: bot/handlers.py
 # ==========================================
 
 import telebot
@@ -14,7 +12,6 @@ def register_handlers(bot: telebot.TeleBot, config: dict):
     from .start import register_start_handler
     from .help import register_help_handler
     from .menu import register_menu_handler
-    from .admin import register_admin_handler
     from .debug import register_debug_handler
     from .youtube_test import register_youtube_test_handler
     from .talk import register_talk_handler
@@ -25,10 +22,24 @@ def register_handlers(bot: telebot.TeleBot, config: dict):
     from .ping import register_ping_handler
     from .unknown import register_unknown_handler
     
+    # ==========================================
+    # ПРЯМАЯ РЕГИСТРАЦИЯ #АДМИН (без admin.py)
+    # ==========================================
+    @bot.message_handler(func=lambda message: message.text.startswith("#админ"))
+    def handle_admin(message):
+        try:
+            from dialogue.admin_commands import handle_admin_command
+            handle_admin_command(message, bot)
+        except Exception as e:
+            debug_log("ADMIN", f"Ошибка в handle_admin: {e}", "ERROR")
+            bot.reply_to(message, "❌ Ошибка при открытии админ-панели")
+    
+    # ==========================================
+    # РЕГИСТРАЦИЯ ВСЕХ ОСТАЛЬНЫХ ОБРАБОТЧИКОВ
+    # ==========================================
     register_start_handler(bot, config)
     register_help_handler(bot, config)
     register_menu_handler(bot, config)
-    register_admin_handler(bot, config)
     register_debug_handler(bot, config)
     register_youtube_test_handler(bot, config)
     register_talk_handler(bot, config)
