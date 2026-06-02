@@ -2,9 +2,6 @@
 # Файл: dialogue/callbacks/mood.py
 # Справка: README.md → Обработчики кнопок / Настроение
 # Задача: обработка кнопок выбора настроения
-# Комментарий: сохраняет настроение пользователя в user_settings
-# Зависит от: telebot, button_map, user_settings
-# Вызывается из: dialogue/callbacks/__init__.py
 # ==========================================
 
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -12,17 +9,13 @@ from dialogue.button_map import get_moods_keyboard, get_callback
 from dialogue.user_settings import set_user_mood, get_user_mood_name
 from debug_utils import debug_log
 
-# ==========================================
-# РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ
-# ==========================================
 def register_mood_callbacks(bot, config):
     
     @bot.callback_query_handler(func=lambda call: call.data == "mood_menu")
     def show_mood_menu(call):
         bot.edit_message_text(
             "🎭 *Выберите настроение*\n\n"
-            "От этого зависит стиль ответов агента.\n\n"
-            "• 🎨 Художник — метафоры, образы, ритм\n"
+            "• 🎨 Художник — метафоры, образы\n"
             "• 📋 Администратор — чётко, структурированно\n"
             "• 🎭 Поэт — лирично, возвышенно\n"
             "• 🔧 Инженер — технично, по делу",
@@ -51,11 +44,9 @@ def register_mood_callbacks(bot, config):
         
         bot.answer_callback_query(call.id, f"🎭 Настроение: {mood_name}")
         
-        # Возвращаемся в меню настроений с обновлённым текстом
         bot.edit_message_text(
             f"🎭 *Настроение установлено:* {mood_name}\n\n"
-            "От этого зависит стиль ответов агента.\n\n"
-            "• 🎨 Художник — метафоры, образы, ритм\n"
+            "• 🎨 Художник — метафоры, образы\n"
             "• 📋 Администратор — чётко, структурированно\n"
             "• 🎭 Поэт — лирично, возвышенно\n"
             "• 🔧 Инженер — технично, по делу",
