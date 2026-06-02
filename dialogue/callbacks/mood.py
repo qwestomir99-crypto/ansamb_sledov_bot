@@ -12,7 +12,7 @@ from debug_utils import debug_log
 def register_mood_callbacks(bot, config):
     
     @bot.callback_query_handler(func=lambda call: call.data == "mood_menu")
-    def show_mood_menu(call):
+    def show_mood_menu_handler(call):  # ← ПЕРЕИМЕНОВАНО
         bot.edit_message_text(
             "🎭 *Выберите настроение*\n\n"
             "• 🎨 Художник — метафоры, образы\n"
