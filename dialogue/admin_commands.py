@@ -1,26 +1,7 @@
 # ==========================================
-# ПЕРЕХВАТ ИМПОРТА (для отладки — показывает, кто вызывает show_mood_menu)
-# ==========================================
-import sys
-original_import = __import__
-
-def debug_import(name, *args, **kwargs):
-    if "show_mood_menu" in str(args) or "show_mood_menu" in name:
-        import traceback
-        print(f"\n" + "="*60)
-        print(f"🔍 Пойман импорт 'show_mood_menu' из модуля: {name}")
-        print("Стек вызовов:")
-        traceback.print_stack()
-        print("="*60 + "\n")
-    return original_import(name, *args, **kwargs)
-
-__builtins__["__import__"] = debug_import
-
-# ==========================================
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
 # Задача: команда #админ, авторизация, вызов меню, диалог
-# Комментарий: добавлена заглушка show_mood_menu для совместимости
 # ==========================================
 
 import os
@@ -29,14 +10,8 @@ import time
 from debug_utils import debug_log
 from dialogue.button_map import get_admin_menu_keyboard
 
-# ==========================================
-# КОНФИГУРАЦИЯ
-# ==========================================
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "tleem2026")
 
-# ==========================================
-# АВТОРИЗАЦИЯ
-# ==========================================
 authorized_admins = {}
 
 def is_admin_authorized(user_id):
@@ -54,9 +29,6 @@ def logout_admin(user_id):
         del authorized_admins[user_id]
         debug_log("ADMIN", f"Админ {user_id} вышел")
 
-# ==========================================
-# БЕЗОПАСНОЕ УДАЛЕНИЕ СООБЩЕНИЙ
-# ==========================================
 def safe_delete(bot, message, delay=3):
     def _delete():
         time.sleep(delay)
@@ -66,9 +38,6 @@ def safe_delete(bot, message, delay=3):
             pass
     threading.Thread(target=_delete, daemon=True).start()
 
-# ==========================================
-# ОБРАБОТЧИК КОМАНДЫ #админ
-# ==========================================
 def handle_admin_command(message, bot):
     user_id = message.from_user.id
     text = message.text.lower()
@@ -92,11 +61,7 @@ def handle_admin_command(message, bot):
     
     bot.reply_to(message, f"🔐 Введите пароль:\n`#админ {ADMIN_PASSWORD}`", parse_mode='Markdown')
 
-# ==========================================
-# ПОКАЗАТЬ ДИАЛОГ С АГЕНТОМ
-# ==========================================
 def show_dialog_ui(call, bot):
-    """Показывает интерфейс для начала диалога (доступен всем)"""
     from dialogue.agent import ask_agent
     msg = bot.send_message(
         call.message.chat.id,
@@ -110,7 +75,6 @@ def show_dialog_ui(call, bot):
     bot.register_next_step_handler(msg, process_dialog_message, bot)
 
 def process_dialog_message(message, bot):
-    """Обрабатывает сообщение от пользователя (диалог с агентом)"""
     if message.text == "/cancel":
         msg = bot.reply_to(message, "❌ Диалог отменён.")
         safe_delete(bot, message, 3)
@@ -135,10 +99,6 @@ def process_dialog_message(message, bot):
     
     safe_delete(bot, message, 5)
 
-# ==========================================
-# ЗАГЛУШКА ДЛЯ show_mood_menu (перенаправляет в callbacks.mood)
-# ==========================================
 def show_mood_menu(call, bot):
-    """Заглушка — перенаправляет в callbacks.mood"""
     from dialogue.callbacks.mood import show_mood_menu as real_show_mood_menu
     real_show_mood_menu(call, bot)
