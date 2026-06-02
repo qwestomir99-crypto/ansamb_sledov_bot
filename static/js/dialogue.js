@@ -2,7 +2,7 @@
 // Файл: static/js/dialogue.js
 // Справка: README.md → Веб-морда / Диалог с агентом
 // Задача: отправка сообщений агенту и отображение истории
-// Комментарий: использует /api/ask_agent
+// Комментарий: исправлен путь на /api/agent/ask
 // Зависит от: helpers.js, ui.js
 // Вызывается из: main.js (импорт)
 // ==========================================
@@ -24,7 +24,7 @@ export function initDialogue() {
         history.scrollTop = history.scrollHeight;
         
         try {
-            const resp = await fetch('/api/ask_agent', {
+            const resp = await fetch('/api/agent/ask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message })
