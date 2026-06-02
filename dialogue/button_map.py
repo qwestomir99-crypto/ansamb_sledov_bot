@@ -49,13 +49,15 @@ BUTTONS = {
 # ==========================================
 def get_button(button_id: str) -> dict:
     return BUTTONS.get(button_id, {"text": "⚠️ Ошибка", "callback": "error"})
+
 def get_text(button_id: str) -> str:
     return get_button(button_id)["text"]
+
 def get_callback(button_id: str) -> str:
     return get_button(button_id)["callback"]
 
 # ==========================================
-# 3. КЛАВИАТУРЫ
+# 3. АДМИН-МЕНЮ
 # ==========================================
 def get_admin_menu_keyboard():
     from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -82,4 +84,54 @@ def get_admin_menu_keyboard():
     keyboard.add(
         InlineKeyboardButton(get_text("youtube_upload"), callback_data=get_callback("youtube_upload")),
     )
+    return keyboard
+
+# ==========================================
+# 4. ГОСТЕВОЕ МЕНЮ (для пользователей)
+# ==========================================
+def get_user_menu_keyboard():
+    from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        InlineKeyboardButton(get_text("user_tleem"), callback_data=get_callback("user_tleem")),
+        InlineKeyboardButton(get_text("user_fix"), callback_data=get_callback("user_fix")),
+    )
+    keyboard.add(
+        InlineKeyboardButton(get_text("user_flash"), callback_data=get_callback("user_flash")),
+        InlineKeyboardButton(get_text("start_dialog"), callback_data=get_callback("start_dialog")),
+    )
+    keyboard.add(
+        InlineKeyboardButton(get_text("mood"), callback_data=get_callback("mood")),
+        InlineKeyboardButton(get_text("admin_login"), callback_data=get_callback("admin_login")),
+    )
+    keyboard.add(
+        InlineKeyboardButton(get_text("user_help"), callback_data=get_callback("user_help")),
+    )
+    return keyboard
+
+# ==========================================
+# 5. КЛАВИАТУРА НАСТРОЕНИЙ
+# ==========================================
+def get_moods_keyboard(with_back=True):
+    from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        InlineKeyboardButton("🎨 Художник", callback_data="mood_artist"),
+        InlineKeyboardButton("📋 Администратор", callback_data="mood_admin"),
+    )
+    keyboard.add(
+        InlineKeyboardButton("🎭 Поэт", callback_data="mood_poet"),
+        InlineKeyboardButton("🔧 Инженер", callback_data="mood_engineer"),
+    )
+    if with_back:
+        keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="back_to_admin"))
+    return keyboard
+
+# ==========================================
+# 6. КЛАВИАТУРА ДИАЛОГА
+# ==========================================
+def get_dialog_keyboard():
+    from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(InlineKeyboardButton("❌ Отменить диалог", callback_data="cancel_dialog"))
     return keyboard
