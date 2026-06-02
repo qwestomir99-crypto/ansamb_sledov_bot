@@ -2,7 +2,7 @@
 # Файл: dialogue/callbacks/admin.py
 # Справка: README.md → Обработчики кнопок / Админ
 # Задача: обработка кнопок админ-меню
-# Комментарий: вызов публикаций, цитат, диагностики
+# Комментарий: добавлены обработчики для пошагового добавления постов
 # Зависит от: telebot, button_map, publisher, quotes
 # Вызывается из: dialogue/callbacks/__init__.py
 # ==========================================
@@ -29,18 +29,57 @@ def register_admin_callbacks(bot, config):
         )
         bot.answer_callback_query(call.id)
     
+    # ==========================================
+    # ПОШАГОВОЕ ДОБАВЛЕНИЕ ПОСТА
+    # ==========================================
     @bot.callback_query_handler(func=lambda call: call.data == "add_post")
     def add_post_ui(call):
-        msg = bot.send_message(
-            call.message.chat.id,
-            "📝 *Добавление поста*\n\n"
-            "Пришлите текст поста (можно с Markdown).\n"
-            "Или /cancel для отмены.",
-            parse_mode='Markdown'
-        )
-        bot.register_next_step_handler(msg, process_post_text, bot)
-        bot.answer_callback_query(call.id)
+        from dialogue.admin_commands import show_add_post_ui
+        show_add_post_ui(call, bot)
     
+    @bot.callback_query_handler(func=lambda call: call.data == "finish_post")
+    def finish_post(call):
+        from dialogue.admin_commands import show_tags_ui
+        show_tags_ui(call, bot)
+    
+    @bot.callback_query_handler(func=lambda call: call.data == "restart_post")
+    def restart_post(call):
+        from dialogue.admin_commands import show_add_post_ui
+        show_add_post_ui(call, bot)
+    
+    @bot.callback_query_handler(func=lambda call: call.data == "skip_tags")
+    def skip_tags(call):
+        from dialogue.admin_commands import finish_post_without_tags
+        finish_post_without_tags(call, bot)
+    
+    @bot.callback_query_handler(func=lambda call: call.data == "cancel_add_post")
+    def cancel_post(call):
+        from dialogue.admin_commands import cancel_add_post
+        cancel_add_post(call, bot)
+    
+    # ==========================================
+    # ОБРАБОТЧИК СООБЩЕНИЙ ДЛЯ ТЕКСТА ПОСТА
+    # ==========================================
+    @bot.message_handler(func=lambda message: True)
+    def handle_post_text(message):
+        user_id = message.from_user.id
+        from dialogue.admin_commands import post_drafts, process_post_text_message
+        if user_id in post_drafts and "text" not in post_drafts[user_id]:
+            process_post_text_message(message, bot)
+    
+    # ==========================================
+    # ОБРАБОТЧИК СООБЩЕНИЙ ДЛЯ ТЕГОВ
+    # ==========================================
+    @bot.message_handler(func=lambda message: True)
+    def handle_post_tags(message):
+        user_id = message.from_user.id
+        from dialogue.admin_commands import post_drafts, process_tags_message
+        if user_id in post_drafts and "text" in post_drafts[user_id] and "tags" not in post_drafts[user_id]:
+            process_tags_message(message, bot)
+    
+    # ==========================================
+    # УПРАВЛЕНИЕ ЦИТАТАМИ
+    # ==========================================
     @bot.callback_query_handler(func=lambda call: call.data == "manage_quotes")
     def quotes_panel(call):
         keyboard = InlineKeyboardMarkup(row_width=2)
@@ -134,41 +173,6 @@ def register_admin_callbacks(bot, config):
 # ==========================================
 # ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 # ==========================================
-def process_post_text(message, bot):
-    if message.text == "/cancel":
-        bot.reply_to(message, "❌ Добавление поста отменено.", reply_markup=get_admin_menu_keyboard())
-        return
-    
-    if not hasattr(process_post_text, "temp_posts"):
-        process_post_text.temp_posts = {}
-    process_post_text.temp_posts[message.from_user.id] = {"text": message.text}
-    
-    msg = bot.send_message(
-        message.chat.id,
-        "🏷️ Введите теги через пробел (например: #тлеем #ансамбль)\n"
-        "Или /skip для пропуска"
-    )
-    bot.register_next_step_handler(msg, process_post_tags, bot, message.from_user.id)
-
-def process_post_tags(message, bot, user_id):
-    if message.text == "/skip":
-        tags = []
-    elif message.text == "/cancel":
-        bot.reply_to(message, "❌ Добавление поста отменено.", reply_markup=get_admin_menu_keyboard())
-        return
-    else:
-        tags = message.text.split()
-    
-    post_data = getattr(process_post_text, "temp_posts", {}).get(user_id, {})
-    text = post_data.get("text", "")
-    
-    success = add_publication(text, tags, author_id=user_id)
-    
-    if success:
-        bot.reply_to(message, "✅ Пост добавлен в пул публикаций!", reply_markup=get_admin_menu_keyboard())
-    else:
-        bot.reply_to(message, "❌ Ошибка при сохранении поста.", reply_markup=get_admin_menu_keyboard())
-
 def process_new_quote(message, bot):
     if message.text == "/cancel":
         bot.reply_to(message, "❌ Добавление цитаты отменено.", reply_markup=get_admin_menu_keyboard())
