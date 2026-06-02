@@ -1,61 +1,64 @@
 // ==========================================
 // Файл: static/js/mail.js
 // Справка: README.md → Веб-морда / Почта
-// Задача: интерфейс для чтения и отправки писем в веб-морде
-// Комментарий: использует /api/mail/inbox и /api/mail/send
-// Зависит от: ui.js (showToast), helpers.js (escapeHtml)
+// Задача: управление почтой (отправка, получение)
+// Комментарий: исправлены пути на /api/mail/...
+// Зависит от: ui.js (showToast)
 // Вызывается из: main.js (импорт)
 // ==========================================
 
 import { showToast } from './ui.js';
-import { escapeHtml } from './helpers.js';
 
 export function initMail() {
-    loadInbox();
+    document.addEventListener('DOMContentLoaded', () => {
+        loadInbox();
+    });
 }
 
 async function loadInbox() {
-    const container = document.getElementById('mail-inbox');
     try {
         const resp = await fetch('/api/mail/inbox');
-        const emails = await resp.json();
-        if (!emails.length) {
-            container.innerHTML = '<p style="color: var(--text-secondary);">Нет писем</p>';
-            return;
+        const data = await resp.json();
+        const inboxDiv = document.getElementById('mail-inbox');
+        if (data.emails && data.emails.length) {
+            inboxDiv.innerHTML = data.emails.map(email =>
+                `<div style="padding: 0.5rem; border-bottom: 1px solid var(--border);">
+                    <strong>${escapeHtml(email.from)}</strong><br>
+                    <small>${escapeHtml(email.subject)}</small>
+                </div>`
+            ).join('');
+        } else {
+            inboxDiv.innerHTML = 'Нет писем.';
         }
-        container.innerHTML = emails.map(e => `
-            <div class="email-item">
-                <div><strong>${escapeHtml(e.from)}</strong></div>
-                <div>${escapeHtml(e.subject)}</div>
-                <div style="font-size: 0.8rem; color: var(--text-secondary);">${escapeHtml(e.date)}</div>
-                <div>${escapeHtml(e.body)}...</div>
-            </div>
-        `).join('');
-    } catch (e) {
-        showToast('Ошибка загрузки писем', 'error');
+    } catch(e) {
+        showToast('Ошибка загрузки почты: ' + e.message, 'error');
     }
 }
 
 window.sendMail = async function() {
-    const to = document.getElementById('mail-to').value;
-    const subject = document.getElementById('mail-subject').value;
-    const body = document.getElementById('mail-body').value;
+    const to = document.getElementById('mail-to').value.trim();
+    const subject = document.getElementById('mail-subject').value.trim();
+    const body = document.getElementById('mail-body').value.trim();
     if (!to || !subject || !body) {
-        showToast('Заполните все поля', 'warning');
+        showToast('Все поля обязательны', 'error');
         return;
     }
     try {
-        await fetch('/api/mail/send', {
+        const resp = await fetch('/api/mail/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ to, subject, body })
         });
-        showToast('Письмо отправлено', 'success');
-        document.getElementById('mail-to').value = '';
-        document.getElementById('mail-subject').value = '';
-        document.getElementById('mail-body').value = '';
-        loadInbox();
-    } catch (e) {
-        showToast('Ошибка отправки письма', 'error');
+        const data = await resp.json();
+        if (data.status === 'ok') {
+            showToast('Письмо отправлено', 'success');
+            document.getElementById('mail-to').value = '';
+            document.getElementById('mail-subject').value = '';
+            document.getElementById('mail-body').value = '';
+        } else {
+            showToast('Ошибка: ' + (data.error || 'неизвестная ошибка'), 'error');
+        }
+    } catch(e) {
+        showToast('Ошибка: ' + e.message, 'error');
     }
 };
