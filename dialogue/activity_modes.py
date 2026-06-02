@@ -138,3 +138,15 @@ def get_publisher_interval():
     """Возвращает интервал публикаций в минутах для текущего режима"""
     mode_config = get_current_mode_config()
     return mode_config.get("publisher_interval", 0)
+
+# ==========================================
+# ДОБАВЛЕНА ФУНКЦИЯ ДЛЯ СОВМЕСТИМОСТИ С modes.py
+# ==========================================
+def set_mode(mode_name):
+    """Устанавливает принудительный режим (для админки)"""
+    config = load_config()
+    config["force_mode"] = mode_name
+    config["force_mode_until"] = (datetime.now().replace(hour=23, minute=59, second=59)).strftime("%Y-%m-%d %H:%M:%S")
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(config, f, indent=4, ensure_ascii=False)
+    debug_log("ACTIVITY_MODES", f"Принудительно установлен режим: {mode_name}")
