@@ -4,6 +4,8 @@
 # Задача: команды #тлеем, #фиксируем
 # ==========================================
 
+from debug_utils import debug_log  # ← ДОБАВИТЬ ЭТУ СТРОКУ
+
 def register_rituals_handler(bot, config):
     @bot.message_handler(func=lambda message: message.text.lower() in ["#тлеем", "#фиксируем", "#tleem", "#fixiruem"])
     def handle_rituals(message):
@@ -17,5 +19,5 @@ def register_rituals_handler(bot, config):
             else:
                 bot.reply_to(message, "📭 База цитат пуста. Добавьте цитаты через админку.")
         except Exception as e:
+            debug_log("RITUALS", f"Ошибка: {e}", "ERROR")  # ← ТЕПЕРЬ РАБОТАЕТ
             bot.reply_to(message, "❌ Ошибка при выборе цитаты.")
-            debug_log("HANDLERS", f"Ошибка: {e}", "ERROR")
