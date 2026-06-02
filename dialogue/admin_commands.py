@@ -2,9 +2,7 @@
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
 # Задача: команда #админ, авторизация, вызов меню
-# Комментарий: без обработки кнопок и диалогов
-# Зависит от: telebot, button_map, debug_utils
-# Вызывается из: bot/handlers/__init__.py
+# Комментарий: добавлена заглушка show_mood_menu для совместимости
 # ==========================================
 
 import os
@@ -75,3 +73,11 @@ def handle_admin_command(message, bot):
         return
     
     bot.reply_to(message, f"🔐 Введите пароль:\n`#админ {ADMIN_PASSWORD}`", parse_mode='Markdown')
+
+# ==========================================
+# ФИКТИВНАЯ ФУНКЦИЯ ДЛЯ СОВМЕСТИМОСТИ (удалить после рефакторинга)
+# ==========================================
+def show_mood_menu(call, bot):
+    """Заглушка — вызывает настоящую функцию из callbacks/mood.py"""
+    from dialogue.callbacks.mood import register_mood_callbacks
+    bot.answer_callback_query(call.id, "Функция в разработке")
