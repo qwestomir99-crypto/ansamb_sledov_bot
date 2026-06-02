@@ -2,7 +2,8 @@
 # Файл: dialogue/callbacks/user.py
 # Справка: README.md → Обработчики кнопок / Гостевые
 # Задача: обработка callback'ов для гостевых кнопок
-# Комментарий: исправлен импорт show_mood_menu (теперь из callbacks.mood)
+# Комментарий: исправлен callback для настроения (mood_menu)
+#              импорт show_mood_menu из callbacks.mood
 # Зависит от: telebot, dialogue.admin_commands, dialogue.callbacks.mood, debug_utils
 # Вызывается из: callbacks/__init__.py
 # ==========================================
@@ -75,7 +76,8 @@ def register_user_callbacks(bot: telebot.TeleBot, config: dict):
         )
         bot.answer_callback_query(call.id)
     
-    @bot.callback_query_handler(func=lambda call: call.data == "mood")
+    # Исправлено: call.data == "mood_menu" (было "mood")
+    @bot.callback_query_handler(func=lambda call: call.data == "mood_menu")
     def callback_mood_menu(call):
         debug_log("CALLBACK", f"Меню настроения от {call.from_user.id}")
         show_mood_menu(call, bot)
