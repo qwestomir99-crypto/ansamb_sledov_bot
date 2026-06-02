@@ -2,13 +2,14 @@
 # Файл: dialogue/callbacks/user.py
 # Справка: README.md → Обработчики кнопок / Гостевые
 # Задача: обработка callback'ов для гостевых кнопок
-# Комментарий: вынесен из callbacks.py
-# Зависит от: telebot, dialogue.admin_commands, debug_utils
+# Комментарий: исправлен импорт show_mood_menu (теперь из callbacks.mood)
+# Зависит от: telebot, dialogue.admin_commands, dialogue.callbacks.mood, debug_utils
 # Вызывается из: callbacks/__init__.py
 # ==========================================
 
 import telebot
-from dialogue.admin_commands import show_mood_menu, show_dialog_ui, handle_admin_command
+from dialogue.admin_commands import show_dialog_ui, handle_admin_command
+from dialogue.callbacks.mood import show_mood_menu
 from debug_utils import debug_log
 
 def register_user_callbacks(bot: telebot.TeleBot, config: dict):
@@ -36,11 +37,22 @@ def register_user_callbacks(bot: telebot.TeleBot, config: dict):
     @bot.callback_query_handler(func=lambda call: call.data == "user_tleem")
     def callback_user_tleem(call):
         debug_log("CALLBACK", f"#тлеем от {call.from_user.id}")
-        bot.edit_message_text(
-            f"👁️ {quote}",
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id
-        )
+        from dialogue.quotes import get_quotes_list
+        import random
+        quotes = get_quotes_list()
+        if quotes:
+            quote = random.choice(quotes)
+            bot.edit_message_text(
+                f"👁️ {quote}",
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id
+            )
+        else:
+            bot.edit_message_text(
+                "📭 База цитат пуста.",
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id
+            )
         bot.answer_callback_query(call.id)
     
     @bot.callback_query_handler(func=lambda call: call.data == "user_fix")
