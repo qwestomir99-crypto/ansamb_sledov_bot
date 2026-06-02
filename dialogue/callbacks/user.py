@@ -2,14 +2,13 @@
 # Файл: dialogue/callbacks/user.py
 # Справка: README.md → Обработчики кнопок / Гостевые
 # Задача: обработка callback'ов для гостевых кнопок
-# Комментарий: исправлен импорт show_mood_menu
-# Зависит от: telebot, dialogue.admin_commands, dialogue.callbacks.mood, debug_utils
+# Комментарий: обработчик НАСТРОЕНИЯ ВРЕМЕННО ОТКЛЮЧЁН (циклический импорт)
+# Зависит от: telebot, dialogue.admin_commands, debug_utils
 # Вызывается из: callbacks/__init__.py
 # ==========================================
 
 import telebot
 from dialogue.admin_commands import show_dialog_ui, handle_admin_command
-from dialogue.callbacks.mood import show_mood_menu_handler as show_mood_menu
 from debug_utils import debug_log
 
 def register_user_callbacks(bot: telebot.TeleBot, config: dict):
@@ -75,11 +74,15 @@ def register_user_callbacks(bot: telebot.TeleBot, config: dict):
         )
         bot.answer_callback_query(call.id)
     
-    @bot.callback_query_handler(func=lambda call: call.data == "mood_menu")
-    def callback_mood_menu(call):
-        debug_log("CALLBACK", f"Меню настроения от {call.from_user.id}")
-        show_mood_menu(call, bot)
-        bot.answer_callback_query(call.id)
+    # ==========================================
+    # ОБРАБОТЧИК НАСТРОЕНИЯ ВРЕМЕННО ОТКЛЮЧЁН
+    # ==========================================
+    # @bot.callback_query_handler(func=lambda call: call.data == "mood_menu")
+    # def callback_mood_menu(call):
+    #     debug_log("CALLBACK", f"Меню настроения от {call.from_user.id}")
+    #     from dialogue.callbacks.mood import show_mood_menu_handler as show_mood_menu
+    #     show_mood_menu(call, bot)
+    #     bot.answer_callback_query(call.id)
     
     @bot.callback_query_handler(func=lambda call: call.data == "start_dialog")
     def callback_start_dialog(call):
