@@ -2,6 +2,7 @@
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
 # Задача: команда #админ, авторизация, вызов меню, диалог
+# Комментарий: БЕЗ ИМПОРТА show_mood_menu (временно отключено)
 # ==========================================
 
 import os
@@ -98,7 +99,3 @@ def process_dialog_message(message, bot):
         bot.reply_to(message, "🌙 Старший брат отдыхает. Попробуй позже.")
     
     safe_delete(bot, message, 5)
-
-def show_mood_menu(call, bot):
-    from dialogue.callbacks.mood import show_mood_menu as real_show_mood_menu
-    real_show_mood_menu(call, bot)
