@@ -2,81 +2,147 @@
 # Модуль: dialogue/quotes_supabase.py
 # Справка: README.md → Цитаты
 # Задача: публикация цитат по расписанию + случайный пост из VK
-# Комментарий: интервал цитат зависит от настроения пользователя (если задано)
-#              Исправлена логика: текст поста — приоритет №1, цитата — опциональна.
-#              Добавлена поддержка Supabase с фоллбэком на файлы.
-# Зависит от: config.json, activity_modes.py, user_settings.py, services.photo_reader
-# Вызывается из: bot.py
+# Комментарий: ИСПОЛЬЗУЕТ ВНУТРЕННЮЮ SQLITE (без внешнего Supabase)
 # ==========================================
 
 import time
 import random
 import os
 import json
+import sqlite3
 from datetime import datetime
 import threading
 from debug_utils import debug_log
 from dialogue.activity_modes import should_publish_quotes, get_quotes_interval, load_config
-from dialogue.user_settings import get_user_quotes_interval
-from services.supabase_client import db_insert, db_select
 
 # ==========================================
 # КОНСТАНТЫ
 # ==========================================
 CONFIG_FILE = "config.json"
 QUOTES_FALLBACK_FILE = "dialogue/data/quotes.txt"
-QUOTES_TABLE = "quotes"
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'quotes.db')
+
+# ==========================================
+# ИНИЦИАЛИЗАЦИЯ БАЗЫ ДАННЫХ
+# ==========================================
+def init_db():
+    """Создаёт таблицу quotes, если её нет"""
+    try:
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS quotes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                text TEXT NOT NULL,
+                created_at TEXT
+            )
+        ''')
+        conn.commit()
+        conn.close()
+        debug_log("QUOTES", "Таблица quotes создана/подтверждена")
+        
+        # Миграция из файла, если база пуста
+        migrate_from_file()
+    except Exception as e:
+        debug_log("QUOTES", f"Ошибка инициализации БД: {e}", "ERROR")
+
+def migrate_from_file():
+    """Переносит цитаты из файла в SQLite, если файл есть, а база пуста"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM quotes")
+        count = c.fetchone()[0]
+        conn.close()
+        
+        if count == 0 and os.path.exists(QUOTES_FALLBACK_FILE):
+            with open(QUOTES_FALLBACK_FILE, "r", encoding="utf-8") as f:
+                quotes = [line.strip() for line in f.readlines() if line.strip()]
+            
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            for quote in quotes:
+                c.execute("INSERT INTO quotes (text, created_at) VALUES (?, ?)", 
+                          (quote, datetime.now().isoformat()))
+            conn.commit()
+            conn.close()
+            debug_log("QUOTES", f"Мигрировано {len(quotes)} цитат из файла")
+    except Exception as e:
+        debug_log("QUOTES", f"Ошибка миграции: {e}", "ERROR")
 
 # ==========================================
 # РАБОТА С ЦИТАТАМИ
 # ==========================================
 def get_quotes(limit=10):
     """
-    Возвращает список цитат.
-    Сначала пытается взять из Supabase, при ошибке — из файла.
+    Возвращает список цитат из SQLite
     """
-    # Попытка из базы
-    result = db_select(QUOTES_TABLE, limit=limit, fallback_file=None)
-    if result:
-        # Если из базы получилось, возвращаем
-        return [row.get("text") for row in result]
-    
-    # Фоллбэк на файл
-    if os.path.exists(QUOTES_FALLBACK_FILE):
-        with open(QUOTES_FALLBACK_FILE, "r", encoding="utf-8") as f:
-            return [line.strip() for line in f.readlines() if line.strip()][-limit:]
-    return []
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT text FROM quotes ORDER BY id DESC LIMIT ?", (limit,))
+        rows = c.fetchall()
+        conn.close()
+        return [row[0] for row in rows]
+    except Exception as e:
+        debug_log("QUOTES", f"Ошибка чтения цитат из БД: {e}", "ERROR")
+        # Фоллбэк на файл
+        if os.path.exists(QUOTES_FALLBACK_FILE):
+            with open(QUOTES_FALLBACK_FILE, "r", encoding="utf-8") as f:
+                return [line.strip() for line in f.readlines() if line.strip()][-limit:]
+        return []
+
+def get_all_quotes():
+    """Возвращает все цитаты"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT id, text, created_at FROM quotes ORDER BY id DESC")
+        rows = c.fetchall()
+        conn.close()
+        return [{"id": row[0], "text": row[1], "created_at": row[2]} for row in rows]
+    except Exception as e:
+        debug_log("QUOTES", f"Ошибка: {e}", "ERROR")
+        return []
 
 def add_quote(text):
-    """
-    Добавляет цитату.
-    Сначала пытается записать в Supabase, при ошибке — в файл.
-    """
-    data = {"text": text, "created_at": datetime.now().isoformat()}
-    # Попытка в базу
-    db_insert(QUOTES_TABLE, data, fallback_file=QUOTES_FALLBACK_FILE)
-    return True
-
-# ==========================================
-# ОСТАЛЬНОЙ КОД БЕЗ ИЗМЕНЕНИЙ
-# ==========================================
-def save_quotes(quotes):
-    config = load_config()
-    quotes_file = config.get("quotes", {}).get("file", QUOTES_FALLBACK_FILE)
-    with open(quotes_file, "w", encoding="utf-8") as f:
-        for q in quotes:
-            f.write(q + "\n")
-
-def delete_quote(index):
-    quotes = get_quotes()
-    if 0 <= index < len(quotes):
-        quotes.pop(index)
-        save_quotes(quotes)
+    """Добавляет цитату в SQLite"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("INSERT INTO quotes (text, created_at) VALUES (?, ?)", 
+                  (text, datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+        debug_log("QUOTES", f"Цитата добавлена: {text[:50]}...")
         return True
-    return False
+    except Exception as e:
+        debug_log("QUOTES", f"Ошибка добавления цитаты: {e}", "ERROR")
+        # Фоллбэк на файл
+        try:
+            with open(QUOTES_FALLBACK_FILE, "a", encoding="utf-8") as f:
+                f.write(text + "\n")
+            return True
+        except:
+            return False
+
+def delete_quote_by_id(quote_id):
+    """Удаляет цитату по ID"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("DELETE FROM quotes WHERE id = ?", (quote_id,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        debug_log("QUOTES", f"Ошибка удаления: {e}", "ERROR")
+        return False
 
 def get_quotes_list():
-    return get_quotes()
+    """Возвращает список текстов цитат (для совместимости)"""
+    return get_quotes(10000)
 
 def get_quotes_interval_minutes():
     config = load_config()
@@ -89,12 +155,13 @@ def set_quotes_interval_minutes(minutes):
     config["quotes"]["interval_minutes"] = minutes
     save_config(config)
 
-# ==========================================
-# Глобальная переменная для остановки старого цикла
-# ==========================================
-quote_thread_running = False
-quote_thread = None
+def save_config(config):
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=4, ensure_ascii=False)
 
+# ==========================================
+# ОТПРАВКА ЦИТАТЫ С ФОТО
+# ==========================================
 def send_quote_with_photo(bot, chat_id, quote):
     """Отправляет цитату с фото из VK (приоритет — текст поста)"""
     try:
@@ -102,33 +169,33 @@ def send_quote_with_photo(bot, chat_id, quote):
         
         post = get_random_post()
         if post and post.get('photo_url'):
-            # Текст поста — главный
             caption = post['text']
             
-            # Добавляем цитату, если влезает
             if len(caption) + len(quote) + 50 < 1024:
                 caption += f"\n\n📜 {quote}"
             
-            # Добавляем хештеги, если влезают
             tags = ' '.join(post.get('tags', [])[:3])
             if len(caption) + len(tags) + 10 < 1024:
                 caption += f"\n\n{tags}"
             
-            # Обрезаем до лимита Telegram на всякий случай
             caption = caption[:1024]
             
             bot.send_photo(chat_id, post['photo_url'], caption=caption, parse_mode='Markdown')
-            debug_log("QUOTES", f"Цитата отправлена с фото (приоритет — текст поста, длина: {len(caption)} симв.)")
+            debug_log("QUOTES", f"Цитата отправлена с фото")
             return True
         else:
             bot.send_message(chat_id, f"📜 *Цитата дня* • {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n{quote}\n\n#ЦитатаДня #СапёрыАутентичности", parse_mode='Markdown')
-            debug_log("QUOTES", "Цитата отправлена без фото (пост не найден)")
             return False
     except Exception as e:
         debug_log("QUOTES", f"Ошибка отправки цитаты с фото: {e}", "ERROR")
-        # Если фото не отправилось — отправляем просто текст
         bot.send_message(chat_id, f"📜 *Цитата дня* • {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n{quote}\n\n#ЦитатаДня #СапёрыАутентичности", parse_mode='Markdown')
         return False
+
+# ==========================================
+# ЦИКЛ ПУБЛИКАЦИИ ЦИТАТ
+# ==========================================
+quote_thread_running = False
+quote_thread = None
 
 def quotes_loop(bot, TG_CHAT_ID):
     global quote_thread_running, quote_thread
@@ -147,10 +214,7 @@ def quotes_loop(bot, TG_CHAT_ID):
                 time.sleep(60)
                 continue
             
-            # Получаем базовый интервал из режима
             base_interval = get_quotes_interval()
-            
-            # Для общего канала используем базовый интервал (без привязки к пользователю)
             current_interval = base_interval
             
             if current_interval != last_interval:
@@ -172,11 +236,12 @@ def quotes_loop(bot, TG_CHAT_ID):
                 continue
                 
             quote = random.choice(quotes)
-            
-            # Отправляем цитату с фото из VK
             send_quote_with_photo(bot, TG_CHAT_ID, quote)
             debug_log("QUOTES", f"Цитата отправлена (интервал {current_interval} мин)")
     
     quote_thread = threading.Thread(target=_run, daemon=True)
     quote_thread.start()
-    debug_log("QUOTES", "Цитаты запущены")
+    debug_log("QUOTES", "Цитаты запущены (SQLite)")
+
+# Инициализация БД при импорте
+init_db()
