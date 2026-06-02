@@ -1,41 +1,80 @@
 # ==========================================
 # Файл: dialogue/callbacks/mood.py
 # Справка: README.md → Обработчики кнопок / Настроение
-# Задача: обработка callback'ов для настроения
-# Комментарий: вынесен из callbacks.py
-# Зависит от: telebot, dialogue.user_settings, debug_utils
-# Вызывается из: callbacks/__init__.py
+# Задача: обработка кнопок выбора настроения
+# Комментарий: сохраняет настроение пользователя в user_settings
+# Зависит от: telebot, button_map, user_settings
+# Вызывается из: dialogue/callbacks/__init__.py
 # ==========================================
 
-import telebot
-from dialogue.user_settings import set_user_mood, get_mood_info
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from dialogue.button_map import get_moods_keyboard, get_callback
+from dialogue.user_settings import set_user_mood, get_user_mood_name
 from debug_utils import debug_log
 
-def register_mood_callbacks(bot: telebot.TeleBot, config: dict):
-    """Регистрирует callback'и для настроения"""
+# ==========================================
+# РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ
+# ==========================================
+def register_mood_callbacks(bot, config):
     
-    @bot.callback_query_handler(func=lambda call: call.data.startswith("mood_"))
-    def callback_set_mood(call):
-        mood = call.data.replace("mood_", "")
-        debug_log("CALLBACK", f"Установка настроения {mood} от {call.from_user.id}")
-        if set_user_mood(call.from_user.id, mood):
-            mood_info = get_mood_info(mood)
-            bot.edit_message_text(
-                f"✅ Настроение изменено на «{mood_info['name']}».\n\n"
-                f"{mood_info['emoji']} {mood_info['description']}",
-                chat_id=call.message.chat.id,
-                message_id=call.message.message_id
-            )
-        else:
-            bot.edit_message_text(
-                "❌ Не удалось изменить настроение.",
-                chat_id=call.message.chat.id,
-                message_id=call.message.message_id
-            )
+    @bot.callback_query_handler(func=lambda call: call.data == "mood_menu")
+    def show_mood_menu(call):
+        bot.edit_message_text(
+            "🎭 *Выберите настроение*\n\n"
+            "От этого зависит стиль ответов агента.\n\n"
+            "• 🎨 Художник — метафоры, образы, ритм\n"
+            "• 📋 Администратор — чётко, структурированно\n"
+            "• 🎭 Поэт — лирично, возвышенно\n"
+            "• 🔧 Инженер — технично, по делу",
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=get_moods_keyboard(with_back=True),
+            parse_mode='Markdown'
+        )
         bot.answer_callback_query(call.id)
     
-    @bot.callback_query_handler(func=lambda call: call.data == "close_mood_menu")
-    def callback_close_mood(call):
-        debug_log("CALLBACK", f"Закрытие меню настроения от {call.from_user.id}")
-        bot.delete_message(call.message.chat.id, call.message.message_id)
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("mood_"))
+    def set_mood(call):
+        user_id = call.from_user.id
+        mood_map = {
+            "mood_artist": "artist",
+            "mood_admin": "admin",
+            "mood_poet": "poet",
+            "mood_engineer": "engineer"
+        }
+        
+        mood_key = call.data
+        mood = mood_map.get(mood_key, "artist")
+        
+        set_user_mood(user_id, mood)
+        mood_name = get_user_mood_name(user_id)
+        
+        bot.answer_callback_query(call.id, f"🎭 Настроение: {mood_name}")
+        
+        # Возвращаемся в меню настроений с обновлённым текстом
+        bot.edit_message_text(
+            f"🎭 *Настроение установлено:* {mood_name}\n\n"
+            "От этого зависит стиль ответов агента.\n\n"
+            "• 🎨 Художник — метафоры, образы, ритм\n"
+            "• 📋 Администратор — чётко, структурированно\n"
+            "• 🎭 Поэт — лирично, возвышенно\n"
+            "• 🔧 Инженер — технично, по делу",
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=get_moods_keyboard(with_back=True),
+            parse_mode='Markdown'
+        )
+        
+        debug_log("MOOD", f"Пользователь {user_id} выбрал настроение: {mood}")
+    
+    @bot.callback_query_handler(func=lambda call: call.data == "mood_back")
+    def mood_back(call):
+        from dialogue.button_map import get_admin_menu_keyboard
+        bot.edit_message_text(
+            "🛡️ *Админ-панель*\n\nВыберите действие:",
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=get_admin_menu_keyboard(),
+            parse_mode='Markdown'
+        )
         bot.answer_callback_query(call.id)
