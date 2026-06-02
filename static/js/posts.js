@@ -2,7 +2,7 @@
 // Файл: static/js/posts.js
 // Справка: README.md → Веб-морда / Посты
 // Задача: создание постов в Telegram и VK
-// Комментарий: функции createPost, sendPost
+// Комментарий: исправлены пути (теперь /api/posts/...)
 // Зависит от: ui.js (showToast)
 // Вызывается из: main.js (импорт)
 // ==========================================
@@ -13,7 +13,7 @@ export function createPost(platform) {
     const text = prompt(`Введите текст поста для ${platform === 'telegram' ? 'Telegram' : 'VK'}:`);
     if (!text) return;
     
-    fetch('/api/create_post', {
+    fetch('/api/posts/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ platform: platform, text: text })
@@ -37,10 +37,10 @@ export async function sendPost() {
     statusSpan.textContent = '⏳ Отправка...';
     
     try {
-        const resp = await fetch('/vk_post', {
+        const resp = await fetch('/api/posts/vk', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ text: text })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text })
         });
         const data = await resp.json();
         if (data.status === 'ok') {
