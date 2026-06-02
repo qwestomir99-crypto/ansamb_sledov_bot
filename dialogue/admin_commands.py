@@ -2,6 +2,7 @@
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
 # Задача: команда #админ, авторизация, вызов меню, диалог
+# Комментарий: добавлена заглушка show_mood_menu для совместимости
 # ==========================================
 
 import os
@@ -115,3 +116,11 @@ def process_dialog_message(message, bot):
         bot.reply_to(message, "🌙 Старший брат отдыхает. Попробуй позже.")
     
     safe_delete(bot, message, 5)
+
+# ==========================================
+# ЗАГЛУШКА ДЛЯ show_mood_menu (перенаправляет в callbacks.mood)
+# ==========================================
+def show_mood_menu(call, bot):
+    """Заглушка — перенаправляет в callbacks.mood"""
+    from dialogue.callbacks.mood import show_mood_menu as real_show_mood_menu
+    real_show_mood_menu(call, bot)
