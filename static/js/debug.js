@@ -2,7 +2,7 @@
 // Файл: static/js/debug.js
 // Справка: README.md → Веб-морда / Дебаггер
 // Задача: дебаггер (логи, аудит, индекс)
-// Комментарий: функции fetchDebugLogs, sendDebugReport, runAudit, showAuditStatus, showDebugIndex
+// Комментарий: исправлены пути на /api/audit/...
 // Зависит от: ui.js (showToast)
 // Вызывается из: main.js (импорт)
 // ==========================================
@@ -14,7 +14,7 @@ export async function fetchDebugLogs() {
     reportDiv.innerHTML = '⏳ Загрузка логов...';
     
     try {
-        const resp = await fetch('/api/debug/logs');
+        const resp = await fetch('/api/audit/logs');
         const data = await resp.json();
         reportDiv.innerHTML = `<pre style="max-height: 300px; overflow-y: auto; background: #f8f8fa; padding: 1rem; border-radius: 12px;">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
     } catch(e) {
@@ -27,7 +27,7 @@ export async function sendDebugReport() {
     reportDiv.innerHTML = '⏳ Отправка отчёта...';
     
     try {
-        const resp = await fetch('/api/debug/send_report', { method: 'POST' });
+        const resp = await fetch('/api/audit/send_report', { method: 'POST' });
         const data = await resp.json();
         if (data.status === 'ok') {
             reportDiv.innerHTML = '✅ Отчёт отправлен в Telegram';
@@ -78,7 +78,7 @@ export async function showDebugIndex() {
     resultDiv.innerHTML = '⏳ Загрузка индекса...';
     
     try {
-        const resp = await fetch('/api/debug/index');
+        const resp = await fetch('/api/audit/index');
         const data = await resp.json();
         if (data.status === 'ok') {
             resultDiv.innerHTML = `<pre style="max-height: 300px; overflow-y: auto; background: #f8f8fa; padding: 1rem; border-radius: 12px;">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
