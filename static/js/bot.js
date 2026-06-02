@@ -2,7 +2,7 @@
 // Файл: static/js/bot.js
 // Справка: README.md → Веб-морда / Управление ботом
 // Задача: управление ботом (режимы, пинг, Алиса)
-// Комментарий: функции setMode, togglePing, toggleAlice
+// Комментарий: исправлены пути на /api/modes/set, /api/ping, /api/alice/toggle
 // Зависит от: ui.js (showToast)
 // Вызывается из: main.js (импорт)
 // ==========================================
@@ -11,7 +11,7 @@ import { showToast } from './ui.js';
 
 export async function setMode(mode) {
     try {
-        const resp = await fetch('/api/set_mode', {
+        const resp = await fetch('/api/modes/set', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ mode: mode })
@@ -29,7 +29,10 @@ export async function setMode(mode) {
 
 export async function togglePing() {
     try {
-        const resp = await fetch('/api/ping_bot');
+        const resp = await fetch('/api/ping', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
         const data = await resp.json();
         if (data.status === 'ok') {
             showToast('✅ Бот отвечает: ' + data.message, 'success');
@@ -43,7 +46,7 @@ export async function togglePing() {
 
 export async function toggleAlice() {
     try {
-        const resp = await fetch('/api/toggle_alice', {
+        const resp = await fetch('/api/alice/toggle', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
