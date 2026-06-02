@@ -160,6 +160,17 @@ def save_config(config):
         json.dump(config, f, indent=4, ensure_ascii=False)
 
 # ==========================================
+# ОБЁРТКИ ДЛЯ СОВМЕСТИМОСТИ С admin_commands.py
+# ==========================================
+def set_quotes_interval(minutes):
+    """Обёртка для совместимости"""
+    return set_quotes_interval_minutes(minutes)
+
+def get_quotes_interval():
+    """Обёртка для совместимости"""
+    return get_quotes_interval_minutes()
+
+# ==========================================
 # ОТПРАВКА ЦИТАТЫ С ФОТО
 # ==========================================
 def send_quote_with_photo(bot, chat_id, quote):
