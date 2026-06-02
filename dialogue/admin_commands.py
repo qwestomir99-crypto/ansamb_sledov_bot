@@ -4,7 +4,7 @@
 # Задача: админ-меню, кнопки, управление цитатами, постинг в VK
 # Комментарий: использует button_map.py для единого управления кнопками
 #              Добавлены подменю «Настроение» и кнопка диалога (для всех)
-#              Добавлено автоудаление сообщений (safe_delete)
+#              Добавлено автоудаление сообщений (safe_delete) — теперь с переданным ботом
 #              Добавлен вход в админку из гостевого меню
 # Зависит от: telebot, button_map, publisher, quotes, diagnostics
 # Вызывается из: bot.py (handle_message), callbacks.py
@@ -46,12 +46,11 @@ ADMIN_USER_ID = int(os.environ.get("ADMIN_USER_ID", 0))
 # ==========================================
 # ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (удаление портянки)
 # ==========================================
-def safe_delete(message, delay=3):
-    """Безопасно удаляет сообщение с задержкой"""
+def safe_delete(bot, message, delay=3):
+    """Безопасно удаляет сообщение с задержкой, используя переданного бота"""
     def _delete():
         time.sleep(delay)
         try:
-            bot = telebot.TeleBot(os.environ.get("BOT_TOKEN"))
             bot.delete_message(message.chat.id, message.message_id)
         except:
             pass
@@ -61,7 +60,7 @@ def send_report(bot, chat_id, text, delete_after=5):
     """Отправляет отчёт и удаляет его через delete_after секунд"""
     msg = bot.send_message(chat_id, text)
     if delete_after > 0:
-        safe_delete(msg, delete_after)
+        safe_delete(bot, msg, delete_after)
 
 def download_file(bot, file_id, suffix=""):
     """Скачивает файл из Telegram во временную папку"""
@@ -110,7 +109,7 @@ def handle_admin_command(message, bot):
     
     if is_admin_authorized(user_id):
         bot.reply_to(message, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
-        safe_delete(message, 3)
+        safe_delete(bot, message, 3)
         return
     
     parts = text.split(maxsplit=1)
@@ -118,11 +117,11 @@ def handle_admin_command(message, bot):
         password = parts[1]
         if authorize_admin(user_id, password):
             bot.reply_to(message, "✅ Авторизация успешна!", reply_markup=get_admin_menu())
-            safe_delete(message, 3)
+            safe_delete(bot, message, 3)
         else:
             msg = bot.reply_to(message, "❌ Неверный пароль.")
-            safe_delete(message, 3)
-            safe_delete(msg, 5)
+            safe_delete(bot, message, 3)
+            safe_delete(bot, msg, 5)
         return
     
     bot.reply_to(message, "🔐 Введите пароль для входа в админ-панель:\n(или #админ пароль)")
@@ -137,7 +136,7 @@ def admin_login_from_menu(call, bot):
         call.message.chat.id,
         "🔐 Введите пароль для входа в админ-панель:"
     )
-    safe_delete(call.message, 1)
+    safe_delete(bot, call.message, 1)
     bot.register_next_step_handler(msg, process_admin_password, bot, user_id)
 
 def process_admin_password(message, bot, user_id):
@@ -147,8 +146,8 @@ def process_admin_password(message, bot, user_id):
         bot.reply_to(message, "✅ Авторизация успешна!", reply_markup=get_admin_menu())
     else:
         msg = bot.reply_to(message, "❌ Неверный пароль.")
-        safe_delete(msg, 5)
-    safe_delete(message, 3)
+        safe_delete(bot, msg, 5)
+    safe_delete(bot, message, 3)
 
 # ==========================================
 # ОБРАБОТЧИКИ КНОПОК
@@ -171,14 +170,14 @@ def show_add_post_ui(call, bot):
         "Или /cancel для отмены.",
         parse_mode='Markdown'
     )
-    safe_delete(call.message, 1)
+    safe_delete(bot, call.message, 1)
     bot.register_next_step_handler(msg, process_post_text, bot)
 
 def process_post_text(message, bot):
     if message.text == "/cancel":
         msg = bot.reply_to(message, "❌ Добавление поста отменено.", reply_markup=get_admin_menu())
-        safe_delete(message, 3)
-        safe_delete(msg, 5)
+        safe_delete(bot, message, 3)
+        safe_delete(bot, msg, 5)
         return
     
     if not hasattr(process_post_text, "temp_posts"):
@@ -191,15 +190,15 @@ def process_post_text(message, bot):
         "Или /skip для пропуска"
     )
     bot.register_next_step_handler(msg, process_post_tags, bot, message.from_user.id)
-    safe_delete(message, 2)
+    safe_delete(bot, message, 2)
 
 def process_post_tags(message, bot, user_id):
     if message.text == "/skip":
         tags = []
     elif message.text == "/cancel":
         msg = bot.reply_to(message, "❌ Добавление поста отменено.", reply_markup=get_admin_menu())
-        safe_delete(message, 3)
-        safe_delete(msg, 5)
+        safe_delete(bot, message, 3)
+        safe_delete(bot, msg, 5)
         return
     else:
         tags = message.text.split()
@@ -215,8 +214,8 @@ def process_post_tags(message, bot, user_id):
     else:
         msg = bot.reply_to(message, "❌ Ошибка при сохранении поста.", reply_markup=get_admin_menu())
     
-    safe_delete(message, 3)
-    safe_delete(msg, 5)
+    safe_delete(bot, message, 3)
+    safe_delete(bot, msg, 5)
 
 def show_vk_post_ui(call, bot):
     msg = bot.send_message(
@@ -227,14 +226,14 @@ def show_vk_post_ui(call, bot):
         "Или /cancel для отмены.",
         parse_mode='Markdown'
     )
-    safe_delete(call.message, 1)
+    safe_delete(bot, call.message, 1)
     bot.register_next_step_handler(msg, process_vk_post, bot)
 
 def process_vk_post(message, bot):
     if message.text == "/cancel":
         msg = bot.reply_to(message, "❌ Отправка в VK отменена.", reply_markup=get_admin_menu())
-        safe_delete(message, 3)
-        safe_delete(msg, 5)
+        safe_delete(bot, message, 3)
+        safe_delete(bot, msg, 5)
         return
     
     vk_token = os.environ.get("VK_TOKEN")
@@ -243,8 +242,8 @@ def process_vk_post(message, bot):
     if not vk_token or not vk_owner_id:
         report = "❌ VK_TOKEN или VK_OWNER_ID не заданы"
         msg = bot.reply_to(message, report)
-        safe_delete(message, 3)
-        safe_delete(msg, 10)
+        safe_delete(bot, message, 3)
+        safe_delete(bot, msg, 10)
         return
     
     file_paths = []
@@ -273,8 +272,8 @@ def process_vk_post(message, bot):
         report = f"❌ Ошибка VK: {result}"
     
     msg = bot.reply_to(message, report)
-    safe_delete(message, 3)
-    safe_delete(msg, 10)
+    safe_delete(bot, message, 3)
+    safe_delete(bot, msg, 10)
     
     for fp in file_paths:
         if os.path.exists(fp):
@@ -340,14 +339,14 @@ def add_quote_ui(call, bot):
         "Или /cancel для отмены.",
         parse_mode='Markdown'
     )
-    safe_delete(call.message, 1)
+    safe_delete(bot, call.message, 1)
     bot.register_next_step_handler(msg, process_new_quote, bot)
 
 def process_new_quote(message, bot):
     if message.text == "/cancel":
         msg = bot.reply_to(message, "❌ Добавление цитаты отменено.", reply_markup=get_admin_menu())
-        safe_delete(message, 3)
-        safe_delete(msg, 5)
+        safe_delete(bot, message, 3)
+        safe_delete(bot, msg, 5)
         return
     
     quote = message.text.strip()
@@ -356,8 +355,8 @@ def process_new_quote(message, bot):
     else:
         msg = bot.reply_to(message, "❌ Ошибка при сохранении цитаты.", reply_markup=get_admin_menu())
     
-    safe_delete(message, 3)
-    safe_delete(msg, 5)
+    safe_delete(bot, message, 3)
+    safe_delete(bot, msg, 5)
 
 def set_quote_interval_ui(call, bot):
     msg = bot.send_message(
@@ -367,14 +366,14 @@ def set_quote_interval_ui(call, bot):
         "Или /cancel для отмены.",
         parse_mode='Markdown'
     )
-    safe_delete(call.message, 1)
+    safe_delete(bot, call.message, 1)
     bot.register_next_step_handler(msg, process_quote_interval, bot)
 
 def process_quote_interval(message, bot):
     if message.text == "/cancel":
         msg = bot.reply_to(message, "❌ Изменение интервала отменено.", reply_markup=get_admin_menu())
-        safe_delete(message, 3)
-        safe_delete(msg, 5)
+        safe_delete(bot, message, 3)
+        safe_delete(bot, msg, 5)
         return
     
     try:
@@ -386,8 +385,8 @@ def process_quote_interval(message, bot):
     except ValueError:
         msg = bot.reply_to(message, "❌ Ошибка: введите число от 5 до 720.", reply_markup=get_admin_menu())
     
-    safe_delete(message, 3)
-    safe_delete(msg, 5)
+    safe_delete(bot, message, 3)
+    safe_delete(bot, msg, 5)
 
 def show_diagnostics(call, bot):
     from dialogue.admin.diagnostics import get_diagnostics_menu
@@ -413,7 +412,7 @@ def admin_logout(call, bot):
         call.message.chat.id,
         "👋 Вы вышли из админ-панели.\n\nДля входа используйте #админ или кнопку в меню."
     )
-    safe_delete(msg, 3)
+    safe_delete(bot, msg, 3)
     bot.answer_callback_query(call.id)
 
 # ==========================================
@@ -444,15 +443,15 @@ def show_dialog_ui(call, bot):
         "/cancel — отменить диалог",
         parse_mode='Markdown'
     )
-    safe_delete(call.message, 1)
+    safe_delete(bot, call.message, 1)
     bot.register_next_step_handler(msg, process_dialog_message, bot)
 
 def process_dialog_message(message, bot):
     """Обрабатывает сообщение от пользователя (диалог с агентом)"""
     if message.text == "/cancel":
         msg = bot.reply_to(message, "❌ Диалог отменён.")
-        safe_delete(message, 3)
-        safe_delete(msg, 5)
+        safe_delete(bot, message, 3)
+        safe_delete(bot, msg, 5)
         return
     
     from dialogue.agent import ask_agent
@@ -472,7 +471,7 @@ def process_dialog_message(message, bot):
     else:
         bot.reply_to(message, "🌙 Старший брат отдыхает. Попробуй позже.")
     
-    safe_delete(message, 5)
+    safe_delete(bot, message, 5)
 
 # ==========================================
 # ВРЕМЕННОЕ ХРАНИЛИЩЕ
