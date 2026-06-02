@@ -103,6 +103,17 @@ def set_user_mood(user_id, mood):
     debug_log("USER_SETTINGS", f"Пользователь {user_id} установил настроение: {mood}", "INFO")
     return True
 
+def get_user_mood_name(user_id):
+    """Возвращает название настроения пользователя на русском"""
+    mood = get_user_mood(user_id)
+    mood_names = {
+        'artist': 'Художник',
+        'admin': 'Администратор',
+        'poet': 'Поэт',
+        'engineer': 'Инженер'
+    }
+    return mood_names.get(mood, 'Художник')
+
 def get_mood_info(mood):
     """Возвращает информацию о настроении"""
     return MOODS.get(mood, MOODS["artist"])
