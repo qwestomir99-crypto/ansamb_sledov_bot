@@ -4,6 +4,8 @@
 # Задача: команда #сброс
 # ==========================================
 
+from debug_utils import debug_log
+
 def register_reset_handler(bot, config):
     @bot.message_handler(func=lambda message: message.text.lower() == "#сброс")
     def handle_reset(message):
