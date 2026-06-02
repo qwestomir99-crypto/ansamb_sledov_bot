@@ -1,4 +1,22 @@
 # ==========================================
+# ПЕРЕХВАТ ИМПОРТА (для отладки — показывает, кто вызывает show_mood_menu)
+# ==========================================
+import sys
+original_import = __import__
+
+def debug_import(name, *args, **kwargs):
+    if "show_mood_menu" in str(args) or "show_mood_menu" in name:
+        import traceback
+        print(f"\n" + "="*60)
+        print(f"🔍 Пойман импорт 'show_mood_menu' из модуля: {name}")
+        print("Стек вызовов:")
+        traceback.print_stack()
+        print("="*60 + "\n")
+    return original_import(name, *args, **kwargs)
+
+__builtins__["__import__"] = debug_import
+
+# ==========================================
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
 # Задача: команда #админ, авторизация, вызов меню, диалог
