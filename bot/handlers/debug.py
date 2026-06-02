@@ -10,8 +10,14 @@ def register_debug_handler(bot, config):
     @bot.message_handler(func=lambda message: message.text.lower() == "#дебаг")
     def handle_debug(message):
         from dialogue.admin_commands import is_admin_authorized
-        if not is_admin_authorized(message.from_user.id):
-            bot.reply_to(message, "❌ Только для админа")
+        
+        # Диагностика
+        user_id = message.from_user.id
+        auth_status = is_admin_authorized(user_id)
+        bot.reply_to(message, f"🔍 Диагностика:\nUser ID: {user_id}\nАвторизован: {auth_status}")
+        
+        if not auth_status:
+            bot.reply_to(message, "❌ Только для админа. Сначала #админ пароль")
             return
         
         logs_file = "debug.log"
@@ -30,4 +36,4 @@ def register_debug_handler(bot, config):
             except Exception as e:
                 bot.reply_to(message, f"❌ Ошибка чтения: {e}")
         else:
-            bot.reply_to(message, "📭 Файл debug.log не найден")
+            bot.reply_to(message, f"📭 Файл debug.log не найден в {os.getcwd()}")
