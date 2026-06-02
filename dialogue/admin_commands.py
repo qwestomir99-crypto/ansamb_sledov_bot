@@ -1,10 +1,7 @@
 # ==========================================
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
-# Задача: команда #админ, авторизация, вызов меню
-# Комментарий: без обработки кнопок и диалогов, без заглушек
-# Зависит от: telebot, button_map, debug_utils
-# Вызывается из: bot/handlers/__init__.py
+# Задача: команда #админ, авторизация, вызов меню, диалог
 # ==========================================
 
 import os
@@ -75,3 +72,46 @@ def handle_admin_command(message, bot):
         return
     
     bot.reply_to(message, f"🔐 Введите пароль:\n`#админ {ADMIN_PASSWORD}`", parse_mode='Markdown')
+
+# ==========================================
+# ПОКАЗАТЬ ДИАЛОГ С АГЕНТОМ
+# ==========================================
+def show_dialog_ui(call, bot):
+    """Показывает интерфейс для начала диалога (доступен всем)"""
+    from dialogue.agent import ask_agent
+    msg = bot.send_message(
+        call.message.chat.id,
+        "🗣 *Начните диалог*\n\n"
+        "Просто напишите сообщение — я передам его агенту.\n\n"
+        "Доступные команды:\n"
+        "/cancel — отменить диалог",
+        parse_mode='Markdown'
+    )
+    safe_delete(bot, call.message, 1)
+    bot.register_next_step_handler(msg, process_dialog_message, bot)
+
+def process_dialog_message(message, bot):
+    """Обрабатывает сообщение от пользователя (диалог с агентом)"""
+    if message.text == "/cancel":
+        msg = bot.reply_to(message, "❌ Диалог отменён.")
+        safe_delete(bot, message, 3)
+        safe_delete(bot, msg, 5)
+        return
+    
+    from dialogue.agent import ask_agent
+    
+    status_msg = bot.reply_to(message, "⏳ Старший брат думает...")
+    
+    answer = ask_agent(message.text, user_id=message.from_user.id)
+    
+    try:
+        bot.delete_message(status_msg.chat.id, status_msg.message_id)
+    except:
+        pass
+    
+    if answer:
+        bot.reply_to(message, f"🗣 *Старший брат:*\n{answer}", parse_mode='Markdown')
+    else:
+        bot.reply_to(message, "🌙 Старший брат отдыхает. Попробуй позже.")
+    
+    safe_delete(bot, message, 5)
