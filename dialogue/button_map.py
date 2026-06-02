@@ -2,7 +2,7 @@
 # Файл: dialogue/button_map.py
 # Справка: README.md → Админ-панель / Кнопки
 # Задача: единая таблица всех кнопок (текст + callback)
-# Комментарий: добавлена кнопка Загрузить на YouTube
+# Комментарий: кнопка НАСТРОЕНИЕ ВРЕМЕННО ОТКЛЮЧЕНА (циклический импорт)
 # Зависит от: telebot
 # Вызывается из: dialogue/admin_commands.py, dialogue/callbacks.py
 # ==========================================
@@ -36,7 +36,7 @@ BUTTONS = {
     "user_tleem":     {"text": "🔥 #тлеем",        "callback": "user_tleem"},
     "user_fix":       {"text": "🔒 #фиксируем",    "callback": "user_fix"},
     "user_flash":     {"text": "⚡ #вспышка",      "callback": "user_flash"},
-    "mood":           {"text": "🎭 Настроение",    "callback": "mood_menu"},
+    # "mood":           {"text": "🎭 Настроение",    "callback": "mood_menu"},  # ВРЕМЕННО ОТКЛЮЧЕНО
     "start_dialog":   {"text": "🗣 Диалог",        "callback": "start_dialog"},
     "admin_login":    {"text": "🛡️ Админ-панель", "callback": "admin_login"},
     "toggle_alice":   {"text": "Старший брат ✅/❌", "callback": "toggle_alice"},
@@ -75,7 +75,7 @@ def get_admin_menu_keyboard():
         InlineKeyboardButton(get_text("logout"), callback_data=get_callback("logout")),
     )
     keyboard.add(
-        InlineKeyboardButton(get_text("mood"), callback_data=get_callback("mood")),
+        # InlineKeyboardButton(get_text("mood"), callback_data=get_callback("mood")),  # ВРЕМЕННО ОТКЛЮЧЕНО
         InlineKeyboardButton(get_text("start_dialog"), callback_data=get_callback("start_dialog")),
     )
     keyboard.add(
@@ -101,7 +101,7 @@ def get_user_menu_keyboard():
         InlineKeyboardButton(get_text("start_dialog"), callback_data=get_callback("start_dialog")),
     )
     keyboard.add(
-        InlineKeyboardButton(get_text("mood"), callback_data=get_callback("mood")),
+        # InlineKeyboardButton(get_text("mood"), callback_data=get_callback("mood")),  # ВРЕМЕННО ОТКЛЮЧЕНО
         InlineKeyboardButton(get_text("admin_login"), callback_data=get_callback("admin_login")),
     )
     keyboard.add(
@@ -110,7 +110,7 @@ def get_user_menu_keyboard():
     return keyboard
 
 # ==========================================
-# 5. КЛАВИАТУРА НАСТРОЕНИЙ
+# 5. КЛАВИАТУРА НАСТРОЕНИЙ (сохранена для внутреннего использования)
 # ==========================================
 def get_moods_keyboard(with_back=True):
     from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
