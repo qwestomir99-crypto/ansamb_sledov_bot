@@ -2,7 +2,7 @@
 // Файл: static/js/quotes.js
 // Справка: README.md → Веб-морда / Цитаты
 // Задача: управление цитатами (добавление)
-// Комментарий: функции addQuote
+// Комментарий: исправлены пути на /api/quotes/add, /api/quotes/list
 // Зависит от: ui.js (showToast)
 // Вызывается из: main.js (импорт)
 // ==========================================
@@ -14,7 +14,7 @@ export async function addQuote() {
     if (!text) return;
     
     try {
-        const resp = await fetch('/api/add_quote', {
+        const resp = await fetch('/api/quotes/add', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: text })
@@ -23,7 +23,7 @@ export async function addQuote() {
         if (data.status === 'ok') {
             document.getElementById('new-quote').value = '';
             // Перезагружаем список цитат
-            const quotesResp = await fetch('/api/get_quotes');
+            const quotesResp = await fetch('/api/quotes/list');
             const quotesData = await quotesResp.json();
             const quotesList = document.getElementById('quotes-list');
             quotesList.innerHTML = '';
