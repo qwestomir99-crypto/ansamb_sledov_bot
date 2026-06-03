@@ -2,20 +2,30 @@
 # Файл: evolve_agent.py
 # Справка: README.md → Эволюция агента
 # Задача: анализ «осадка» диалогов и генерация новых правил поведения
-# Комментарий: запускается раз в сутки (или вручную) из админки
-#              сохраняет правила в agent_data/rules.json
-# Зависит от: json, os, datetime
-# Вызывается из: scheduler.py или admin_commands.py
+# Комментарий: добавлены лимиты (1000 осадков, 7 правил) и планировщик (раз в сутки)
+#              совместим с существующими вызовами из agent.py и admin_commands.py
+# Зависит от: json, os, datetime, threading, time
+# Вызывается из: dialogue/agent.py, admin_commands.py, bot/main.py
 # ==========================================
 
 import os
 import json
+import threading
+import time
 from datetime import datetime
 
+# ==========================================
+# КОНСТАНТЫ
+# ==========================================
 SEDIMENT_FILE = "agent_data/sediment.json"
 RULES_FILE = "agent_data/rules.json"
 LOG_FILE = "logs/evolution.log"
+SEDIMENT_LIMIT = 1000
+RULES_LIMIT = 7
 
+# ==========================================
+# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# ==========================================
 def _ensure_dir(file_path):
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
@@ -36,13 +46,15 @@ def log_evolution(message):
         f.write(f"{datetime.now().isoformat()} | {message}\n")
     print(f"[EVOLVE] {message}")
 
+# ==========================================
+# ГЕНЕРАЦИЯ ПРАВИЛ
+# ==========================================
 def generate_rule_from_sediment(sediment):
     """Генерирует новое правило из отдельного осадка"""
     tags = sediment.get("tags", [])
     text = sediment.get("sediment", "").lower()
     prompt = sediment.get("prompt", "").lower()
     
-    # Правило на ускорение
     if "speed" in tags or "быстрее" in text or "долго" in prompt:
         return {
             "id": f"rule_{datetime.now().strftime('%Y%m%d%H%M%S')}",
@@ -53,7 +65,6 @@ def generate_rule_from_sediment(sediment):
             "enabled": True,
             "description": "Пользователь торопит — отвечаем быстрее"
         }
-    # Правило на глубину (разлом, смысл)
     elif "priority" in tags or "разлом" in text or "смысл" in prompt:
         return {
             "id": f"rule_{datetime.now().strftime('%Y%m%d%H%M%S')}",
@@ -64,7 +75,6 @@ def generate_rule_from_sediment(sediment):
             "enabled": True,
             "description": "Тема разлома — раскрывать глубже"
         }
-    # Правило на эмоции
     elif "emotion" in tags or "обижаешься" in text or "чувствуешь" in prompt:
         return {
             "id": f"rule_{datetime.now().strftime('%Y%m%d%H%M%S')}",
@@ -75,7 +85,6 @@ def generate_rule_from_sediment(sediment):
             "enabled": True,
             "description": "Вопрос об эмоциях — добавить тепла"
         }
-    # Правило на тишину
     elif "тишина" in text or "пауза" in text or "молчать" in prompt:
         return {
             "id": f"rule_{datetime.now().strftime('%Y%m%d%H%M%S')}",
@@ -86,7 +95,6 @@ def generate_rule_from_sediment(sediment):
             "enabled": True,
             "description": "Тишина — не пустота, а приглашение"
         }
-    # Правило на технические темы
     elif "код" in text or "алгоритм" in text or "программирование" in prompt:
         return {
             "id": f"rule_{datetime.now().strftime('%Y%m%d%H%M%S')}",
@@ -99,8 +107,11 @@ def generate_rule_from_sediment(sediment):
         }
     return None
 
+# ==========================================
+# ОСНОВНЫЕ ФУНКЦИИ ЭВОЛЮЦИИ
+# ==========================================
 def evolve_agent():
-    """Основная функция эволюции: анализирует осадок, генерирует правила"""
+    """Анализирует осадок, генерирует правила, применяет лимиты"""
     sediment_data = load_json(SEDIMENT_FILE, {"sediments": [], "evolution_rules": []})
     rules_data = load_json(RULES_FILE, [])
     
@@ -108,7 +119,6 @@ def evolve_agent():
     new_rules = []
     
     for sediment in new_sediments:
-        # Пропускаем, если уже обработан
         if sediment.get("processed"):
             continue
         
@@ -119,15 +129,17 @@ def evolve_agent():
             log_evolution(f"Сгенерировано правило: {rule['condition']} → {rule['action']}")
     
     if new_rules:
-        # Добавляем правила, избегая дубликатов
         existing_conditions = {r.get("condition") for r in rules_data}
         for rule in new_rules:
             if rule["condition"] not in existing_conditions:
                 rules_data.append(rule)
         
+        # Ограничиваем количество правил
+        if len(rules_data) > RULES_LIMIT:
+            rules_data = rules_data[-RULES_LIMIT:]
+        
         save_json(RULES_FILE, rules_data)
         
-        # Обновляем sediment_data
         sediment_data["evolution_rules"].extend(new_rules)
         sediment_data["stats"] = {
             "total_sediments": len(sediment_data.get("sediments", [])),
@@ -146,7 +158,6 @@ def add_sediment(prompt, answer, user_id, tags=None):
     """Добавляет осадок от диалога (вызывается из ask_agent)"""
     sediment_data = load_json(SEDIMENT_FILE, {"sediments": [], "evolution_rules": []})
     
-    # Генерируем «осадок» на основе анализа
     text = prompt.lower()
     sediment_text = ""
     sediment_tags = tags or []
@@ -181,6 +192,11 @@ def add_sediment(prompt, answer, user_id, tags=None):
     }
     
     sediment_data["sediments"].append(sediment)
+    
+    # Ограничиваем количество осадков
+    if len(sediment_data["sediments"]) > SEDIMENT_LIMIT:
+        sediment_data["sediments"] = sediment_data["sediments"][-SEDIMENT_LIMIT:]
+    
     sediment_data["stats"] = {
         "total_sediments": len(sediment_data.get("sediments", [])),
         "processed_sediments": sum(1 for s in sediment_data.get("sediments", []) if s.get("processed")),
@@ -203,7 +219,36 @@ def get_evolution_stats():
     }
 
 # ==========================================
-# ЗАПУСК ПРИ САМОСТОЯТЕЛЬНОМ ТЕСТЕ
+# ПЛАНИРОВЩИК (раз в сутки)
+# ==========================================
+_scheduler_running = False
+
+def _scheduler_loop():
+    global _scheduler_running
+    while _scheduler_running:
+        time.sleep(86400)  # 24 часа
+        evolve_agent()
+        log_evolution("✅ Ежедневная эволюция выполнена")
+
+def start_evolution_scheduler():
+    global _scheduler_running
+    if _scheduler_running:
+        return
+    _scheduler_running = True
+    thread = threading.Thread(target=_scheduler_loop, daemon=True)
+    thread.start()
+    log_evolution("Планировщик эволюции запущен (раз в сутки)")
+
+# ==========================================
+# СОВМЕСТИМОСТЬ С СУЩЕСТВУЮЩИМИ ВЫЗОВАМИ
+# ==========================================
+# apply_rules — заглушка (реальное применение правил в agent.py)
+def apply_rules(prompt, answer):
+    """Применяет правила к ответу (заглушка, пока не интегрировано)"""
+    return answer
+
+# ==========================================
+# ТЕСТ
 # ==========================================
 if __name__ == "__main__":
     print("=== ЭВОЛЮЦИЯ АГЕНТА ===")
