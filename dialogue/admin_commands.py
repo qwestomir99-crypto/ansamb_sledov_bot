@@ -2,7 +2,6 @@
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
 # Задача: команда #админ, авторизация, вызов меню, добавление поста
-# Комментарий: ИСПРАВЛЕНА ВЕРСИЯ — используется send_message вместо edit_message_text
 # ==========================================
 
 import os
@@ -65,19 +64,17 @@ def handle_admin_command(message, bot):
     bot.reply_to(message, "🔐 Введите пароль для входа в админ-панель:\n(или #админ пароль)")
 
 # ==========================================
-# ДОБАВЛЕНИЕ ПОСТА (с отправкой нового сообщения)
+# ДОБАВЛЕНИЕ ПОСТА
 # ==========================================
 
 def show_add_post_ui(call, bot):
-    user_id = call.from_user.id
-    
     # Удаляем старое меню
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except:
         pass
     
-    # Отправляем НОВОЕ сообщение (не редактируем!)
+    # Отправляем новое сообщение
     msg = bot.send_message(
         call.message.chat.id,
         "📝 *Добавление поста*\n\n"
@@ -98,18 +95,15 @@ def process_post(message, bot):
         bot.reply_to(message, "❌ Добавьте текст к посту.")
         return
     
-    # Извлекаем теги
     tags = [word for word in text.split() if word.startswith('#')]
     tags_str = " ".join(tags)
     
-    # Получаем file_id для медиа
     file_id = None
     if message.photo:
         file_id = message.photo[-1].file_id
     elif message.video:
         file_id = message.video.file_id
     
-    # Публикуем сразу
     success = publish_post_immediately(bot, message.chat.id, text, tags_str, file_id)
     
     if success:
