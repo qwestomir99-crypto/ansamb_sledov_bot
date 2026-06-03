@@ -1,14 +1,17 @@
 # ==========================================
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
-# Задача: команда #админ, авторизация, вызов меню, ПРЯМАЯ ПУБЛИКАЦИЯ ПОСТОВ
+# Задача: команда #админ, авторизация, вызов меню, добавление поста
+# Комментарий: ИСПРАВЛЕНА ВЕРСИЯ — используется send_message вместо edit_message_text
 # ==========================================
 
 import os
 import threading
 import time
+import json
 from debug_utils import debug_log
 from dialogue.button_map import get_admin_menu_keyboard
+from dialogue.publisher import publish_post_immediately
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "tleem2026")
 
@@ -62,75 +65,54 @@ def handle_admin_command(message, bot):
     bot.reply_to(message, "🔐 Введите пароль для входа в админ-панель:\n(или #админ пароль)")
 
 # ==========================================
-# ПРЯМАЯ ПУБЛИКАЦИЯ ПОСТА (без сохранения в пул)
+# ДОБАВЛЕНИЕ ПОСТА (с отправкой нового сообщения)
 # ==========================================
 
 def show_add_post_ui(call, bot):
+    user_id = call.from_user.id
+    
     # Удаляем старое меню
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except:
         pass
     
-    # Отправляем новое сообщение
+    # Отправляем НОВОЕ сообщение (не редактируем!)
     msg = bot.send_message(
         call.message.chat.id,
-        "📝 *Публикация поста*\n\n"
+        "📝 *Добавление поста*\n\n"
         "Пришлите текст поста (можно с фото/видео).\n"
         "Для отмены введите /cancel",
         parse_mode='Markdown'
     )
     bot.answer_callback_query(call.id)
-    bot.register_next_step_handler(msg, publish_post, bot)
+    bot.register_next_step_handler(msg, process_post, bot)
 
-def publish_post(message, bot):
+def process_post(message, bot):
     if message.text == "/cancel":
-        bot.reply_to(message, "❌ Публикация отменена.")
+        bot.reply_to(message, "❌ Добавление поста отменено.")
         return
     
-    # Получаем текст и теги
     text = message.caption if message.photo else message.text
     if not text:
         bot.reply_to(message, "❌ Добавьте текст к посту.")
         return
     
+    # Извлекаем теги
     tags = [word for word in text.split() if word.startswith('#')]
     tags_str = " ".join(tags)
     
-    # Получаем file_id (если есть фото/видео)
+    # Получаем file_id для медиа
     file_id = None
     if message.photo:
         file_id = message.photo[-1].file_id
     elif message.video:
         file_id = message.video.file_id
     
-    # === ПУБЛИКАЦИЯ ===
-    config = load_config()
-    tg_chat_id = config.get("telegram", {}).get("publish_channel", "@qwestomir")
-    vk_token = os.environ.get("VK_TOKEN")
-    vk_owner_id = os.environ.get("VK_OWNER_ID")
+    # Публикуем сразу
+    success = publish_post_immediately(bot, message.chat.id, text, tags_str, file_id)
     
-    from dialogue.publisher_utils import post_to_telegram, post_to_vk
-    
-    success_tg = False
-    success_vk = False
-    
-    # Публикуем в Telegram
-    if tg_chat_id:
-        success_tg = post_to_telegram(bot, tg_chat_id, text, file_id, tags_str)
-        debug_log("PUBLISH", f"Telegram: {'✅' if success_tg else '❌'}")
-    
-    # Публикуем в VK
-    if vk_token and vk_owner_id:
-        success_vk, _ = post_to_vk(text, tags_str, vk_token, vk_owner_id, file_id)
-        debug_log("PUBLISH", f"VK: {'✅' if success_vk else '❌'}")
-    
-    if success_tg or success_vk:
+    if success:
         bot.reply_to(message, "✅ *Пост опубликован!*", parse_mode='Markdown')
     else:
         bot.reply_to(message, "❌ *Ошибка при публикации.*", parse_mode='Markdown')
-
-def load_config():
-    import json
-    with open("config.json", "r") as f:
-        return json.load(f)
