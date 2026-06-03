@@ -2,7 +2,7 @@
 # Файл: dialogue/message_dispatcher.py
 # Справка: README.md → Диспетчер сообщений
 # Задача: обработка всех сообщений без register_next_step_handler
-# Комментарий: после сохранения поста — автоматический возврат в админ-меню
+# Комментарий: состояния вынесены в state_manager
 # ==========================================
 
 import os
@@ -14,9 +14,7 @@ from dialogue.quotes import add_quote, set_quotes_interval
 from dialogue.post_manager import add_post_to_pool
 from dialogue.admin_commands import is_admin_authorized
 from dialogue.button_map import get_admin_menu_keyboard
-
-# Глобальные словари для состояний
-user_states = {}      # {user_id: "waiting_dialog" / "waiting_quote_text" / "waiting_quote_interval" / "waiting_simple_post"}
+from dialogue.state_manager import user_states, post_drafts, clear_state
 
 def register_dispatcher(bot):
     """Регистрирует универсальный обработчик сообщений"""
@@ -30,7 +28,7 @@ def register_dispatcher(bot):
         if state == "waiting_dialog":
             if message.text == "/cancel":
                 bot.reply_to(message, "❌ Диалог отменён.")
-                user_states.pop(user_id, None)
+                clear_state(user_id)
                 return
             
             status_msg = bot.reply_to(message, "⏳ Старший брат думает...")
@@ -46,7 +44,7 @@ def register_dispatcher(bot):
             else:
                 bot.reply_to(message, "🌙 Старший брат отдыхает. Попробуй позже.")
             
-            user_states.pop(user_id, None)
+            clear_state(user_id)
             return
         
         # === ДОБАВЛЕНИЕ ЦИТАТЫ ===
@@ -61,7 +59,7 @@ def register_dispatcher(bot):
             else:
                 bot.reply_to(message, "❌ *Текст цитаты не может быть пустым.*", parse_mode='Markdown')
             
-            user_states.pop(user_id, None)
+            clear_state(user_id)
             return
         
         # === УСТАНОВКА ИНТЕРВАЛА ЦИТАТ ===
@@ -76,14 +74,14 @@ def register_dispatcher(bot):
             except ValueError:
                 bot.reply_to(message, "❌ *Ошибка: введите целое число.*", parse_mode='Markdown')
             
-            user_states.pop(user_id, None)
+            clear_state(user_id)
             return
         
-        # === ДОБАВЛЕНИЕ ПОСТА (простой режим, только file_id) ===
+        # === ДОБАВЛЕНИЕ ПОСТА ===
         if state == "waiting_simple_post":
             if message.text == "/cancel":
                 bot.reply_to(message, "❌ Добавление поста отменено.")
-                user_states.pop(user_id, None)
+                clear_state(user_id)
                 # Возвращаем админ-меню
                 if is_admin_authorized(user_id):
                     bot.send_message(
@@ -127,7 +125,7 @@ def register_dispatcher(bot):
                     parse_mode='Markdown'
                 )
             
-            user_states.pop(user_id, None)
+            clear_state(user_id)
             return
         
         # === ЕСЛИ НЕТ СОСТОЯНИЯ — ИГНОРИРУЕМ ===
