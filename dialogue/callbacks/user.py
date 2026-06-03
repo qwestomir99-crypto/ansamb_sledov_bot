@@ -3,6 +3,7 @@
 # Справка: README.md → Обработчики кнопок / Гостевые
 # Задача: обработка callback'ов для гостевых кнопок
 # Комментарий: обработчик НАСТРОЕНИЯ ВРЕМЕННО ОТКЛЮЧЁН (циклический импорт)
+#              исправлен FakeMessage (добавлен message_id)
 # Зависит от: telebot, dialogue.admin_commands, debug_utils
 # Вызывается из: callbacks/__init__.py
 # ==========================================
@@ -94,10 +95,11 @@ def register_user_callbacks(bot: telebot.TeleBot, config: dict):
     def callback_admin_login(call):
         debug_log("CALLBACK", f"Запрос входа в админку от {call.from_user.id}")
         class FakeMessage:
-            def __init__(self, user_id, chat_id):
+            def __init__(self, user_id, chat_id, message_id):
                 self.from_user = type('obj', (object,), {'id': user_id})()
                 self.chat = type('obj', (object,), {'id': chat_id})()
+                self.message_id = message_id
                 self.text = "#админ"
-        fake_msg = FakeMessage(call.from_user.id, call.message.chat.id)
+        fake_msg = FakeMessage(call.from_user.id, call.message.chat.id, call.message.message_id)
         handle_admin_command(fake_msg, bot)
         bot.answer_callback_query(call.id)
