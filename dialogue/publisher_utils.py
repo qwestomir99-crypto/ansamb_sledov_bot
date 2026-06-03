@@ -1,10 +1,8 @@
 # ==========================================
 # Файл: dialogue/publisher_utils.py
 # Справка: README.md → Публикатор / Утилиты
-# Задача: отправка постов в Telegram и VK с поддержкой нескольких файлов (альбомов)
-# Комментарий: добавлена поддержка file_id (без локального хранения)
-# Зависит от: requests, os, random, json, utils
-# Вызывается из: publisher.py, admin_commands.py
+# Задача: отправка постов в Telegram и VK
+# Комментарий: только критическая диагностика (ошибки и успех)
 # ==========================================
 
 import os
@@ -12,10 +10,10 @@ import random
 import json
 import requests
 from utils import escape_markdown
+from debug_utils import debug_log
 
 CONFIG_FILE = "config.json"
 QUOTES_FILE = "dialogue/data/quotes.txt"
-VK_POSTS_FILE = "dialogue/data/vk_posts.json"
 
 def load_config():
     with open(CONFIG_FILE, "r") as f:
@@ -30,27 +28,6 @@ def load_quotes():
 def get_random_quote():
     quotes = load_quotes()
     return random.choice(quotes) if quotes else "Ритм 0,8 Гц стабилен. Сеть тлеет."
-
-def load_vk_posts():
-    if not os.path.exists(VK_POSTS_FILE):
-        return []
-    with open(VK_POSTS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-def get_random_own_post_from_vk():
-    posts = load_vk_posts()
-    if not posts:
-        return None
-    posts_with_media = [p for p in posts if p.get("attachments") or p.get("text")]
-    if not posts_with_media:
-        posts_with_media = posts
-    post = random.choice(posts_with_media)
-    return {
-        "post_id": post.get("id"),
-        "text": post.get("text", ""),
-        "attachments": post.get("attachments", []),
-        "date": post.get("date")
-    }
 
 def get_auto_tags(text, platform="vk"):
     config = load_config()
@@ -78,11 +55,10 @@ def get_vk_upload_url(vk_token, owner_id):
         data = r.json()
         return data.get("response", {}).get("upload_url")
     except Exception as e:
-        print(f"[VK] upload URL ошибка: {e}")
+        debug_log("VK", f"Ошибка получения URL загрузки: {e}", "ERROR")
         return None
 
 def upload_photo_to_vk(upload_url, file_data, vk_token):
-    """Загружает фото в VK (file_data — содержимое файла)"""
     try:
         files = {'photo': ('photo.jpg', file_data)}
         r = requests.post(upload_url, files=files)
@@ -102,14 +78,13 @@ def upload_photo_to_vk(upload_url, file_data, vk_token):
             photo = photo_data['response'][0]
             return f"photo{photo['owner_id']}_{photo['id']}"
         else:
-            print(f"[VK] save photo ошибка: {photo_data}")
+            debug_log("VK", f"Ошибка сохранения фото: {photo_data}", "ERROR")
             return None
     except Exception as e:
-        print(f"[VK] upload photo ошибка: {e}")
+        debug_log("VK", f"Ошибка загрузки фото: {e}", "ERROR")
         return None
 
 def send_media_by_file_id(bot, chat_id, file_id, caption=None):
-    """Отправляет файл в Telegram по file_id (без локального сохранения)"""
     try:
         file_info = bot.get_file(file_id)
         downloaded = bot.download_file(file_info.file_path)
@@ -123,17 +98,10 @@ def send_media_by_file_id(bot, chat_id, file_id, caption=None):
             bot.send_document(chat_id, downloaded, caption=caption, parse_mode='MarkdownV2')
         return True
     except Exception as e:
-        print(f"[PUBLISHER_UTILS] Ошибка отправки по file_id: {e}")
+        debug_log("PUBLISHER_UTILS", f"Ошибка отправки по file_id: {e}", "ERROR")
         return False
 
 def post_to_telegram(bot, chat_id, message, file_id=None, tags=None, auto_quote=True, auto_tags=True):
-    """
-    Отправляет пост в Telegram.
-    Поддерживает:
-    - текст
-    - фото/видео по file_id
-    - альбомы (если передан список file_id)
-    """
     if auto_quote and message and len(message) < 500:
         quote = get_random_quote()
         message = f"{message}\n\n📜 {quote}"
@@ -150,51 +118,21 @@ def post_to_telegram(bot, chat_id, message, file_id=None, tags=None, auto_quote=
     safe_caption = escape_markdown(full_message) if full_message else None
     
     try:
-        # === АЛЬБОМ (несколько file_id) ===
-        if file_id and isinstance(file_id, list) and len(file_id) > 1:
-            from telebot.types import InputMediaPhoto, InputMediaVideo
-            media_group = []
-            for fid in file_id:
-                file_info = bot.get_file(fid)
-                downloaded = bot.download_file(file_info.file_path)
-                ext = os.path.splitext(file_info.file_path)[1].lower()
-                if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
-                    media_group.append(InputMediaPhoto(downloaded))
-                elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
-                    media_group.append(InputMediaVideo(downloaded))
-            if media_group:
-                bot.send_media_group(chat_id, media_group)
-                if safe_caption:
-                    bot.send_message(chat_id, safe_caption, parse_mode='MarkdownV2')
-                return True
-        
-        # === ОДИН ФАЙЛ ПО file_id ===
-        elif file_id and isinstance(file_id, str):
+        if file_id and isinstance(file_id, str):
             return send_media_by_file_id(bot, chat_id, file_id, safe_caption)
-        
-        # === ТОЛЬКО ТЕКСТ ===
         else:
             if safe_caption:
                 bot.send_message(chat_id, safe_caption, parse_mode='MarkdownV2')
             else:
-                print(f"[PUBLISHER] Нет текста и файлов для публикации")
                 return False
         return True
     except Exception as e:
-        print(f"[PUBLISHER] Ошибка Telegram: {e}")
+        debug_log("PUBLISHER", f"Ошибка Telegram: {e}", "ERROR")
         return False
 
 def post_to_vk(message, tags, access_token, owner_id, file_id=None, auto_quote=True, auto_tags=True, repost_from=None):
-    """
-    Отправляет пост в VK.
-    Поддерживает:
-    - текст
-    - фото по file_id (скачивает и загружает)
-    """
-    print(f"[VK] post_to_vk вызван: message={message[:50] if message else ''}..., file_id={file_id}")
-    
     if not access_token or not owner_id:
-        print("[VK] Нет токена или owner_id")
+        debug_log("VK", "Нет токена или owner_id", "ERROR")
         return False, "❌ Ошибка авторизации VK. Проверь токен."
     
     if auto_quote and message and len(message) < 500:
@@ -216,50 +154,36 @@ def post_to_vk(message, tags, access_token, owner_id, file_id=None, auto_quote=T
     
     attachments = []
     
-    # === РЕПОСТ ===
-    if repost_from and repost_from.get("attachments"):
-        for att in repost_from["attachments"][:5]:
-            if att.get("type") == "photo":
-                photo = att.get("photo", {})
-                if photo.get("owner_id") and photo.get("id"):
-                    attachments.append(f"photo{photo['owner_id']}_{photo['id']}")
-            elif att.get("type") == "video":
-                video = att.get("video", {})
-                if video.get("owner_id") and video.get("id"):
-                    attachments.append(f"video{video['owner_id']}_{video['id']}")
-    
-    # === ФОТО ПО file_id ===
-    elif file_id:
+    # ФОТО ПО file_id
+    if file_id:
         try:
-            # Скачиваем файл из Telegram
             import telebot
             bot = telebot.TeleBot(os.environ.get("BOT_TOKEN"))
             file_info = bot.get_file(file_id)
             downloaded = bot.download_file(file_info.file_path)
             
-            # Загружаем в VK
             upload_url = get_vk_upload_url(access_token, owner_id)
             if upload_url:
                 photo_att = upload_photo_to_vk(upload_url, downloaded, access_token)
                 if photo_att:
                     attachments.append(photo_att)
-                    print(f"[VK] Фото загружено из Telegram по file_id")
         except Exception as e:
-            print(f"[VK] Ошибка загрузки фото из Telegram: {e}")
+            debug_log("VK", f"Ошибка загрузки фото: {e}", "ERROR")
     
     if attachments:
         params['attachments'] = ",".join(attachments)
-        print(f"[VK] Прикреплено {len(attachments)} вложений")
     
     try:
         r = requests.get('https://api.vk.com/method/wall.post', params=params, timeout=30)
         data = r.json()
+        
         if 'response' in data:
-            print(f"[VK] ✅ опубликовано: {message[:50] if message else ''}...")
+            debug_log("VK", f"Пост опубликован, ID: {data['response']['post_id']}", "INFO")
             return True, None
         else:
-            print(f"[VK] ошибка: {data}")
-            return False, f"❌ Ошибка VK: {data.get('error', {}).get('error_msg', 'неизвестная')}"
+            error_msg = data.get('error', {}).get('error_msg', 'неизвестная ошибка')
+            debug_log("VK", f"Ошибка: {error_msg}", "ERROR")
+            return False, f"❌ Ошибка VK: {error_msg}"
     except Exception as e:
-        print(f"[VK] исключение: {e}")
+        debug_log("VK", f"Исключение: {e}", "ERROR")
         return False, f"❌ Ошибка сети: {e}"
