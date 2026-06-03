@@ -65,15 +65,16 @@ def handle_admin_command(message, bot):
     bot.reply_to(message, f"🔐 Введите пароль:\n`#админ {ADMIN_PASSWORD}`", parse_mode='Markdown')
 
 # ==========================================
-# ДОБАВЛЕНИЕ ПОСТА (только кнопка и установка состояния)
+# ДОБАВЛЕНИЕ ПОСТА (простой режим)
 # ==========================================
 
 def show_add_post_ui(call, bot):
     user_id = call.from_user.id
-    user_states[user_id] = "waiting_post_text"
+    user_states[user_id] = "waiting_simple_post"
     bot.edit_message_text(
         "📝 *Добавление поста*\n\n"
-        "Введите текст поста (можно с Markdown).\n"
+        "Пришлите текст поста. Если нужно приложить фото или видео — приложите.\n"
+        "Теги можно написать прямо в тексте (как #хештеги).\n"
         "Для отмены введите /cancel",
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
