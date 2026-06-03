@@ -10,7 +10,8 @@ import time
 import json
 from debug_utils import debug_log
 from dialogue.button_map import get_admin_menu_keyboard
-from dialogue.publisher import publish_post_immediately
+from dialogue.message_dispatcher import user_states
+from dialogue.post_manager import add_post_to_pool
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "tleem2026")
 
@@ -64,18 +65,19 @@ def handle_admin_command(message, bot):
     bot.reply_to(message, "🔐 Введите пароль для входа в админ-панель:\n(или #админ пароль)")
 
 # ==========================================
-# ДОБАВЛЕНИЕ ПОСТА
+# ДОБАВЛЕНИЕ ПОСТА (без register_next_step_handler)
 # ==========================================
 
 def show_add_post_ui(call, bot):
-    # Удаляем старое меню
+    user_id = call.from_user.id
+    user_states[user_id] = "waiting_for_post"
+    
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except:
         pass
     
-    # Отправляем новое сообщение
-    msg = bot.send_message(
+    bot.send_message(
         call.message.chat.id,
         "📝 *Добавление поста*\n\n"
         "Пришлите текст поста (можно с фото/видео).\n"
@@ -83,30 +85,3 @@ def show_add_post_ui(call, bot):
         parse_mode='Markdown'
     )
     bot.answer_callback_query(call.id)
-    bot.register_next_step_handler(msg, process_post, bot)
-
-def process_post(message, bot):
-    if message.text == "/cancel":
-        bot.reply_to(message, "❌ Добавление поста отменено.")
-        return
-    
-    text = message.caption if message.photo else message.text
-    if not text:
-        bot.reply_to(message, "❌ Добавьте текст к посту.")
-        return
-    
-    tags = [word for word in text.split() if word.startswith('#')]
-    tags_str = " ".join(tags)
-    
-    file_id = None
-    if message.photo:
-        file_id = message.photo[-1].file_id
-    elif message.video:
-        file_id = message.video.file_id
-    
-    success = publish_post_immediately(bot, message.chat.id, text, tags_str, file_id)
-    
-    if success:
-        bot.reply_to(message, "✅ *Пост опубликован!*", parse_mode='Markdown')
-    else:
-        bot.reply_to(message, "❌ *Ошибка при публикации.*", parse_mode='Markdown')
