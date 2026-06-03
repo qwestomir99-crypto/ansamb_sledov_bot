@@ -3,6 +3,8 @@
 # Справка: README.md → Обработчики кнопок / Админ
 # Задача: обработка кнопок админ-меню
 # Комментарий: полностью без register_next_step_handler
+# Зависит от: telebot, button_map, quotes, message_dispatcher
+# Вызывается из: dialogue/callbacks/__init__.py
 # ==========================================
 
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -46,7 +48,7 @@ def register_admin_callbacks(bot, config):
             bot.answer_callback_query(call.id, "❌ Сначала введите текст поста")
     
     # ==========================================
-    # УПРАВЛЕНИЕ ЦИТАТАМИ (без register_next_step_handler)
+    # УПРАВЛЕНИЕ ЦИТАТАМИ
     # ==========================================
     @bot.callback_query_handler(func=lambda call: call.data == "manage_quotes")
     def quotes_panel(call):
