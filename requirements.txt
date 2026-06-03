@@ -47,4 +47,4 @@ google-auth-oauthlib==1.0.0
 google-api-python-client==2.108.0
 
 # Расчёт Шаббата (локально, без внешних API)
-hebcal
+# hebcal
