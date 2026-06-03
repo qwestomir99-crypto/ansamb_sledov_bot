@@ -5,12 +5,12 @@
 # ==========================================
 
 from debug_utils import debug_log
+from dialogue.button_map import get_admin_menu_keyboard
 
 def register_admin_callbacks(bot, config):
     
     @bot.callback_query_handler(func=lambda call: call.data == "admin_panel")
     def show_admin_panel(call):
-        from dialogue.button_map import get_admin_menu_keyboard
         bot.edit_message_text(
             "🛡️ *Админ-панель*\n\nВыберите действие:",
             chat_id=call.message.chat.id,
@@ -34,5 +34,8 @@ def register_admin_callbacks(bot, config):
     def admin_logout(call):
         from dialogue.admin_commands import logout_admin
         logout_admin(call.from_user.id)
-        bot.delete_message(call.message.chat.id, call.message.message_id)
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except:
+            pass
         bot.answer_callback_query(call.id, "👋 Вы вышли")
