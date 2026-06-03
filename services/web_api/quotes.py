@@ -2,7 +2,7 @@
 # Файл: services/web_api/quotes.py
 # Справка: README.md → Веб-морда / API / Цитаты
 # Задача: эндпоинты для работы с цитатами
-# Комментарий: Supabase отключён, используется SQLite через dialogue.quotes
+# Комментарий: переписан на SQLite (dialogue.quotes)
 # ==========================================
 
 from flask import Blueprint, request, jsonify
@@ -17,7 +17,7 @@ def log_q(level, message):
 @quotes_bp.route('/list', methods=['GET'])
 def list_quotes():
     try:
-        quotes = get_quotes_list(limit=10)
+        quotes = get_quotes_list(limit=50)
         return jsonify({"status": "ok", "data": quotes})
     except Exception as e:
         log_q("ERROR", str(e))
