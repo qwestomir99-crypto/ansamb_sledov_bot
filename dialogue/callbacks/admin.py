@@ -2,21 +2,15 @@
 # Файл: dialogue/callbacks/admin.py
 # Справка: README.md → Обработчики кнопок / Админ
 # Задача: обработка кнопок админ-меню
-# Комментарий: логика добавления постов и диалога — в admin_commands.py
-#              состояния — в message_dispatcher.py
-# Зависит от: telebot, button_map, admin_commands, message_dispatcher
-# Вызывается из: dialogue/callbacks/__init__.py
+# Комментарий: полностью без register_next_step_handler
 # ==========================================
 
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dialogue.button_map import get_text, get_callback, get_admin_menu_keyboard
-from dialogue.publisher import add_publication
-from dialogue.quotes import get_quotes_list, add_quote, set_quotes_interval, get_quotes_interval
+from dialogue.quotes import get_quotes_list, get_quotes_interval
 from debug_utils import debug_log
+from dialogue.message_dispatcher import user_states
 
-# ==========================================
-# РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ
-# ==========================================
 def register_admin_callbacks(bot, config):
     
     @bot.callback_query_handler(func=lambda call: call.data == "admin_panel")
@@ -31,7 +25,7 @@ def register_admin_callbacks(bot, config):
         bot.answer_callback_query(call.id)
     
     # ==========================================
-    # КНОПКА «ДОБАВИТЬ ПОСТ» (вызов из admin_commands)
+    # ДОБАВЛЕНИЕ ПОСТА
     # ==========================================
     @bot.callback_query_handler(func=lambda call: call.data == "add_post")
     def add_post_ui(call):
@@ -43,8 +37,16 @@ def register_admin_callbacks(bot, config):
         from dialogue.admin_commands import cancel_add_post
         cancel_add_post(call, bot)
     
+    @bot.callback_query_handler(func=lambda call: call.data == "finish_post")
+    def handle_finish_post(call):
+        user_id = call.from_user.id
+        if user_id in user_states and user_states.get(user_id) == "waiting_post_tags":
+            bot.answer_callback_query(call.id, "📝 Введите теги (через пробел) или /skip")
+        else:
+            bot.answer_callback_query(call.id, "❌ Сначала введите текст поста")
+    
     # ==========================================
-    # УПРАВЛЕНИЕ ЦИТАТАМИ
+    # УПРАВЛЕНИЕ ЦИТАТАМИ (без register_next_step_handler)
     # ==========================================
     @bot.callback_query_handler(func=lambda call: call.data == "manage_quotes")
     def quotes_panel(call):
@@ -99,26 +101,30 @@ def register_admin_callbacks(bot, config):
     
     @bot.callback_query_handler(func=lambda call: call.data == "add_quote")
     def add_quote_ui(call):
-        msg = bot.send_message(
-            call.message.chat.id,
+        user_id = call.from_user.id
+        user_states[user_id] = "waiting_quote_text"
+        bot.edit_message_text(
             "📜 *Добавление цитаты*\n\n"
-            "Пришлите текст цитаты (можно на нескольких строках).\n"
-            "Или /cancel для отмены.",
+            "Введите текст цитаты (можно на нескольких строках).\n"
+            "/cancel — отмена",
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
             parse_mode='Markdown'
         )
-        bot.register_next_step_handler(msg, process_new_quote, bot)
         bot.answer_callback_query(call.id)
     
     @bot.callback_query_handler(func=lambda call: call.data == "set_quote_interval")
     def set_interval_ui(call):
-        msg = bot.send_message(
-            call.message.chat.id,
+        user_id = call.from_user.id
+        user_states[user_id] = "waiting_quote_interval"
+        bot.edit_message_text(
             f"⏱️ *Текущий интервал цитат:* {get_quotes_interval()} мин.\n\n"
             "Введите новое значение в минутах (число от 5 до 720).\n"
-            "Или /cancel для отмены.",
+            "/cancel — отмена",
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
             parse_mode='Markdown'
         )
-        bot.register_next_step_handler(msg, process_quote_interval, bot)
         bot.answer_callback_query(call.id)
     
     @bot.callback_query_handler(func=lambda call: call.data == "back_to_admin")
@@ -137,37 +143,9 @@ def register_admin_callbacks(bot, config):
         bot.answer_callback_query(call.id, "👋 Вы вышли из админ-панели")
     
     # ==========================================
-    # КНОПКА «ДИАЛОГ С АГЕНТОМ» (вызов из admin_commands)
+    # ДИАЛОГ С АГЕНТОМ
     # ==========================================
     @bot.callback_query_handler(func=lambda call: call.data == "start_dialog")
     def start_dialog(call):
         from dialogue.admin_commands import show_dialog_ui
         show_dialog_ui(call, bot)
-
-# ==========================================
-# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (для цитат)
-# ==========================================
-def process_new_quote(message, bot):
-    if message.text == "/cancel":
-        bot.reply_to(message, "❌ Добавление цитаты отменено.", reply_markup=get_admin_menu_keyboard())
-        return
-    
-    quote = message.text.strip()
-    if add_quote(quote):
-        bot.reply_to(message, "✅ Цитата добавлена в базу!", reply_markup=get_admin_menu_keyboard())
-    else:
-        bot.reply_to(message, "❌ Ошибка при сохранении цитаты.", reply_markup=get_admin_menu_keyboard())
-
-def process_quote_interval(message, bot):
-    if message.text == "/cancel":
-        bot.reply_to(message, "❌ Изменение интервала отменено.", reply_markup=get_admin_menu_keyboard())
-        return
-    
-    try:
-        interval = int(message.text.strip())
-        if interval < 5 or interval > 720:
-            raise ValueError
-        set_quotes_interval(interval)
-        bot.reply_to(message, f"✅ Интервал цитат установлен на {interval} минут.", reply_markup=get_admin_menu_keyboard())
-    except ValueError:
-        bot.reply_to(message, "❌ Ошибка: введите число от 5 до 720.", reply_markup=get_admin_menu_keyboard())
