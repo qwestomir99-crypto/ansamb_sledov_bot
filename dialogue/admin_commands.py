@@ -63,24 +63,28 @@ def handle_admin_command(message, bot):
     bot.reply_to(message, "🔐 Введите пароль для входа в админ-панель:\n(или #админ пароль)")
 
 # ==========================================
-# ДОБАВЛЕНИЕ ПОСТА
+# ДОБАВЛЕНИЕ ПОСТА (ИСПРАВЛЕННАЯ ВЕРСИЯ)
 # ==========================================
 
 def show_add_post_ui(call, bot):
-    msg = bot.edit_message_text(
+    # Удаляем старое меню
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except:
+        pass
+    
+    # Отправляем новое сообщение
+    msg = bot.send_message(
+        call.message.chat.id,
         "📝 *Добавление поста*\n\n"
         "Пришлите текст поста (можно с фото/видео).\n"
         "Для отмены введите /cancel",
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
         parse_mode='Markdown'
     )
     bot.answer_callback_query(call.id)
     bot.register_next_step_handler(msg, process_post, bot)
 
 def process_post(message, bot):
-    debug_log("ADMIN", f"process_post вызван. Текст: {message.text}, Фото: {bool(message.photo)}", "INFO")
-    
     if message.text == "/cancel":
         bot.reply_to(message, "❌ Добавление поста отменено.")
         return
