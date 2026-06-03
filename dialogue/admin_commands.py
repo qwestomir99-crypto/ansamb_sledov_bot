@@ -2,7 +2,7 @@
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
 # Задача: команда #админ, авторизация, вызов меню, диалог
-# Комментарий: добавлен пошаговый ввод поста (без register_next_step_handler)
+# Комментарий: состояния вынесены в message_dispatcher
 # ==========================================
 
 import os
@@ -11,13 +11,11 @@ import time
 from debug_utils import debug_log
 from dialogue.button_map import get_admin_menu_keyboard
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from dialogue.message_dispatcher import user_states
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "tleem2026")
 
 authorized_admins = {}
-
-# Временное хранилище для черновиков постов
-post_drafts = {}
 
 def is_admin_authorized(user_id):
     return authorized_admins.get(user_id, False)
@@ -67,133 +65,25 @@ def handle_admin_command(message, bot):
     bot.reply_to(message, f"🔐 Введите пароль:\n`#админ {ADMIN_PASSWORD}`", parse_mode='Markdown')
 
 # ==========================================
-# ПОШАГОВОЕ ДОБАВЛЕНИЕ ПОСТА (без register_next_step_handler)
+# ДОБАВЛЕНИЕ ПОСТА (только кнопка и установка состояния)
 # ==========================================
 
 def show_add_post_ui(call, bot):
-    """Показывает интерфейс добавления поста (шаг 1: текст)"""
     user_id = call.from_user.id
-    post_drafts[user_id] = {}
-    
-    keyboard = InlineKeyboardMarkup()
-    keyboard.add(InlineKeyboardButton("❌ Отмена", callback_data="cancel_add_post"))
-    
+    user_states[user_id] = "waiting_post_text"
     bot.edit_message_text(
-        "📝 *Шаг 1 из 2: текст поста*\n\n"
-        "Напишите текст поста (можно с Markdown).\n"
-        "После отправки текста нажмите кнопку 'Готово'.",
+        "📝 *Добавление поста*\n\n"
+        "Введите текст поста (можно с Markdown).\n"
+        "Для отмены введите /cancel",
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
-        parse_mode='Markdown',
-        reply_markup=keyboard
+        parse_mode='Markdown'
     )
-    bot.answer_callback_query(call.id)
-
-def process_post_text_message(message, bot):
-    """Обрабатывает текст поста, отправленный пользователем"""
-    user_id = message.from_user.id
-    if user_id not in post_drafts:
-        return
-    
-    post_drafts[user_id]["text"] = message.text
-    
-    keyboard = InlineKeyboardMarkup(row_width=2)
-    keyboard.add(
-        InlineKeyboardButton("✅ Готово", callback_data="finish_post"),
-        InlineKeyboardButton("✏️ Заново", callback_data="restart_post"),
-        InlineKeyboardButton("❌ Отмена", callback_data="cancel_add_post")
-    )
-    
-    bot.reply_to(
-        message,
-        f"📝 *Текст сохранён:*\n\n{message.text[:200]}{'...' if len(message.text) > 200 else ''}\n\n"
-        f"Теперь нажмите 'Готово' для ввода тегов.",
-        parse_mode='Markdown',
-        reply_markup=keyboard
-    )
-    safe_delete(bot, message, 2)
-
-def show_tags_ui(call, bot):
-    """Показывает интерфейс ввода тегов (шаг 2)"""
-    user_id = call.from_user.id
-    if user_id not in post_drafts or "text" not in post_drafts[user_id]:
-        bot.answer_callback_query(call.id, "❌ Ошибка: текст не найден")
-        return
-    
-    keyboard = InlineKeyboardMarkup()
-    keyboard.add(
-        InlineKeyboardButton("⏭️ Пропустить теги", callback_data="skip_tags"),
-        InlineKeyboardButton("❌ Отмена", callback_data="cancel_add_post")
-    )
-    
-    bot.edit_message_text(
-        "🏷️ *Шаг 2 из 2: теги*\n\n"
-        "Введите теги через пробел (например: #тлеем #ансамбль).\n"
-        "Или нажмите 'Пропустить теги'.",
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        parse_mode='Markdown',
-        reply_markup=keyboard
-    )
-    bot.answer_callback_query(call.id)
-
-def process_tags_message(message, bot):
-    """Обрабатывает теги, отправленные пользователем"""
-    user_id = message.from_user.id
-    if user_id not in post_drafts or "text" not in post_drafts[user_id]:
-        return
-    
-    tags = message.text.split()
-    post_drafts[user_id]["tags"] = tags
-    
-    # Сохраняем пост
-    from dialogue.post_manager import add_post_to_pool
-    text = post_drafts[user_id]["text"]
-    success = add_post_to_pool(text, tags, author_id=user_id)
-    
-    if success:
-        bot.reply_to(message, "✅ *Пост добавлен в пул публикаций!*", parse_mode='Markdown')
-    else:
-        bot.reply_to(message, "❌ *Ошибка при сохранении поста.*", parse_mode='Markdown')
-    
-    # Чистим черновик
-    del post_drafts[user_id]
-    safe_delete(bot, message, 2)
-
-def finish_post_without_tags(call, bot):
-    """Завершает добавление поста без тегов"""
-    user_id = call.from_user.id
-    if user_id not in post_drafts or "text" not in post_drafts[user_id]:
-        bot.answer_callback_query(call.id, "❌ Ошибка: текст не найден")
-        return
-    
-    from dialogue.post_manager import add_post_to_pool
-    text = post_drafts[user_id]["text"]
-    success = add_post_to_pool(text, [], author_id=user_id)
-    
-    if success:
-        bot.edit_message_text(
-            "✅ *Пост добавлен в пул публикаций!*",
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            parse_mode='Markdown'
-        )
-    else:
-        bot.edit_message_text(
-            "❌ *Ошибка при сохранении поста.*",
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            parse_mode='Markdown'
-        )
-    
-    del post_drafts[user_id]
     bot.answer_callback_query(call.id)
 
 def cancel_add_post(call, bot):
-    """Отменяет добавление поста"""
     user_id = call.from_user.id
-    if user_id in post_drafts:
-        del post_drafts[user_id]
+    user_states.pop(user_id, None)
     bot.edit_message_text(
         "❌ *Добавление поста отменено.*",
         chat_id=call.message.chat.id,
@@ -203,41 +93,18 @@ def cancel_add_post(call, bot):
     bot.answer_callback_query(call.id)
 
 # ==========================================
-# ДИАЛОГ С АГЕНТОМ
+# ДИАЛОГ С АГЕНТОМ (только кнопка и установка состояния)
 # ==========================================
 
 def show_dialog_ui(call, bot):
-    msg = bot.send_message(
-        call.message.chat.id,
-        "🗣 *Начните диалог*\n\n"
-        "Просто напишите сообщение — я передам его агенту.\n\n"
-        "Доступные команды:\n"
+    user_id = call.from_user.id
+    user_states[user_id] = "waiting_dialog"
+    bot.edit_message_text(
+        "🗣 *Диалог с агентом*\n\n"
+        "Просто напишите сообщение.\n"
         "/cancel — отменить диалог",
+        chat_id=call.message.chat.id,
+        message_id=call.message.message_id,
         parse_mode='Markdown'
     )
-    safe_delete(bot, call.message, 1)
-    bot.register_next_step_handler(msg, process_dialog_message, bot)
-
-def process_dialog_message(message, bot):
-    if message.text == "/cancel":
-        msg = bot.reply_to(message, "❌ Диалог отменён.")
-        safe_delete(bot, message, 3)
-        safe_delete(bot, msg, 5)
-        return
-    
-    from dialogue.agent import ask_agent
-    
-    status_msg = bot.reply_to(message, "⏳ Старший брат думает...")
-    answer = ask_agent(message.text, user_id=message.from_user.id)
-    
-    try:
-        bot.delete_message(status_msg.chat.id, status_msg.message_id)
-    except:
-        pass
-    
-    if answer:
-        bot.reply_to(message, f"🗣 *Старший брат:*\n{answer}", parse_mode='Markdown')
-    else:
-        bot.reply_to(message, "🌙 Старший брат отдыхает. Попробуй позже.")
-    
-    safe_delete(bot, message, 5)
+    bot.answer_callback_query(call.id)
