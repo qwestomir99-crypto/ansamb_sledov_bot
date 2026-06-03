@@ -2,49 +2,46 @@
 # Файл: requirements.txt
 # Справка: README.md → Зависимости проекта
 # Задача: все необходимые библиотеки для бота и веб-морды
-# Комментарий: устанавливаются на Render при деплое
+# Комментарий: Supabase УДАЛЁН, используется SQLite
 # ==========================================
 
 # Основной бот
-pytelegrambotapi>=4.12.0
+pytelegrambotapi==4.16.0
 
 # Веб-морда и API
-flask>=2.3.0
-flask-socketio>=5.3.0
-gevent>=23.9.0
-gunicorn>=21.2.0
+flask==2.3.3
+flask-socketio==5.3.6
+gevent==23.9.1
+gunicorn==21.2.0
 
 # HTTP-запросы и работа с API
-requests>=2.31.0
+requests==2.31.0
 
 # YouTube прокси и работа с видео
-yt-dlp>=2024.12.0
+yt-dlp==2023.12.30
 
 # VK API
-vk-api>=11.0.0
+vk-api==11.9.9
 
 # Telegram API (большие видео)
-telethon>=1.34.0
+telethon==1.34.0
 
 # Планировщик
-schedule>=1.2.0
+schedule==1.2.0
 
 # Часовые пояса (для Шаббата и полуночного ритуала)
-pytz>=2024.1
+pytz==2023.3
 
 # Переменные окружения
-python-dotenv>=1.0.0
+python-dotenv==1.0.0
 
-# Цветной вывод в консоль (опционально)
-colorlog>=6.8.0
+# Цветной вывод в консоль
+colorlog==6.8.0
 
 # Парсинг HTML для агента (чтение ссылок)
-beautifulsoup4>=4.12.0
-
-# Клиент Supabase (база данных)
-supabase>=2.0.0
+beautifulsoup4==4.12.2
 
 # Google API (для YouTube Upload)
-google-auth>=2.28.0
-google-auth-oauthlib>=1.0.0
-google-api-python-client>=2.108.0
+google-auth==2.23.4
+google-auth-oauthlib==1.0.0
+google-api-python-client==2.108.0
