@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 03.06.2026 06:08:10*
+*Обновлено: 03.06.2026 06:09:07*
 
 | Файл | Статус |
 |------|--------|
@@ -299,7 +299,6 @@
 | `services/sql_analytics.py` | ✅ Redmi-шапка |
 | `services/sqlite_client.py` | ❌ Без шапки |
 | `services/suggestion_engine.py` | ✅ Redmi-шапка |
-| `services/supabase_client.py` | ✅ Redmi-шапка |
 | `services/tg_api.py` | ✅ Redmi-шапка |
 | `services/theme.py` | ✅ Redmi-шапка |
 | `services/tracking.py` | ✅ Redmi-шапка |
