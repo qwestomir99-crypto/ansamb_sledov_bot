@@ -7,14 +7,13 @@
 import os
 import threading
 import time
-import json
 from debug_utils import debug_log
 from dialogue.button_map import get_admin_menu_keyboard
-from dialogue.message_dispatcher import user_states
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "tleem2026")
 
 authorized_admins = {}
+user_states = {}  # свой словарь вместо импорта из message_dispatcher
 
 def is_admin_authorized(user_id):
     return authorized_admins.get(user_id, False)
