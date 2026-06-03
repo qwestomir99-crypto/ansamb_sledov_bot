@@ -2,7 +2,7 @@
 # Файл: dialogue/callbacks/admin.py
 # Справка: README.md → Обработчики кнопок / Админ
 # Задача: обработка кнопок админ-меню (главное меню)
-# Комментарий: добавлен обработчик vk_post
+# Комментарий: исправлен импорт (удалён state_manager)
 # ==========================================
 
 import threading
@@ -10,7 +10,6 @@ import time
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dialogue.button_map import get_admin_menu_keyboard
 from debug_utils import debug_log
-from dialogue.state_manager import user_states
 
 def auto_delete_menu(bot, chat_id, message_id, delay=720):
     """Удаляет сообщение через delay секунд (720 = 12 минут)"""
