@@ -63,7 +63,7 @@ def handle_admin_command(message, bot):
     bot.reply_to(message, "🔐 Введите пароль для входа в админ-панель:\n(или #админ пароль)")
 
 # ==========================================
-# ДОБАВЛЕНИЕ ПОСТА (старая, работавшая версия)
+# ДОБАВЛЕНИЕ ПОСТА
 # ==========================================
 
 def show_add_post_ui(call, bot):
@@ -79,6 +79,8 @@ def show_add_post_ui(call, bot):
     bot.register_next_step_handler(msg, process_post, bot)
 
 def process_post(message, bot):
+    debug_log("ADMIN", f"process_post вызван. Текст: {message.text}, Фото: {bool(message.photo)}", "INFO")
+    
     if message.text == "/cancel":
         bot.reply_to(message, "❌ Добавление поста отменено.")
         return
