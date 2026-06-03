@@ -2,17 +2,18 @@
 # Файл: dialogue/message_dispatcher.py
 # Справка: README.md → Диспетчер сообщений
 # Задача: обработка всех сообщений без register_next_step_handler
-# Комментарий: использует button_map для кнопок
+# Комментарий: поддерживает добавление постов, цитат, интервалов, диалог с агентом
 # ==========================================
 
 from debug_utils import debug_log
 from dialogue.agent import ask_agent
 from dialogue.post_manager import add_post_to_pool
+from dialogue.quotes import add_quote, set_quotes_interval
 from dialogue.button_map import get_text, get_callback
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # Глобальные словари для состояний
-user_states = {}      # {user_id: "waiting_post_text" / "waiting_post_tags" / "waiting_dialog"}
+user_states = {}      # {user_id: "waiting_post_text" / "waiting_post_tags" / "waiting_dialog" / "waiting_quote_text" / "waiting_quote_interval"}
 post_drafts = {}      # {user_id: {"text": "...", "tags": [...]}}
 
 def register_dispatcher(bot):
@@ -51,7 +52,6 @@ def register_dispatcher(bot):
             post_drafts[user_id] = {"text": message.text}
             user_states[user_id] = "waiting_post_tags"
             
-            # Кнопки из button_map
             keyboard = InlineKeyboardMarkup()
             keyboard.add(
                 InlineKeyboardButton(get_text("finish_post"), callback_data=get_callback("finish_post")),
@@ -82,6 +82,36 @@ def register_dispatcher(bot):
             
             user_states.pop(user_id, None)
             post_drafts.pop(user_id, None)
+            return
+        
+        # === ДОБАВЛЕНИЕ ЦИТАТЫ ===
+        if state == "waiting_quote_text":
+            quote = message.text.strip()
+            if quote:
+                success = add_quote(quote)
+                if success:
+                    bot.reply_to(message, "✅ *Цитата добавлена в базу!*", parse_mode='Markdown')
+                else:
+                    bot.reply_to(message, "❌ *Ошибка при сохранении цитаты.*", parse_mode='Markdown')
+            else:
+                bot.reply_to(message, "❌ *Текст цитаты не может быть пустым.*", parse_mode='Markdown')
+            
+            user_states.pop(user_id, None)
+            return
+        
+        # === УСТАНОВКА ИНТЕРВАЛА ЦИТАТ ===
+        if state == "waiting_quote_interval":
+            try:
+                interval = int(message.text.strip())
+                if 5 <= interval <= 720:
+                    set_quotes_interval(interval)
+                    bot.reply_to(message, f"✅ *Интервал цитат установлен на {interval} минут.*", parse_mode='Markdown')
+                else:
+                    bot.reply_to(message, "❌ *Ошибка: введите число от 5 до 720.*", parse_mode='Markdown')
+            except ValueError:
+                bot.reply_to(message, "❌ *Ошибка: введите целое число.*", parse_mode='Markdown')
+            
+            user_states.pop(user_id, None)
             return
         
         # === ЕСЛИ НЕТ СОСТОЯНИЯ — ИГНОРИРУЕМ ===
