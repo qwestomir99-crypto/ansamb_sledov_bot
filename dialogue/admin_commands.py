@@ -2,7 +2,7 @@
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
 # Задача: команда #админ, авторизация, вызов меню, диалог
-# Комментарий: состояния вынесены в state_manager
+# Комментарий: добавление поста — без режима ожидания (скрепка доступна)
 # ==========================================
 
 import os
@@ -65,21 +65,29 @@ def handle_admin_command(message, bot):
     bot.reply_to(message, f"🔐 Введите пароль:\n`#админ {ADMIN_PASSWORD}`", parse_mode='Markdown')
 
 # ==========================================
-# ДОБАВЛЕНИЕ ПОСТА
+# ДОБАВЛЕНИЕ ПОСТА (без режима ожидания, скрепка доступна)
 # ==========================================
 
 def show_add_post_ui(call, bot):
     user_id = call.from_user.id
-    user_states[user_id] = "waiting_simple_post"
-    bot.edit_message_text(
+    # Удаляем меню, чтобы не висело
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except:
+        pass
+    
+    # Отправляем обычное сообщение (не в режиме ожидания)
+    bot.send_message(
+        call.message.chat.id,
         "📝 *Добавление поста*\n\n"
-        "Пришлите текст поста. Если нужно приложить фото или видео — приложите.\n"
-        "Теги можно написать прямо в тексте (как #хештеги).\n"
+        "Просто отправьте фото или видео с подписью (текстом).\n"
+        "Теги пишите прямо в подписи.\n"
         "Для отмены введите /cancel",
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
         parse_mode='Markdown'
     )
+    
+    # Устанавливаем состояние, чтобы бот понял, что это пост
+    user_states[user_id] = "waiting_simple_post"
     bot.answer_callback_query(call.id)
 
 def cancel_add_post(call, bot):
