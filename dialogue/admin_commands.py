@@ -1,8 +1,8 @@
 # ==========================================
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
-# Задача: команда #админ, авторизация, вызов меню, диалог
-# Комментарий: добавление поста — без режима ожидания (скрепка доступна)
+# Задача: команда #админ, авторизация, вызов меню, диалог, VK пост
+# Комментарий: добавлена функция show_vk_post_ui для публикации в VK
 # ==========================================
 
 import os
@@ -65,18 +65,16 @@ def handle_admin_command(message, bot):
     bot.reply_to(message, f"🔐 Введите пароль:\n`#админ {ADMIN_PASSWORD}`", parse_mode='Markdown')
 
 # ==========================================
-# ДОБАВЛЕНИЕ ПОСТА (без режима ожидания, скрепка доступна)
+# ДОБАВЛЕНИЕ ПОСТА (в пул)
 # ==========================================
 
 def show_add_post_ui(call, bot):
     user_id = call.from_user.id
-    # Удаляем меню, чтобы не висело
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except:
         pass
     
-    # Отправляем обычное сообщение (не в режиме ожидания)
     bot.send_message(
         call.message.chat.id,
         "📝 *Добавление поста*\n\n"
@@ -85,8 +83,6 @@ def show_add_post_ui(call, bot):
         "Для отмены введите /cancel",
         parse_mode='Markdown'
     )
-    
-    # Устанавливаем состояние, чтобы бот понял, что это пост
     user_states[user_id] = "waiting_simple_post"
     bot.answer_callback_query(call.id)
 
@@ -99,6 +95,28 @@ def cancel_add_post(call, bot):
         message_id=call.message.message_id,
         parse_mode='Markdown'
     )
+    bot.answer_callback_query(call.id)
+
+# ==========================================
+# ПОСТ В VK (прямая публикация)
+# ==========================================
+
+def show_vk_post_ui(call, bot):
+    user_id = call.from_user.id
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except:
+        pass
+    
+    bot.send_message(
+        call.message.chat.id,
+        "🎬 *Пост в VK*\n\n"
+        "Пришлите текст поста. Если нужно приложить фото или видео — приложите.\n"
+        "Теги пишите прямо в подписи.\n"
+        "Для отмены введите /cancel",
+        parse_mode='Markdown'
+    )
+    user_states[user_id] = "waiting_vk_post"
     bot.answer_callback_query(call.id)
 
 # ==========================================
