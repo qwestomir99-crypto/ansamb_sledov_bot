@@ -2,6 +2,9 @@
 # Файл: dialogue/callbacks/quotes.py
 # Справка: README.md → Обработчики кнопок / Цитаты
 # Задача: управление цитатами (список, добавление, интервал)
+# Комментарий: полностью вынесен из admin.py
+# Зависит от: telebot, button_map, quotes, message_dispatcher
+# Вызывается из: dialogue/callbacks/__init__.py
 # ==========================================
 
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -90,3 +93,8 @@ def register_quotes_callbacks(bot, config):
             parse_mode='Markdown'
         )
         bot.answer_callback_query(call.id)
+    
+    @bot.callback_query_handler(func=lambda call: call.data == "back_to_admin")
+    def back_to_admin(call):
+        from dialogue.callbacks.admin import show_admin_panel
+        show_admin_panel(call)
