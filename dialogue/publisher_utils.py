@@ -2,7 +2,7 @@
 # Файл: dialogue/publisher_utils.py
 # Справка: README.md → Публикатор / Утилиты
 # Задача: отправка постов в Telegram и VK с поддержкой нескольких файлов (альбомов)
-# Комментарий: поддерживает одиночные файлы, альбомы (до 10 фото/видео), репосты
+# Комментарий: добавлена поддержка file_id (без локального хранения)
 # Зависит от: requests, os, random, json, utils
 # Вызывается из: publisher.py, admin_commands.py
 # ==========================================
@@ -81,12 +81,12 @@ def get_vk_upload_url(vk_token, owner_id):
         print(f"[VK] upload URL ошибка: {e}")
         return None
 
-def upload_photo_to_vk(upload_url, file_path, vk_token):
+def upload_photo_to_vk(upload_url, file_data, vk_token):
+    """Загружает фото в VK (file_data — содержимое файла)"""
     try:
-        with open(file_path, 'rb') as f:
-            files = {'photo': f}
-            r = requests.post(upload_url, files=files)
-            data = r.json()
+        files = {'photo': ('photo.jpg', file_data)}
+        r = requests.post(upload_url, files=files)
+        data = r.json()
         
         save_params = {
             "access_token": vk_token,
@@ -108,17 +108,32 @@ def upload_photo_to_vk(upload_url, file_path, vk_token):
         print(f"[VK] upload photo ошибка: {e}")
         return None
 
-def post_to_telegram(bot, chat_id, message, file_paths=None, tags=None, auto_quote=True, auto_tags=True):
+def send_media_by_file_id(bot, chat_id, file_id, caption=None):
+    """Отправляет файл в Telegram по file_id (без локального сохранения)"""
+    try:
+        file_info = bot.get_file(file_id)
+        downloaded = bot.download_file(file_info.file_path)
+        ext = os.path.splitext(file_info.file_path)[1].lower()
+        
+        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+            bot.send_photo(chat_id, downloaded, caption=caption, parse_mode='MarkdownV2')
+        elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
+            bot.send_video(chat_id, downloaded, caption=caption, parse_mode='MarkdownV2')
+        else:
+            bot.send_document(chat_id, downloaded, caption=caption, parse_mode='MarkdownV2')
+        return True
+    except Exception as e:
+        print(f"[PUBLISHER_UTILS] Ошибка отправки по file_id: {e}")
+        return False
+
+def post_to_telegram(bot, chat_id, message, file_id=None, tags=None, auto_quote=True, auto_tags=True):
     """
     Отправляет пост в Telegram.
     Поддерживает:
-    - одиночное фото/видео/документ
-    - несколько фото/видео (альбом, media_group)
-    - текст без медиа
+    - текст
+    - фото/видео по file_id
+    - альбомы (если передан список file_id)
     """
-    import telebot
-    from telebot.types import InputMediaPhoto, InputMediaVideo
-    
     if auto_quote and message and len(message) < 500:
         quote = get_random_quote()
         message = f"{message}\n\n📜 {quote}"
@@ -134,59 +149,28 @@ def post_to_telegram(bot, chat_id, message, file_paths=None, tags=None, auto_quo
     
     safe_caption = escape_markdown(full_message) if full_message else None
     
-    # Приводим file_paths к списку, если передан один путь
-    if file_paths and not isinstance(file_paths, list):
-        file_paths = [file_paths]
-    
     try:
-        # === АЛЬБОМ (несколько фото/видео) ===
-        if file_paths and len(file_paths) > 1:
+        # === АЛЬБОМ (несколько file_id) ===
+        if file_id and isinstance(file_id, list) and len(file_id) > 1:
+            from telebot.types import InputMediaPhoto, InputMediaVideo
             media_group = []
-            for fp in file_paths:
-                if not os.path.exists(fp):
-                    continue
-                ext = os.path.splitext(fp)[1].lower()
+            for fid in file_id:
+                file_info = bot.get_file(fid)
+                downloaded = bot.download_file(file_info.file_path)
+                ext = os.path.splitext(file_info.file_path)[1].lower()
                 if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
-                    with open(fp, 'rb') as f:
-                        media_group.append(InputMediaPhoto(f.read()))
+                    media_group.append(InputMediaPhoto(downloaded))
                 elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
-                    with open(fp, 'rb') as f:
-                        media_group.append(InputMediaVideo(f.read()))
+                    media_group.append(InputMediaVideo(downloaded))
             if media_group:
                 bot.send_media_group(chat_id, media_group)
                 if safe_caption:
                     bot.send_message(chat_id, safe_caption, parse_mode='MarkdownV2')
                 return True
         
-        # === ОДИНОЧНЫЙ ФАЙЛ ===
-        elif file_paths and len(file_paths) == 1:
-            fp = file_paths[0]
-            if not os.path.exists(fp):
-                print(f"[PUBLISHER] Файл не найден: {fp}")
-                return False
-            ext = os.path.splitext(fp)[1].lower()
-            with open(fp, 'rb') as f:
-                if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
-                    if safe_caption:
-                        bot.send_photo(chat_id, f, caption=safe_caption, parse_mode='MarkdownV2')
-                    else:
-                        bot.send_photo(chat_id, f)
-                elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
-                    if safe_caption:
-                        bot.send_video(chat_id, f, caption=safe_caption, parse_mode='MarkdownV2')
-                    else:
-                        bot.send_video(chat_id, f)
-                elif ext in ['.mp3', '.m4a', '.wav']:
-                    if safe_caption:
-                        bot.send_audio(chat_id, f, caption=safe_caption, parse_mode='MarkdownV2')
-                    else:
-                        bot.send_audio(chat_id, f)
-                else:
-                    if safe_caption:
-                        bot.send_document(chat_id, f, caption=safe_caption, parse_mode='MarkdownV2')
-                    else:
-                        bot.send_document(chat_id, f)
-            return True
+        # === ОДИН ФАЙЛ ПО file_id ===
+        elif file_id and isinstance(file_id, str):
+            return send_media_by_file_id(bot, chat_id, file_id, safe_caption)
         
         # === ТОЛЬКО ТЕКСТ ===
         else:
@@ -200,15 +184,14 @@ def post_to_telegram(bot, chat_id, message, file_paths=None, tags=None, auto_quo
         print(f"[PUBLISHER] Ошибка Telegram: {e}")
         return False
 
-def post_to_vk(message, tags, access_token, owner_id, file_paths=None, auto_quote=True, auto_tags=True, repost_from=None):
+def post_to_vk(message, tags, access_token, owner_id, file_id=None, auto_quote=True, auto_tags=True, repost_from=None):
     """
     Отправляет пост в VK.
     Поддерживает:
-    - несколько фото (до 10)
-    - одно видео (пока только одно, VK ограничивает)
-    - текст без медиа
+    - текст
+    - фото по file_id (скачивает и загружает)
     """
-    print(f"[VK] post_to_vk вызван: message={message[:50] if message else ''}..., files={len(file_paths) if file_paths else 0}")
+    print(f"[VK] post_to_vk вызван: message={message[:50] if message else ''}..., file_id={file_id}")
     
     if not access_token or not owner_id:
         print("[VK] Нет токена или owner_id")
@@ -233,10 +216,6 @@ def post_to_vk(message, tags, access_token, owner_id, file_paths=None, auto_quot
     
     attachments = []
     
-    # Приводим file_paths к списку, если передан один путь
-    if file_paths and not isinstance(file_paths, list):
-        file_paths = [file_paths]
-    
     # === РЕПОСТ ===
     if repost_from and repost_from.get("attachments"):
         for att in repost_from["attachments"][:5]:
@@ -249,21 +228,24 @@ def post_to_vk(message, tags, access_token, owner_id, file_paths=None, auto_quot
                 if video.get("owner_id") and video.get("id"):
                     attachments.append(f"video{video['owner_id']}_{video['id']}")
     
-    # === НЕСКОЛЬКО ФАЙЛОВ ===
-    elif file_paths:
-        for fp in file_paths:
-            if not os.path.exists(fp):
-                continue
-            ext = os.path.splitext(fp)[1].lower()
-            if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
-                upload_url = get_vk_upload_url(access_token, owner_id)
-                if upload_url:
-                    photo_att = upload_photo_to_vk(upload_url, fp, access_token)
-                    if photo_att:
-                        attachments.append(photo_att)
-            elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
-                # VK пока не поддерживает видео через API в постинге
-                print(f"[VK] Видео пока не поддерживается: {fp}")
+    # === ФОТО ПО file_id ===
+    elif file_id:
+        try:
+            # Скачиваем файл из Telegram
+            import telebot
+            bot = telebot.TeleBot(os.environ.get("BOT_TOKEN"))
+            file_info = bot.get_file(file_id)
+            downloaded = bot.download_file(file_info.file_path)
+            
+            # Загружаем в VK
+            upload_url = get_vk_upload_url(access_token, owner_id)
+            if upload_url:
+                photo_att = upload_photo_to_vk(upload_url, downloaded, access_token)
+                if photo_att:
+                    attachments.append(photo_att)
+                    print(f"[VK] Фото загружено из Telegram по file_id")
+        except Exception as e:
+            print(f"[VK] Ошибка загрузки фото из Telegram: {e}")
     
     if attachments:
         params['attachments'] = ",".join(attachments)
