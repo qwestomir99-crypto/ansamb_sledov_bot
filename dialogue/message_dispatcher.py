@@ -2,7 +2,7 @@
 # Файл: dialogue/message_dispatcher.py
 # Справка: README.md → Диспетчер сообщений
 # Задача: обработка всех сообщений без register_next_step_handler
-# Комментарий: ДИАЛОГ, ЦИТАТЫ, ИНТЕРВАЛЫ, ПОСТЫ (только file_id)
+# Комментарий: после сохранения поста — автоматический возврат в админ-меню
 # ==========================================
 
 import os
@@ -12,6 +12,8 @@ from debug_utils import debug_log
 from dialogue.agent import ask_agent
 from dialogue.quotes import add_quote, set_quotes_interval
 from dialogue.post_manager import add_post_to_pool
+from dialogue.admin_commands import is_admin_authorized
+from dialogue.button_map import get_admin_menu_keyboard
 
 # Глобальные словари для состояний
 user_states = {}      # {user_id: "waiting_dialog" / "waiting_quote_text" / "waiting_quote_interval" / "waiting_simple_post"}
@@ -82,6 +84,14 @@ def register_dispatcher(bot):
             if message.text == "/cancel":
                 bot.reply_to(message, "❌ Добавление поста отменено.")
                 user_states.pop(user_id, None)
+                # Возвращаем админ-меню
+                if is_admin_authorized(user_id):
+                    bot.send_message(
+                        message.chat.id,
+                        "🛡️ *Админ-меню*",
+                        reply_markup=get_admin_menu_keyboard(),
+                        parse_mode='Markdown'
+                    )
                 return
             
             # Определяем текст (caption для медиа, иначе обычный текст)
@@ -100,13 +110,22 @@ def register_dispatcher(bot):
             elif message.video:
                 media_file_id = message.video.file_id
             
-            # Сохраняем пост (file_id будет передан в publisher_utils)
+            # Сохраняем пост
             success = add_post_to_pool(text, tags, author=str(user_id), source="tg", media_url=media_file_id)
             
             if success:
                 bot.reply_to(message, "✅ *Пост добавлен в пул публикаций!*", parse_mode='Markdown')
             else:
                 bot.reply_to(message, "❌ *Ошибка при сохранении поста.*", parse_mode='Markdown')
+            
+            # Возвращаем админ-меню
+            if is_admin_authorized(user_id):
+                bot.send_message(
+                    message.chat.id,
+                    "🛡️ *Админ-меню*",
+                    reply_markup=get_admin_menu_keyboard(),
+                    parse_mode='Markdown'
+                )
             
             user_states.pop(user_id, None)
             return
