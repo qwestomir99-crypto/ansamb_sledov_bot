@@ -2,7 +2,7 @@
 # Файл: bot/main.py
 # Справка: README.md → Бот / Запуск
 # Задача: запуск бота + сохранение сообщений в SQLite
-# Комментарий: добавлена регистрация колбэков и диспетчера
+# Комментарий: добавлена регистрация колбэков, диспетчера и планировщика эволюции
 # ==========================================
 
 import time
@@ -11,6 +11,7 @@ from .handlers import register_handlers
 from dialogue.callbacks import register_callback_handlers
 from dialogue.message_dispatcher import register_dispatcher
 from services.sqlite_client import save_message
+from evolve_agent import start_evolution_scheduler
 
 def main():
     config = load_config()
@@ -29,6 +30,9 @@ def main():
     @bot.message_handler(func=lambda message: True)
     def save_all_messages(message):
         save_message(message.chat.id, message.text, source="tg")
+
+    # Запуск планировщика эволюции агента (раз в сутки)
+    start_evolution_scheduler()
 
     print("Бот запущен. Ритм 0,8 Гц.")
     bot.polling()
