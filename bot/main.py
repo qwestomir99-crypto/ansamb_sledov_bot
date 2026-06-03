@@ -16,7 +16,7 @@ def main():
     bot = get_bot()
     
     register_handlers(bot, config)
-    register_dispatcher(bot)  # <-- ДОБАВИТЬ ЭТУ СТРОКУ
+    register_dispatcher(bot)
     
     @bot.message_handler(func=lambda message: True)
     def save_all_messages(message):
@@ -24,12 +24,7 @@ def main():
     
     start_evolution_scheduler()
     
-    try:
-        bot.delete_webhook()
-        print("[MAIN] Webhook удалён")
-    except:
-        pass
-    
+    # НЕ УДАЛЯЕМ WEBHOOK!
     print("[MAIN] Запуск polling")
     bot.polling()
 
