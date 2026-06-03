@@ -1,11 +1,7 @@
 # ==========================================
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
-# Задача: команда #админ, авторизация, вызов меню, диалог, VK пост
-# Комментарий: исправлена утечка пароля (показывается только при вводе)
-#              добавлена функция show_vk_post_ui для публикации в VK
-# Зависит от: os, threading, time, debug_utils, button_map, state_manager
-# Вызывается из: bot/handlers/__init__.py, callbacks/admin.py
+# Задача: команда #админ, авторизация, вызов меню, добавление поста
 # ==========================================
 
 import os
@@ -13,17 +9,10 @@ import threading
 import time
 from debug_utils import debug_log
 from dialogue.button_map import get_admin_menu_keyboard
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from dialogue.state_manager import user_states
+from dialogue.post_manager import add_post_to_pool
 
-# ==========================================
-# КОНФИГУРАЦИЯ
-# ==========================================
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "tleem2026")
 
-# ==========================================
-# АВТОРИЗАЦИЯ
-# ==========================================
 authorized_admins = {}
 
 def is_admin_authorized(user_id):
@@ -41,9 +30,6 @@ def logout_admin(user_id):
         del authorized_admins[user_id]
         debug_log("ADMIN", f"Админ {user_id} вышел")
 
-# ==========================================
-# БЕЗОПАСНОЕ УДАЛЕНИЕ СООБЩЕНИЙ
-# ==========================================
 def safe_delete(bot, message, delay=3):
     def _delete():
         time.sleep(delay)
@@ -53,9 +39,6 @@ def safe_delete(bot, message, delay=3):
             pass
     threading.Thread(target=_delete, daemon=True).start()
 
-# ==========================================
-# ОБРАБОТЧИК КОМАНДЫ #админ
-# ==========================================
 def handle_admin_command(message, bot):
     user_id = message.from_user.id
     text = message.text.lower()
@@ -77,74 +60,38 @@ def handle_admin_command(message, bot):
             safe_delete(bot, msg, 5)
         return
     
-    # Безопасный запрос пароля (не показываем пароль)
     bot.reply_to(message, "🔐 Введите пароль для входа в админ-панель:\n(или #админ пароль)")
 
 # ==========================================
-# ДОБАВЛЕНИЕ ПОСТА (в пул)
+# ДОБАВЛЕНИЕ ПОСТА (старая, работавшая версия)
 # ==========================================
+
 def show_add_post_ui(call, bot):
-    user_id = call.from_user.id
-    try:
-        bot.delete_message(call.message.chat.id, call.message.message_id)
-    except:
-        pass
-    
-    bot.send_message(
-        call.message.chat.id,
+    msg = bot.edit_message_text(
         "📝 *Добавление поста*\n\n"
-        "Просто отправьте фото или видео с подписью (текстом).\n"
-        "Теги пишите прямо в подписи.\n"
+        "Пришлите текст поста (можно с фото/видео).\n"
         "Для отмены введите /cancel",
-        parse_mode='Markdown'
-    )
-    user_states[user_id] = "waiting_simple_post"
-    bot.answer_callback_query(call.id)
-
-def cancel_add_post(call, bot):
-    user_id = call.from_user.id
-    user_states.pop(user_id, None)
-    bot.edit_message_text(
-        "❌ *Добавление поста отменено.*",
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
         parse_mode='Markdown'
     )
     bot.answer_callback_query(call.id)
+    bot.register_next_step_handler(msg, process_post, bot)
 
-# ==========================================
-# ПОСТ В VK (прямая публикация)
-# ==========================================
-def show_vk_post_ui(call, bot):
-    user_id = call.from_user.id
-    try:
-        bot.delete_message(call.message.chat.id, call.message.message_id)
-    except:
-        pass
+def process_post(message, bot):
+    if message.text == "/cancel":
+        bot.reply_to(message, "❌ Добавление поста отменено.")
+        return
     
-    bot.send_message(
-        call.message.chat.id,
-        "📌 *Пост в VK*\n\n"
-        "Пришлите фото или видео с подписью (текстом).\n"
-        "Теги пишите прямо в подписи.\n"
-        "Для отмены введите /cancel",
-        parse_mode='Markdown'
-    )
-    user_states[user_id] = "waiting_vk_post"
-    bot.answer_callback_query(call.id)
-
-# ==========================================
-# ДИАЛОГ С АГЕНТОМ
-# ==========================================
-def show_dialog_ui(call, bot):
-    user_id = call.from_user.id
-    user_states[user_id] = "waiting_dialog"
-    bot.edit_message_text(
-        "🗣 *Диалог с агентом*\n\n"
-        "Просто напишите сообщение.\n"
-        "/cancel — отменить диалог",
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        parse_mode='Markdown'
-    )
-    bot.answer_callback_query(call.id)
+    text = message.caption if message.photo else message.text
+    if not text:
+        bot.reply_to(message, "❌ Добавьте текст к посту.")
+        return
+    
+    tags = [word for word in text.split() if word.startswith('#')]
+    success = add_post_to_pool(text, tags, author=str(message.from_user.id), source="tg")
+    
+    if success:
+        bot.reply_to(message, "✅ *Пост добавлен в пул публикаций!*", parse_mode='Markdown')
+    else:
+        bot.reply_to(message, "❌ *Ошибка при сохранении поста.*", parse_mode='Markdown')
