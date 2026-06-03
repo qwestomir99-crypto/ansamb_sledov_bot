@@ -11,7 +11,6 @@ import json
 from debug_utils import debug_log
 from dialogue.button_map import get_admin_menu_keyboard
 from dialogue.message_dispatcher import user_states
-from dialogue.post_manager import add_post_to_pool
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "tleem2026")
 
@@ -65,7 +64,7 @@ def handle_admin_command(message, bot):
     bot.reply_to(message, "🔐 Введите пароль для входа в админ-панель:\n(или #админ пароль)")
 
 # ==========================================
-# ДОБАВЛЕНИЕ ПОСТА (без register_next_step_handler)
+# ДОБАВЛЕНИЕ ПОСТА
 # ==========================================
 
 def show_add_post_ui(call, bot):
