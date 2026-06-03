@@ -2,7 +2,7 @@
 # Файл: dialogue/message_dispatcher.py
 # Справка: README.md → Диспетчер сообщений
 # Задача: обработка всех сообщений без register_next_step_handler
-# Комментарий: поддерживает диалог, цитаты, посты (с медиа)
+# Комментарий: добавлена обработка VK поста (waiting_vk_post)
 # ==========================================
 
 import os
@@ -77,12 +77,11 @@ def register_dispatcher(bot):
             clear_state(user_id)
             return
         
-        # === ДОБАВЛЕНИЕ ПОСТА ===
+        # === ДОБАВЛЕНИЕ ПОСТА (в пул) ===
         if state == "waiting_simple_post":
             if message.text == "/cancel":
                 bot.reply_to(message, "❌ Добавление поста отменено.")
                 clear_state(user_id)
-                # Возвращаем админ-меню
                 if is_admin_authorized(user_id):
                     bot.send_message(
                         message.chat.id,
@@ -92,23 +91,19 @@ def register_dispatcher(bot):
                     )
                 return
             
-            # Определяем текст (caption для медиа, иначе обычный текст)
             text = message.caption if message.photo or message.video else message.text
             if not text:
                 bot.reply_to(message, "❌ Добавьте текст к посту (описание картинки или видео).")
                 return
             
-            # Извлекаем теги из текста
             tags = [word for word in text.split() if word.startswith('#')]
             
-            # Получаем file_id (если есть фото или видео)
             media_file_id = None
             if message.photo:
                 media_file_id = message.photo[-1].file_id
             elif message.video:
                 media_file_id = message.video.file_id
             
-            # Сохраняем пост
             success = add_post_to_pool(text, tags, author=str(user_id), source="tg", media_url=media_file_id)
             
             if success:
@@ -116,7 +111,6 @@ def register_dispatcher(bot):
             else:
                 bot.reply_to(message, "❌ *Ошибка при сохранении поста.*", parse_mode='Markdown')
             
-            # Возвращаем админ-меню
             if is_admin_authorized(user_id):
                 bot.send_message(
                     message.chat.id,
@@ -124,6 +118,47 @@ def register_dispatcher(bot):
                     reply_markup=get_admin_menu_keyboard(),
                     parse_mode='Markdown'
                 )
+            
+            clear_state(user_id)
+            return
+        
+        # === ПОСТ В VK (прямая публикация) ===
+        if state == "waiting_vk_post":
+            if message.text == "/cancel":
+                bot.reply_to(message, "❌ Публикация в VK отменена.")
+                clear_state(user_id)
+                return
+            
+            text = message.caption if message.photo or message.video else message.text
+            if not text:
+                bot.reply_to(message, "❌ Добавьте текст к посту.")
+                return
+            
+            tags = [word for word in text.split() if word.startswith('#')]
+            tags_str = " ".join(tags)
+            
+            media_file_id = None
+            if message.photo:
+                media_file_id = message.photo[-1].file_id
+            elif message.video:
+                media_file_id = message.video.file_id
+            
+            # Отправляем в VK
+            from dialogue.publisher_utils import post_to_vk
+            vk_token = os.environ.get("VK_TOKEN")
+            vk_owner_id = os.environ.get("VK_OWNER_ID")
+            
+            if not vk_token or not vk_owner_id:
+                bot.reply_to(message, "❌ VK_TOKEN или VK_OWNER_ID не заданы в переменных окружения.")
+                clear_state(user_id)
+                return
+            
+            success, error = post_to_vk(text, tags_str, vk_token, vk_owner_id, file_id=media_file_id)
+            
+            if success:
+                bot.reply_to(message, "✅ *Пост опубликован в VK!*", parse_mode='Markdown')
+            else:
+                bot.reply_to(message, f"❌ *Ошибка VK:* {error}", parse_mode='Markdown')
             
             clear_state(user_id)
             return
