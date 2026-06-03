@@ -2,15 +2,20 @@
 # Файл: dialogue/message_dispatcher.py
 # Справка: README.md → Диспетчер сообщений
 # Задача: обработка всех сообщений без register_next_step_handler
-# Комментарий: ТОЛЬКО ДИАЛОГ, ЦИТАТЫ, ИНТЕРВАЛЫ (БЕЗ ПОСТОВ)
+# Комментарий: ДИАЛОГ, ЦИТАТЫ, ИНТЕРВАЛЫ, ПОСТЫ (с медиа)
 # ==========================================
 
+import os
+import time
+from datetime import datetime
 from debug_utils import debug_log
 from dialogue.agent import ask_agent
 from dialogue.quotes import add_quote, set_quotes_interval
+from dialogue.post_manager import add_post_to_pool
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # Глобальные словари для состояний
-user_states = {}      # {user_id: "waiting_dialog" / "waiting_quote_text" / "waiting_quote_interval"}
+user_states = {}      # {user_id: "waiting_dialog" / "waiting_quote_text" / "waiting_quote_interval" / "waiting_simple_post"}
 
 def register_dispatcher(bot):
     """Регистрирует универсальный обработчик сообщений"""
@@ -69,6 +74,53 @@ def register_dispatcher(bot):
                     bot.reply_to(message, "❌ *Ошибка: введите число от 5 до 720.*", parse_mode='Markdown')
             except ValueError:
                 bot.reply_to(message, "❌ *Ошибка: введите целое число.*", parse_mode='Markdown')
+            
+            user_states.pop(user_id, None)
+            return
+        
+        # === ДОБАВЛЕНИЕ ПОСТА (простой режим) ===
+        if state == "waiting_simple_post":
+            if message.text == "/cancel":
+                bot.reply_to(message, "❌ Добавление поста отменено.")
+                user_states.pop(user_id, None)
+                return
+            
+            # Определяем текст (caption для медиа, иначе обычный текст)
+            text = message.caption if message.photo or message.video else message.text
+            if not text:
+                bot.reply_to(message, "❌ Добавьте текст к посту (описание картинки или видео).")
+                return
+            
+            # Извлекаем теги из текста
+            tags = [word for word in text.split() if word.startswith('#')]
+            
+            # Сохраняем медиа (если есть)
+            media_url = None
+            if message.photo:
+                file_info = bot.get_file(message.photo[-1].file_id)
+                downloaded = bot.download_file(file_info.file_path)
+                # Временное сохранение (потом перенесём в постоянное хранилище)
+                filename = f"post_media_{user_id}_{int(time.time())}.jpg"
+                file_path = os.path.join("/tmp", filename)
+                with open(file_path, "wb") as f:
+                    f.write(downloaded)
+                media_url = file_path  # пока ссылка на временный файл
+            elif message.video:
+                file_info = bot.get_file(message.video.file_id)
+                downloaded = bot.download_file(file_info.file_path)
+                filename = f"post_media_{user_id}_{int(time.time())}.mp4"
+                file_path = os.path.join("/tmp", filename)
+                with open(file_path, "wb") as f:
+                    f.write(downloaded)
+                media_url = file_path
+            
+            # Сохраняем пост
+            success = add_post_to_pool(text, tags, author=str(user_id), source="tg", media_url=media_url)
+            
+            if success:
+                bot.reply_to(message, "✅ *Пост добавлен в пул публикаций!*", parse_mode='Markdown')
+            else:
+                bot.reply_to(message, "❌ *Ошибка при сохранении поста.*", parse_mode='Markdown')
             
             user_states.pop(user_id, None)
             return
