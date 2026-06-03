@@ -1,64 +1,68 @@
 # ==========================================
 # Файл: dialogue/shabbat_manager.py
 # Справка: README.md → Управление Шаббатом
-# Задача: определяет, сейчас ли Шаббат (с учётом координат и +72 минут)
-# Комментарий: использует локальную библиотеку hebcal (без внешних API)
-# Зависит от: hebcal, datetime, pytz
+# Задача: определяет, сейчас ли Шаббат (через API hebcal)
+# Комментарий: использует официальный API, не зависит от unstable Python-библиотеки
+# Зависит от: requests, datetime, pytz
 # Вызывается из: activity_modes.py
 # ==========================================
 
-import pytz
+import requests
 from datetime import datetime
+import pytz
 from debug_utils import debug_log
-
-# Подключаем библиотеку hebcal (ставится через pip install hebcal)
-try:
-    import hebcal
-    from hebcal.util.location import get_location
-    HEBICAL_AVAILABLE = True
-    debug_log("SHABBAT", "Библиотека hebcal загружена", "INFO")
-except ImportError:
-    HEBICAL_AVAILABLE = False
-    debug_log("SHABBAT", "Библиотека hebcal не найдена, Шаббат отключён", "ERROR")
 
 MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 MOSCOW_LAT = 55.7558
 MOSCOW_LON = 37.6173
 
-def is_shabbat():
-    """
-    Возвращает True, если сейчас Шаббат (с учётом захода солнца и +72 минут).
-    """
-    if not HEBICAL_AVAILABLE:
-        return False
-    
+def fetch_shabbat_times():
+    """Запрашивает через API времена начала и окончания Шаббата на текущие сутки"""
+    today = datetime.now(MOSCOW_TZ).date()
+    url = "https://www.hebcal.com/shabbat"
+    params = {
+        "cfg": "json",
+        "gy": today.year,
+        "gm": today.month,
+        "gd": today.day,
+        "lat": MOSCOW_LAT,
+        "lng": MOSCOW_LON,
+        "tzid": "Europe/Moscow",
+        "havdalah": 72,      # 72 минуты для исхода
+        "candle": 18         # зажигание свечей за 18 минут до захода
+    }
+
     try:
-        # Получаем локальное время с учётом координат
-        timezone = get_location(latitude=MOSCOW_LAT, longitude=MOSCOW_LON)
-        time_info = hebcal.TimeInfo.now(
-            timezone=timezone,
-            latitude=MOSCOW_LAT,
-            longitude=MOSCOW_LON
-        )
-        
-        # Флаг Шаббата (учитывает все правила + добавленные минуты)
-        is_shabbat_flag = getattr(time_info, 'is_shabbat', None)
-        if is_shabbat_flag is not None:
-            if is_shabbat_flag():
-                debug_log("SHABBAT", "Шаббат (по расчёту hebcal)", "INFO")
-                return True
-        
-        # Альтернативный способ: проверяем, что сегодня суббота и уже зашло солнце
-        if time_info.is_shabbat():
-            debug_log("SHABBAT", "Шаббат (по is_shabbat)", "INFO")
-            return True
-            
+        r = requests.get(url, params=params, timeout=10)
+        data = r.json()
+        items = data.get('items', [])
+        for item in items:
+            if item.get('category') == 'shabbat':
+                start = datetime.fromisoformat(item['date'] + 'T' + item['start']['datetime'])
+                end = datetime.fromisoformat(item['date'] + 'T' + item['end']['datetime'])
+                start = MOSCOW_TZ.localize(start)
+                end = MOSCOW_TZ.localize(end)
+                return start, end
+        return None, None
     except Exception as e:
-        debug_log("SHABBAT", f"Ошибка расчёта: {e}", "ERROR")
+        debug_log("SHABBAT", f"Ошибка API: {e}", "ERROR")
+        return None, None
+
+def is_shabbat():
+    now_moscow = datetime.now(MOSCOW_TZ)
+    start, end = fetch_shabbat_times()
+
+    if start and end:
+        if start <= now_moscow <= end:
+            debug_log("SHABBAT", f"Шаббат до {end.strftime('%H:%M')}", "INFO")
+            return True
+        else:
+            debug_log("SHABBAT", "Не Шаббат", "INFO")
+            return False
+    else:
+        # Если API не ответил — безопасный режим: Шаббат не активируем
+        debug_log("SHABBAT", "API не ответил, режим покоя отключён", "WARNING")
         return False
-    
-    debug_log("SHABBAT", "Не Шаббат", "INFO")
-    return False
 
 # ==========================================
 # ТЕСТ
