@@ -2,7 +2,7 @@
 # Модуль: dialogue/activity_modes.py
 # Справка: README.md → Режимы дня
 # Задача: определение текущего режима (эталонного или адаптивного)
-# Комментарий: поддерживает адаптивные режимы и Шаббат
+# Комментарий: добавлена проверка Шаббата (отдых агента, цитат, постов)
 # Зависит от: config.json, settings.py, adaptive_modes.py, shabbat_manager.py
 # Вызывается из: bot.py, publisher.py, quotes.py
 # ==========================================
@@ -110,17 +110,26 @@ def get_current_mode_config():
     return mode_config
 
 def should_respond_to_talk():
-    """Можно ли отвечать на #говори"""
+    """Можно ли отвечать на #говори (с учётом Шаббата)"""
+    if is_shabbat():
+        debug_log("ACTIVITY_MODES", "Шаббат — отвечать на #говори запрещено", "INFO")
+        return False
     mode_config = get_current_mode_config()
     return mode_config.get("talk", True)
 
 def should_publish_quotes():
-    """Можно ли публиковать цитаты"""
+    """Можно ли публиковать цитаты (с учётом Шаббата)"""
+    if is_shabbat():
+        debug_log("ACTIVITY_MODES", "Шаббат — публикация цитат запрещена", "INFO")
+        return False
     mode_config = get_current_mode_config()
     return mode_config.get("quotes", True)
 
 def should_publish():
-    """Можно ли публиковать отложенные посты"""
+    """Можно ли публиковать отложенные посты (с учётом Шаббата)"""
+    if is_shabbat():
+        debug_log("ACTIVITY_MODES", "Шаббат — публикация постов запрещена", "INFO")
+        return False
     mode_config = get_current_mode_config()
     return mode_config.get("publisher", True)
 
