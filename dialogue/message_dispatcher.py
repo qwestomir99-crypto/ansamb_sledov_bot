@@ -9,6 +9,7 @@ from dialogue.post_manager import add_post_to_pool
 from dialogue.admin_commands import is_admin_authorized
 from dialogue.button_map import get_admin_menu_keyboard
 
+# Словарь состояний (временно здесь, потом перенесём)
 user_states = {}
 
 def register_dispatcher(bot):
