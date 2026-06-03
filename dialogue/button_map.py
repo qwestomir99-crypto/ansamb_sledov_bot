@@ -3,7 +3,6 @@
 # Справка: README.md → Админ-панель / Кнопки
 # Задача: единая таблица всех кнопок (текст + callback)
 # Комментарий: кнопка НАСТРОЕНИЕ ВРЕМЕННО ОТКЛЮЧЕНА (циклический импорт)
-#              добавлена кнопка finish_post для пошагового добавления постов
 # Зависит от: telebot
 # Вызывается из: dialogue/admin_commands.py, dialogue/callbacks.py
 # ==========================================
@@ -33,7 +32,6 @@ BUTTONS = {
     "clear_logs":     {"text": "🧹 Очистить логи", "callback": "clear_logs"},
     "back_to_admin":  {"text": "◀️ Назад в админ-меню", "callback": "back_to_admin"},
     "cancel":         {"text": "❌ Отмена",             "callback": "cancel"},
-    "finish_post":    {"text": "✅ Готово",             "callback": "finish_post"},
     "user_help":      {"text": "❓ Помощь",         "callback": "user_help"},
     "user_tleem":     {"text": "🔥 #тлеем",        "callback": "user_tleem"},
     "user_fix":       {"text": "🔒 #фиксируем",    "callback": "user_fix"},
