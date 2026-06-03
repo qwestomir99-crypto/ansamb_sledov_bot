@@ -1,188 +1,189 @@
 # ==========================================
-# Файл: dialogue/publisher.py
-# Справка: README.md → Публикатор
-# Задача: публикация отложенных постов и постов из пула (post_pool.json)
-# Комментарий: поддерживает Telegram и VK, добавляет цитаты и хештеги
-# Зависит от: activity_modes.py, publisher_utils.py, post_manager.py
-# Вызывается из: bot.py (отдельный поток)
+# Файл: dialogue/publisher_utils.py
+# Справка: README.md → Публикатор / Утилиты
+# Задача: отправка постов в Telegram и VK
+# Комментарий: только критическая диагностика (ошибки и успех)
 # ==========================================
 
-import time
-import json
 import os
 import random
-from datetime import datetime
+import json
+import requests
+from utils import escape_markdown
 from debug_utils import debug_log
-from dialogue.activity_modes import should_publish, get_current_mode_config
-from dialogue.publisher_utils import post_to_telegram, post_to_vk, get_random_own_post_from_vk
-from dialogue.post_manager import get_post_for_publishing, build_tags
 
-PUBLICATIONS_FILE = "publications.json"
 CONFIG_FILE = "config.json"
+QUOTES_FILE = "dialogue/data/quotes.txt"
 
 def load_config():
     with open(CONFIG_FILE, "r") as f:
         return json.load(f)
 
-def load_publications():
-    if not os.path.exists(PUBLICATIONS_FILE):
+def load_quotes():
+    if not os.path.exists(QUOTES_FILE):
         return []
-    with open(PUBLICATIONS_FILE, "r") as f:
-        return json.load(f)
+    with open(QUOTES_FILE, "r", encoding="utf-8") as f:
+        return [line.strip() for line in f if line.strip()]
 
-def save_publications(pubs):
-    with open(PUBLICATIONS_FILE, "w") as f:
-        json.dump(pubs, f, indent=2)
+def get_random_quote():
+    quotes = load_quotes()
+    return random.choice(quotes) if quotes else "Ритм 0,8 Гц стабилен. Сеть тлеет."
 
-def add_publication(platform, text, delay_seconds, tags, file_path=None):
-    pubs = load_publications()
-    publish_at = time.time() + delay_seconds
-    pubs.append({
-        "platform": platform,
-        "text": text,
-        "publish_at": publish_at,
-        "tags": tags,
-        "file_path": file_path,
-        "status": "pending"
-    })
-    save_publications(pubs)
+def get_auto_tags(text, platform="vk"):
+    config = load_config()
+    tags = set()
+    if platform == "vk":
+        vk_tags = config.get("autoposter", {}).get("vk_tags", "#Ансамбль #СледНаКонтаке")
+        tags.update(vk_tags.split())
+    else:
+        default_tags = config.get("publisher", {}).get("default_tags", "#СапёрыАутентичности #МихоельАв #2026плита")
+        tags.update(default_tags.split())
+    words = text.split()
+    for w in words:
+        if w.startswith('#'):
+            tags.add(w)
+    return " ".join(tags)
 
-def publish_post(bot, tg_chat_id, vk_token, vk_owner_id, post, platform="both"):
-    text = post.get("text", "")
-    tags = build_tags(post)
-    full_message = f"{text}\n\n{tags}" if text else tags
-    
-    success_tg = False
-    success_vk = False
-    
-    if platform in ["both", "telegram"]:
-        try:
-            success_tg = post_to_telegram(bot, tg_chat_id, text, None, tags)
-            debug_log("PUBLISHER", f"Telegram: {'✅' if success_tg else '❌'}")
-        except Exception as e:
-            debug_log("PUBLISHER", f"Telegram ошибка: {e}", "ERROR")
-    
-    if platform in ["both", "vk"] and vk_token and vk_owner_id:
-        try:
-            config = load_config()
-            repost_enabled = config.get("settings", {}).get("REPOST_ENABLED", False)
-            
-            if repost_enabled and random.randint(1, 100) <= config.get("settings", {}).get("REPOST_QUOTE_CHANCE", 50):
-                repost_from = get_random_own_post_from_vk()
-                if repost_from:
-                    debug_log("PUBLISHER", f"Репост из VK поста {repost_from.get('post_id')}")
-                    success_vk, error = post_to_vk(
-                        text, tags, vk_token, vk_owner_id, None,
-                        auto_quote=True, auto_tags=True, repost_from=repost_from
-                    )
-                else:
-                    success_vk, error = post_to_vk(text, tags, vk_token, vk_owner_id, None)
-            else:
-                success_vk, error = post_to_vk(text, tags, vk_token, vk_owner_id, None)
-            
-            debug_log("PUBLISHER", f"VK: {'✅' if success_vk else '❌'}")
-        except Exception as e:
-            debug_log("PUBLISHER", f"VK ошибка: {e}", "ERROR")
-    
-    return success_tg or success_vk
+def get_vk_upload_url(vk_token, owner_id):
+    params = {
+        "access_token": vk_token,
+        "v": "5.199",
+        "owner_id": owner_id
+    }
+    try:
+        r = requests.get("https://api.vk.com/method/photos.getWallUploadServer", params=params, timeout=10)
+        data = r.json()
+        return data.get("response", {}).get("upload_url")
+    except Exception as e:
+        debug_log("VK", f"Ошибка получения URL загрузки: {e}", "ERROR")
+        return None
 
-def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
-    """Основной цикл публикатора"""
-    debug_log("PUBLISHER", "Поток публикатора запущен, проверка каждые 30 секунд")
-    
-    last_pool_check = 0
-    last_interval = None
-    
-    while True:
-        try:
-            mode_config = get_current_mode_config()
-            pool_interval = mode_config.get("publisher_interval", 0)
-            
-            if pool_interval != last_interval:
-                last_interval = pool_interval
-                if pool_interval > 0:
-                    debug_log("PUBLISHER", f"Интервал публикаций обновлён: {pool_interval} минут")
-                else:
-                    debug_log("PUBLISHER", "Публикации отключены в текущем режиме")
-            
-            if not should_publish() or pool_interval <= 0:
-                time.sleep(30)
-                continue
-            
-            # Отложенные публикации
-            pubs = load_publications()
-            now = time.time()
-            changed = False
-            
-            for pub in pubs[:]:
-                if pub.get("status") != "pending":
-                    continue
-                
-                if pub["publish_at"] <= now:
-                    platform = pub["platform"]
-                    text = pub.get("text")
-                    tags = pub.get("tags", "")
-                    file_path = pub.get("file_path")
-                    
-                    success = False
-                    
-                    if platform == "telegram":
-                        success = post_to_telegram(bot, tg_chat_id, text, file_path, tags)
-                    elif platform == "vk":
-                        config = load_config()
-                        repost_enabled = config.get("settings", {}).get("REPOST_ENABLED", False)
-                        
-                        if repost_enabled and random.randint(1, 100) <= config.get("settings", {}).get("REPOST_QUOTE_CHANCE", 50):
-                            repost_from = get_random_own_post_from_vk()
-                            if repost_from:
-                                success, _ = post_to_vk(
-                                    text, tags, vk_token, vk_owner_id, file_path,
-                                    auto_quote=True, auto_tags=True, repost_from=repost_from
-                                )
-                            else:
-                                success, _ = post_to_vk(text, tags, vk_token, vk_owner_id, file_path)
-                        else:
-                            success, _ = post_to_vk(text, tags, vk_token, vk_owner_id, file_path)
-                    
-                    if success:
-                        pub["status"] = "published"
-                        pub["published_at"] = now
-                        changed = True
-                        debug_log("PUBLISHER", "Отложенный пост опубликован")
-                    
-                    time.sleep(1)
-            
-            if changed:
-                save_publications(pubs)
-            
-            # Очистка старых публикаций
-            cleaned = False
-            new_pubs = []
-            for pub in pubs:
-                if pub["status"] == "published":
-                    if pub.get("published_at", 0) < now - 86400:
-                        cleaned = True
-                        continue
-                new_pubs.append(pub)
-            
-            if cleaned:
-                save_publications(new_pubs)
-            
-            # Пост из пула
-            current_time = time.time()
-            interval_seconds = pool_interval * 60
-            
-            if current_time - last_pool_check >= interval_seconds:
-                last_pool_check = current_time
-                
-                post, index = get_post_for_publishing()
-                if post:
-                    debug_log("PUBLISHER", f"Публикуем пост из пула (интервал {pool_interval} мин)")
-                    publish_post(bot, tg_chat_id, vk_token, vk_owner_id, post)
-                else:
-                    debug_log("PUBLISHER", "Нет постов в пуле", "WARNING")
-            
-        except Exception as e:
-            debug_log("PUBLISHER", f"Ошибка в цикле: {e}", "ERROR")
+def upload_photo_to_vk(upload_url, file_data, vk_token):
+    try:
+        files = {'photo': ('photo.jpg', file_data)}
+        r = requests.post(upload_url, files=files)
+        data = r.json()
         
-        time.sleep(30)
+        save_params = {
+            "access_token": vk_token,
+            "v": "5.199",
+            "photo": data['photo'],
+            "server": data['server'],
+            "hash": data['hash']
+        }
+        r = requests.get("https://api.vk.com/method/photos.saveWallPhoto", params=save_params)
+        photo_data = r.json()
+        
+        if 'response' in photo_data and photo_data['response']:
+            photo = photo_data['response'][0]
+            return f"photo{photo['owner_id']}_{photo['id']}"
+        else:
+            debug_log("VK", f"Ошибка сохранения фото: {photo_data}", "ERROR")
+            return None
+    except Exception as e:
+        debug_log("VK", f"Ошибка загрузки фото: {e}", "ERROR")
+        return None
+
+def send_media_by_file_id(bot, chat_id, file_id, caption=None):
+    try:
+        file_info = bot.get_file(file_id)
+        downloaded = bot.download_file(file_info.file_path)
+        ext = os.path.splitext(file_info.file_path)[1].lower()
+        
+        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+            bot.send_photo(chat_id, downloaded, caption=caption, parse_mode='MarkdownV2')
+        elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
+            bot.send_video(chat_id, downloaded, caption=caption, parse_mode='MarkdownV2')
+        else:
+            bot.send_document(chat_id, downloaded, caption=caption, parse_mode='MarkdownV2')
+        return True
+    except Exception as e:
+        debug_log("PUBLISHER_UTILS", f"Ошибка отправки по file_id: {e}", "ERROR")
+        return False
+
+def post_to_telegram(bot, chat_id, message, file_id=None, tags=None, auto_quote=True, auto_tags=True):
+    if auto_quote and message and len(message) < 500:
+        quote = get_random_quote()
+        message = f"{message}\n\n📜 {quote}"
+    
+    if auto_tags:
+        tags = get_auto_tags(message, "tg")
+    
+    full_message = message
+    if tags and message:
+        full_message = f"{message}\n\n{tags}"
+    elif tags and not message:
+        full_message = tags
+    
+    safe_caption = escape_markdown(full_message) if full_message else None
+    
+    try:
+        if file_id and isinstance(file_id, str):
+            return send_media_by_file_id(bot, chat_id, file_id, safe_caption)
+        else:
+            if safe_caption:
+                bot.send_message(chat_id, safe_caption, parse_mode='MarkdownV2')
+            else:
+                return False
+        return True
+    except Exception as e:
+        debug_log("PUBLISHER", f"Ошибка Telegram: {e}", "ERROR")
+        return False
+
+def post_to_vk(message, tags, access_token, owner_id, file_id=None, auto_quote=True, auto_tags=True, repost_from=None):
+    if not access_token or not owner_id:
+        debug_log("VK", "Нет токена или owner_id", "ERROR")
+        return False, "❌ Ошибка авторизации VK. Проверь токен."
+    
+    if auto_quote and message and len(message) < 500:
+        quote = get_random_quote()
+        message = f"{message}\n\n📜 {quote}"
+    
+    if auto_tags:
+        tags = get_auto_tags(message, "vk")
+    
+    full_message = f"{message}\n\n{tags}" if message else tags
+    
+    params = {
+        "access_token": access_token,
+        "v": "5.199",
+        "owner_id": owner_id,
+        "message": full_message,
+        "from_group": 1
+    }
+    
+    attachments = []
+    
+    # ФОТО ПО file_id
+    if file_id:
+        try:
+            import telebot
+            bot = telebot.TeleBot(os.environ.get("BOT_TOKEN"))
+            file_info = bot.get_file(file_id)
+            downloaded = bot.download_file(file_info.file_path)
+            
+            upload_url = get_vk_upload_url(access_token, owner_id)
+            if upload_url:
+                photo_att = upload_photo_to_vk(upload_url, downloaded, access_token)
+                if photo_att:
+                    attachments.append(photo_att)
+        except Exception as e:
+            debug_log("VK", f"Ошибка загрузки фото: {e}", "ERROR")
+    
+    if attachments:
+        params['attachments'] = ",".join(attachments)
+    
+    try:
+        r = requests.get('https://api.vk.com/method/wall.post', params=params, timeout=30)
+        data = r.json()
+        
+        if 'response' in data:
+            debug_log("VK", f"Пост опубликован, ID: {data['response']['post_id']}", "INFO")
+            return True, None
+        else:
+            error_msg = data.get('error', {}).get('error_msg', 'неизвестная ошибка')
+            debug_log("VK", f"Ошибка: {error_msg}", "ERROR")
+            return False, f"❌ Ошибка VK: {error_msg}"
+    except Exception as e:
+        debug_log("VK", f"Исключение: {e}", "ERROR")
+        return False, f"❌ Ошибка сети: {e}"
