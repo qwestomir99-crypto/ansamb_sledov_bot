@@ -2,7 +2,6 @@
 # Файл: dialogue/publisher_utils.py
 # Справка: README.md → Публикатор / Утилиты
 # Задача: отправка постов в Telegram и VK
-# Комментарий: только критическая диагностика (ошибки и успех)
 # ==========================================
 
 import os
@@ -118,14 +117,13 @@ def post_to_telegram(bot, chat_id, message, file_id=None, tags=None, auto_quote=
     safe_caption = escape_markdown(full_message) if full_message else None
     
     try:
-        if file_id and isinstance(file_id, str):
+        if file_id:
             return send_media_by_file_id(bot, chat_id, file_id, safe_caption)
         else:
             if safe_caption:
                 bot.send_message(chat_id, safe_caption, parse_mode='MarkdownV2')
-            else:
-                return False
-        return True
+                return True
+            return False
     except Exception as e:
         debug_log("PUBLISHER", f"Ошибка Telegram: {e}", "ERROR")
         return False
@@ -154,7 +152,6 @@ def post_to_vk(message, tags, access_token, owner_id, file_id=None, auto_quote=T
     
     attachments = []
     
-    # ФОТО ПО file_id
     if file_id:
         try:
             import telebot
