@@ -2,9 +2,7 @@
 # Файл: debug_utils.py
 # Справка: README.md → Отладка / Дебаггер
 # Задача: единая система логирования для всех модулей
-# Комментарий: ротация логов (1 МБ, 1 бэкап), отправка отчётов в Telegram и веб-морду
-#              Поддерживает логирование из bot.py, app.py, agent.py, services/*.py, dialogue/*.py
-#              Добавлена интеграция с debug_audit.py
+# Комментарий: добавлено подавление шума от urllib3 и werkzeug
 # Зависит от: logging, os, datetime, traceback, json
 # Вызывается из: bot.py, app.py, agent.py, services/*.py, dialogue/*.py
 # ==========================================
@@ -17,7 +15,13 @@ from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
 # ==========================================
-# 1. НАСТРОЙКА ЛОГГЕРА
+# 1. ПОДАВЛЕНИЕ ШУМА
+# ==========================================
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("werkzeug").setLevel(logging.WARNING)
+
+# ==========================================
+# 2. НАСТРОЙКА ЛОГГЕРА
 # ==========================================
 
 # Глобальный логгер Ансамбля
@@ -29,7 +33,7 @@ if debug_logger.hasHandlers():
     debug_logger.handlers.clear()
 
 # ==========================================
-# 2. КОНСОЛЬНЫЙ ВЫВОД (цветной, если есть colorlog)
+# 3. КОНСОЛЬНЫЙ ВЫВОД (цветной, если есть colorlog)
 # ==========================================
 try:
     import colorlog
@@ -50,7 +54,7 @@ except ImportError:
 debug_logger.addHandler(console_handler)
 
 # ==========================================
-# 3. ФАЙЛОВЫЙ ЛОГ (ротация, 1 МБ, только последние 2 файла)
+# 4. ФАЙЛОВЫЙ ЛОГ (ротация, 1 МБ, только последние 2 файла)
 # ==========================================
 log_file = "debug.log"
 file_handler = RotatingFileHandler(
@@ -66,7 +70,7 @@ file_handler.setFormatter(logging.Formatter(
 debug_logger.addHandler(file_handler)
 
 # ==========================================
-# 4. ОСНОВНЫЕ ФУНКЦИИ ЛОГИРОВАНИЯ
+# 5. ОСНОВНЫЕ ФУНКЦИИ ЛОГИРОВАНИЯ
 # ==========================================
 
 def debug_log(module, message, level="INFO"):
@@ -87,7 +91,7 @@ def log_exception(module, e):
     debug_logger.error(f"[{module}] Исключение: {type(e).__name__}: {e}\n{tb}")
 
 # ==========================================
-# 5. ПОЛУЧЕНИЕ ЛОГОВ ДЛЯ ОТЧЁТОВ
+# 6. ПОЛУЧЕНИЕ ЛОГОВ ДЛЯ ОТЧЁТОВ
 # ==========================================
 
 def get_logs(limit=100):
@@ -152,7 +156,7 @@ def get_logs_as_dict(limit=100):
         return [{"level": "ERROR", "message": f"Ошибка парсинга логов: {e}"}]
 
 # ==========================================
-# 6. ОТПРАВКА ОТЧЁТОВ В TELEGRAM
+# 7. ОТПРАВКА ОТЧЁТОВ В TELEGRAM
 # ==========================================
 
 def send_debug_report(bot, chat_id, limit=100):
@@ -180,7 +184,7 @@ def send_debug_report(bot, chat_id, limit=100):
             bot.send_message(chat_id, f"```\n{part}\n```", parse_mode='Markdown')
 
 # ==========================================
-# 7. ИНТЕГРАЦИЯ С АУДИТОМ
+# 8. ИНТЕГРАЦИЯ С АУДИТОМ
 # ==========================================
 
 def run_audit():
@@ -212,7 +216,7 @@ def get_audit_status():
         return {"audit_exists": False, "error": str(e)}
 
 # ==========================================
-# 8. ТЕСТ
+# 9. ТЕСТ
 # ==========================================
 if __name__ == "__main__":
     print("=== ТЕСТ ДЕБАГГЕРА ===\n")
