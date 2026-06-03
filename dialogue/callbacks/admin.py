@@ -2,7 +2,7 @@
 # Файл: dialogue/callbacks/admin.py
 # Справка: README.md → Обработчики кнопок / Админ
 # Задача: обработка кнопок админ-меню
-# Комментарий: полностью без register_next_step_handler
+# Комментарий: полностью без register_next_step_handler, БЕЗ finish_post
 # Зависит от: telebot, button_map, quotes, message_dispatcher
 # Вызывается из: dialogue/callbacks/__init__.py
 # ==========================================
@@ -27,7 +27,7 @@ def register_admin_callbacks(bot, config):
         bot.answer_callback_query(call.id)
     
     # ==========================================
-    # ДОБАВЛЕНИЕ ПОСТА
+    # ДОБАВЛЕНИЕ ПОСТА (только кнопка, логика в admin_commands)
     # ==========================================
     @bot.callback_query_handler(func=lambda call: call.data == "add_post")
     def add_post_ui(call):
@@ -38,14 +38,6 @@ def register_admin_callbacks(bot, config):
     def cancel_post(call):
         from dialogue.admin_commands import cancel_add_post
         cancel_add_post(call, bot)
-    
-    @bot.callback_query_handler(func=lambda call: call.data == "finish_post")
-    def handle_finish_post(call):
-        user_id = call.from_user.id
-        if user_id in user_states and user_states.get(user_id) == "waiting_post_tags":
-            bot.answer_callback_query(call.id, "📝 Введите теги (через пробел) или /skip")
-        else:
-            bot.answer_callback_query(call.id, "❌ Сначала введите текст поста")
     
     # ==========================================
     # УПРАВЛЕНИЕ ЦИТАТАМИ
