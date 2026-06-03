@@ -8,7 +8,7 @@
 # ==========================================
 
 from flask import Blueprint
-# from .quotes import quotes_bp  # Временно отключено — чиним переход на SQLite
+from .quotes import quotes_bp  # Временно отключено — чиним переход на SQLite
 from .modes import modes_bp
 from .ping import ping_bp
 from .posts import posts_bp
