@@ -2,7 +2,7 @@
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
 # Задача: команда #админ, авторизация, вызов меню, диалог
-# Комментарий: состояния вынесены в message_dispatcher
+# Комментарий: состояния вынесены в state_manager
 # ==========================================
 
 import os
@@ -11,7 +11,7 @@ import time
 from debug_utils import debug_log
 from dialogue.button_map import get_admin_menu_keyboard
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from dialogue.message_dispatcher import user_states
+from dialogue.state_manager import user_states
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "tleem2026")
 
@@ -65,7 +65,7 @@ def handle_admin_command(message, bot):
     bot.reply_to(message, f"🔐 Введите пароль:\n`#админ {ADMIN_PASSWORD}`", parse_mode='Markdown')
 
 # ==========================================
-# ДОБАВЛЕНИЕ ПОСТА (простой режим)
+# ДОБАВЛЕНИЕ ПОСТА
 # ==========================================
 
 def show_add_post_ui(call, bot):
@@ -94,7 +94,7 @@ def cancel_add_post(call, bot):
     bot.answer_callback_query(call.id)
 
 # ==========================================
-# ДИАЛОГ С АГЕНТОМ (только кнопка и установка состояния)
+# ДИАЛОГ С АГЕНТОМ
 # ==========================================
 
 def show_dialog_ui(call, bot):
