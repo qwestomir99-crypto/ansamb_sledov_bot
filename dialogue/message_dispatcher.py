@@ -77,7 +77,7 @@ def register_dispatcher(bot):
             user_states.pop(user_id, None)
             return
         
-        # === ДОБАВЛЕНИЕ ПОСТА (простой режим, без временных файлов) ===
+        # === ДОБАВЛЕНИЕ ПОСТА (простой режим, только file_id) ===
         if state == "waiting_simple_post":
             if message.text == "/cancel":
                 bot.reply_to(message, "❌ Добавление поста отменено.")
@@ -94,14 +94,14 @@ def register_dispatcher(bot):
             tags = [word for word in text.split() if word.startswith('#')]
             
             # Получаем file_id (если есть фото или видео)
-            file_id = None
+            media_file_id = None
             if message.photo:
-                file_id = message.photo[-1].file_id
+                media_file_id = message.photo[-1].file_id
             elif message.video:
-                file_id = message.video.file_id
+                media_file_id = message.video.file_id
             
-            # Сохраняем пост
-            success = add_post_to_pool(text, tags, author=str(user_id), source="tg", media_url=file_id)
+            # Сохраняем пост (file_id будет передан в publisher_utils)
+            success = add_post_to_pool(text, tags, author=str(user_id), source="tg", media_url=media_file_id)
             
             if success:
                 bot.reply_to(message, "✅ *Пост добавлен в пул публикаций!*", parse_mode='Markdown')
