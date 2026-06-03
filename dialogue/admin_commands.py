@@ -2,7 +2,10 @@
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
 # Задача: команда #админ, авторизация, вызов меню, диалог, VK пост
-# Комментарий: добавлена функция show_vk_post_ui для публикации в VK
+# Комментарий: исправлена утечка пароля (показывается только при вводе)
+#              добавлена функция show_vk_post_ui для публикации в VK
+# Зависит от: os, threading, time, debug_utils, button_map, state_manager
+# Вызывается из: bot/handlers/__init__.py, callbacks/admin.py
 # ==========================================
 
 import os
@@ -13,8 +16,14 @@ from dialogue.button_map import get_admin_menu_keyboard
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dialogue.state_manager import user_states
 
+# ==========================================
+# КОНФИГУРАЦИЯ
+# ==========================================
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "tleem2026")
 
+# ==========================================
+# АВТОРИЗАЦИЯ
+# ==========================================
 authorized_admins = {}
 
 def is_admin_authorized(user_id):
@@ -32,6 +41,9 @@ def logout_admin(user_id):
         del authorized_admins[user_id]
         debug_log("ADMIN", f"Админ {user_id} вышел")
 
+# ==========================================
+# БЕЗОПАСНОЕ УДАЛЕНИЕ СООБЩЕНИЙ
+# ==========================================
 def safe_delete(bot, message, delay=3):
     def _delete():
         time.sleep(delay)
@@ -41,6 +53,9 @@ def safe_delete(bot, message, delay=3):
             pass
     threading.Thread(target=_delete, daemon=True).start()
 
+# ==========================================
+# ОБРАБОТЧИК КОМАНДЫ #админ
+# ==========================================
 def handle_admin_command(message, bot):
     user_id = message.from_user.id
     text = message.text.lower()
@@ -62,12 +77,12 @@ def handle_admin_command(message, bot):
             safe_delete(bot, msg, 5)
         return
     
-    bot.reply_to(message, f"🔐 Введите пароль:\n`#админ {ADMIN_PASSWORD}`", parse_mode='Markdown')
+    # Безопасный запрос пароля (не показываем пароль)
+    bot.reply_to(message, "🔐 Введите пароль для входа в админ-панель:\n(или #админ пароль)")
 
 # ==========================================
 # ДОБАВЛЕНИЕ ПОСТА (в пул)
 # ==========================================
-
 def show_add_post_ui(call, bot):
     user_id = call.from_user.id
     try:
@@ -100,7 +115,6 @@ def cancel_add_post(call, bot):
 # ==========================================
 # ПОСТ В VK (прямая публикация)
 # ==========================================
-
 def show_vk_post_ui(call, bot):
     user_id = call.from_user.id
     try:
@@ -110,8 +124,8 @@ def show_vk_post_ui(call, bot):
     
     bot.send_message(
         call.message.chat.id,
-        "🎬 *Пост в VK*\n\n"
-        "Пришлите текст поста. Если нужно приложить фото или видео — приложите.\n"
+        "📌 *Пост в VK*\n\n"
+        "Пришлите фото или видео с подписью (текстом).\n"
         "Теги пишите прямо в подписи.\n"
         "Для отмены введите /cancel",
         parse_mode='Markdown'
@@ -122,7 +136,6 @@ def show_vk_post_ui(call, bot):
 # ==========================================
 # ДИАЛОГ С АГЕНТОМ
 # ==========================================
-
 def show_dialog_ui(call, bot):
     user_id = call.from_user.id
     user_states[user_id] = "waiting_dialog"
