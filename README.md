@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 03.06.2026 22:18:56*
+*Обновлено: 03.06.2026 22:21:53*
 
 | Файл | Статус |
 |------|--------|
@@ -227,7 +227,7 @@
 | `dialogue/admin/menu.py` | ❌ Без шапки |
 | `dialogue/admin/posts.py` | ✅ Redmi-шапка |
 | `dialogue/admin/quotes_admin.py` | ✅ Redmi-шапка |
-| `dialogue/admin_commands.py` | ✅ Redmi-шапка |
+| `dialogue/admin_commands.py` | ❌ Без шапки |
 | `dialogue/agent.py` | ✅ Redmi-шапка |
 | `dialogue/agent_journal.py` | ✅ Redmi-шапка |
 | `dialogue/agent_memory.py` | ✅ Redmi-шапка |
