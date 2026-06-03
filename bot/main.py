@@ -7,6 +7,7 @@
 import time
 from .core import load_config, get_bot
 from .handlers import register_handlers
+from dialogue.message_dispatcher import register_dispatcher
 from services.sqlite_client import save_message
 from evolve_agent import start_evolution_scheduler
 
@@ -15,6 +16,7 @@ def main():
     bot = get_bot()
     
     register_handlers(bot, config)
+    register_dispatcher(bot)  # <-- ДОБАВИТЬ ЭТУ СТРОКУ
     
     @bot.message_handler(func=lambda message: True)
     def save_all_messages(message):
@@ -22,7 +24,6 @@ def main():
     
     start_evolution_scheduler()
     
-    # Удаляем webhook, чтобы не мешал
     try:
         bot.delete_webhook()
         print("[MAIN] Webhook удалён")
