@@ -2,7 +2,7 @@
 # Файл: dialogue/message_dispatcher.py
 # Справка: README.md → Диспетчер сообщений
 # Задача: обработка всех сообщений без register_next_step_handler
-# Комментарий: ДИАЛОГ, ЦИТАТЫ, ИНТЕРВАЛЫ, ПОСТЫ (с медиа)
+# Комментарий: ДИАЛОГ, ЦИТАТЫ, ИНТЕРВАЛЫ, ПОСТЫ (только file_id)
 # ==========================================
 
 import os
@@ -12,7 +12,6 @@ from debug_utils import debug_log
 from dialogue.agent import ask_agent
 from dialogue.quotes import add_quote, set_quotes_interval
 from dialogue.post_manager import add_post_to_pool
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # Глобальные словари для состояний
 user_states = {}      # {user_id: "waiting_dialog" / "waiting_quote_text" / "waiting_quote_interval" / "waiting_simple_post"}
@@ -78,7 +77,7 @@ def register_dispatcher(bot):
             user_states.pop(user_id, None)
             return
         
-        # === ДОБАВЛЕНИЕ ПОСТА (простой режим) ===
+        # === ДОБАВЛЕНИЕ ПОСТА (простой режим, без временных файлов) ===
         if state == "waiting_simple_post":
             if message.text == "/cancel":
                 bot.reply_to(message, "❌ Добавление поста отменено.")
@@ -94,28 +93,15 @@ def register_dispatcher(bot):
             # Извлекаем теги из текста
             tags = [word for word in text.split() if word.startswith('#')]
             
-            # Сохраняем медиа (если есть)
-            media_url = None
+            # Получаем file_id (если есть фото или видео)
+            file_id = None
             if message.photo:
-                file_info = bot.get_file(message.photo[-1].file_id)
-                downloaded = bot.download_file(file_info.file_path)
-                # Временное сохранение (потом перенесём в постоянное хранилище)
-                filename = f"post_media_{user_id}_{int(time.time())}.jpg"
-                file_path = os.path.join("/tmp", filename)
-                with open(file_path, "wb") as f:
-                    f.write(downloaded)
-                media_url = file_path  # пока ссылка на временный файл
+                file_id = message.photo[-1].file_id
             elif message.video:
-                file_info = bot.get_file(message.video.file_id)
-                downloaded = bot.download_file(file_info.file_path)
-                filename = f"post_media_{user_id}_{int(time.time())}.mp4"
-                file_path = os.path.join("/tmp", filename)
-                with open(file_path, "wb") as f:
-                    f.write(downloaded)
-                media_url = file_path
+                file_id = message.video.file_id
             
             # Сохраняем пост
-            success = add_post_to_pool(text, tags, author=str(user_id), source="tg", media_url=media_url)
+            success = add_post_to_pool(text, tags, author=str(user_id), source="tg", media_url=file_id)
             
             if success:
                 bot.reply_to(message, "✅ *Пост добавлен в пул публикаций!*", parse_mode='Markdown')
