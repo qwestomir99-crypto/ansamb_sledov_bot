@@ -1,8 +1,8 @@
 # ==========================================
 # Файл: dialogue/callbacks/admin.py
 # Справка: README.md → Обработчики кнопок / Админ
-# Задача: обработка кнопок админ-меню (только главное меню)
-# Комментарий: состояния вынесены в state_manager
+# Задача: обработка кнопок админ-меню (главное меню)
+# Комментарий: добавлен обработчик vk_post
 # ==========================================
 
 import threading
@@ -36,6 +36,9 @@ def register_admin_callbacks(bot, config):
         auto_delete_menu(bot, call.message.chat.id, call.message.message_id)
         bot.answer_callback_query(call.id)
     
+    # ==========================================
+    # ДОБАВЛЕНИЕ ПОСТА (в пул)
+    # ==========================================
     @bot.callback_query_handler(func=lambda call: call.data == "add_post")
     def add_post_ui(call):
         from dialogue.admin_commands import show_add_post_ui
@@ -46,11 +49,33 @@ def register_admin_callbacks(bot, config):
         from dialogue.admin_commands import cancel_add_post
         cancel_add_post(call, bot)
     
+    # ==========================================
+    # ПОСТ В VK (прямая публикация)
+    # ==========================================
+    @bot.callback_query_handler(func=lambda call: call.data == "vk_post")
+    def vk_post_ui(call):
+        from dialogue.admin_commands import show_vk_post_ui
+        show_vk_post_ui(call, bot)
+    
+    # ==========================================
+    # УПРАВЛЕНИЕ ЦИТАТАМИ
+    # ==========================================
+    @bot.callback_query_handler(func=lambda call: call.data == "manage_quotes")
+    def quotes_panel(call):
+        from dialogue.callbacks.quotes import quotes_panel
+        quotes_panel(call)
+    
+    # ==========================================
+    # ДИАЛОГ С АГЕНТОМ
+    # ==========================================
     @bot.callback_query_handler(func=lambda call: call.data == "start_dialog")
     def start_dialog(call):
         from dialogue.admin_commands import show_dialog_ui
         show_dialog_ui(call, bot)
     
+    # ==========================================
+    # ВЫХОД ИЗ АДМИНКИ
+    # ==========================================
     @bot.callback_query_handler(func=lambda call: call.data == "admin_logout")
     def admin_logout(call):
         from dialogue.admin_commands import logout_admin
