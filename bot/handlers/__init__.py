@@ -1,8 +1,8 @@
 # ==========================================
 # Файл: bot/handlers/__init__.py
 # Справка: README.md → Обработчики команд / Сборка
-# Задача: собирает все модули handlers, сохраняет сообщения в SQLite
-# Комментарий: все сообщения пишутся в БД для веб-морды
+# Задача: собирает все модули handlers
+# Комментарий: без сохранения в SQLite
 # ==========================================
 
 import os
@@ -23,15 +23,6 @@ def register_handlers(bot: telebot.TeleBot, config: dict):
     from .mood import register_mood_handler
     from .ping import register_ping_handler
     from .unknown import register_unknown_handler
-    
-    # Сохраняем все входящие сообщения в SQLite для веб-морды
-    @bot.message_handler(func=lambda message: True)
-    def save_all_messages(message):
-        try:
-            from services.sqlite_client import save_message
-            save_message(message.chat.id, message.text or message.caption or "[медиа]", source="tg")
-        except Exception as e:
-            debug_log("HANDLERS", f"Ошибка сохранения сообщения: {e}", "ERROR")
     
     @bot.message_handler(func=lambda message: message.text and message.text.startswith("#админ"))
     def handle_admin(message):
@@ -59,7 +50,6 @@ def register_handlers(bot: telebot.TeleBot, config: dict):
 
 
 def register_all_handlers(bot, config):
-    """Регистрирует обработчики + колбэки + потоки"""
     from dialogue.callbacks import register_callback_handlers
     from dialogue.scheduler import scheduler_loop
     from dialogue.quotes import quotes_loop
@@ -74,16 +64,10 @@ def register_all_handlers(bot, config):
     vk_token = os.environ.get("VK_TOKEN")
     vk_owner_id = os.environ.get("VK_OWNER_ID", "607754499")
     
-    # Полуночный ритуал + эволюция
     threading.Thread(target=scheduler_loop, args=(bot, tg_chat_id, admin_id), daemon=True).start()
-    
-    # Цитаты по расписанию (с шаббатом)
     threading.Thread(target=quotes_loop, args=(bot, tg_chat_id), daemon=True).start()
-    
-    # Автопостинг из пула (с шаббатом)
     threading.Thread(target=publish_loop, args=(bot, vk_token, vk_owner_id, tg_chat_id), daemon=True).start()
     
-    # YouTube автопостер
     if config.get("autoposter", {}).get("enabled", True):
         threading.Thread(target=start_autoposter, args=(config, vk_token, vk_owner_id), daemon=True).start()
     
