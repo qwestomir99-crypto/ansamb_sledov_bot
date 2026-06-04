@@ -10,7 +10,7 @@
 import { initSocket } from './socket.js';
 import { initReplies } from './replies.js';
 import { createPost, sendPost, createPostWithMedia } from './posts.js';
-import { setMode, togglePing, toggleAlice } from './bot.js';
+import { setMode, setMood, togglePing, toggleAlice } from './bot.js';
 import { addQuote } from './quotes.js';
 import { fetchDebugLogs, sendDebugReport, runAudit, showAuditStatus, showDebugIndex } from './debug.js';
 import { showToast } from './ui.js';
@@ -25,6 +25,7 @@ window.createPost = createPost;
 window.sendPost = sendPost;
 window.createPostWithMedia = createPostWithMedia;
 window.setMode = setMode;
+window.setMood = setMood;
 window.togglePing = togglePing;
 window.toggleAlice = toggleAlice;
 window.addQuote = addQuote;
