@@ -4,7 +4,7 @@
 # Задача: публикация постов из пула (автоматическая и немедленная)
 # Комментарий: публикует посты с цитатами, тегами, фото/видео
 #              Если нет медиа — добавляет тематическое фото
-#              Старший брат генерирует описание если его нет
+#              Старший брат ОТКЛЮЧЁН
 #              Лимит пула — 100 постов, старые удаляются
 # Зависит от: os, json, time, random, threading, debug_utils, publisher_utils, post_manager
 # Вызывается из: bot.py (поток publish_loop)
@@ -45,18 +45,6 @@ def get_theme_photo():
         pass
     return None
 
-def generate_description(text):
-    """Генерирует описание через Старшего брата если текст короткий"""
-    try:
-        from dialogue.agent import ask_agent
-        prompt = f"Опиши это в стиле художественного манифеста, коротко, 2-3 предложения, с ритмом и образами: {text}"
-        description = ask_agent(prompt)
-        if description and len(description) > 10:
-            return description
-    except:
-        pass
-    return None
-
 def publish_post_immediately(bot, chat_id, text, tags_str, file_id=None):
     """Публикует пост немедленно в Telegram и VK"""
     config = load_config()
@@ -90,20 +78,13 @@ def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
     if not pool:
         return False
     
-    # Берём последний добавленный пост
     post = pool[-1]
     index = len(pool) - 1
     
     text = post.get("text", "")
     media_url = post.get("media_url")
     tags = build_tags(post)
-    
     quote = get_random_quote()
-    
-    if len(text) < 100:
-        description = generate_description(text)
-        if description:
-            text = f"{text}\n\n{description}"
     
     full_text = f"{text}\n\n📜 {quote}"
     
@@ -121,7 +102,7 @@ def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
                     success_tg = post_to_telegram(bot, tg_chat_id, full_text, None, tags)
             if success_tg:
                 success = True
-                debug_log("PUBLISH", f"Пост опубликован в Telegram")
+                debug_log("PUBLISH", "Пост опубликован в Telegram")
         except Exception as e:
             debug_log("PUBLISH", f"Ошибка Telegram: {e}", "ERROR")
     
@@ -130,11 +111,10 @@ def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
             success_vk, _ = post_to_vk(full_text, tags, vk_token, vk_owner_id, media_url)
             if success_vk:
                 success = True
-                debug_log("PUBLISH", f"Пост опубликован в VK")
+                debug_log("PUBLISH", "Пост опубликован в VK")
         except Exception as e:
             debug_log("PUBLISH", f"Ошибка VK: {e}", "ERROR")
     
-    # Удаляем пост из пула после публикации
     if success:
         remove_post_from_pool(index)
         debug_log("PUBLISH", f"Пост удалён из пула, осталось {len(load_post_pool())}")
@@ -143,11 +123,10 @@ def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
 
 def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
     """Основной цикл автопостинга из пула"""
-    debug_log("PUBLISH", "Цикл публикации запущен (лимит пула: 100)")
+    debug_log("PUBLISH", "Цикл публикации запущен (лимит пула: 100, Старший брат отключён)")
     
     while True:
         try:
-            # Проверяем шаббат
             try:
                 from dialogue.shabbat_manager import is_shabbat
                 if is_shabbat():
@@ -157,7 +136,6 @@ def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
             except ImportError:
                 pass
             
-            # Чистим пул если больше 100
             clean_pool()
             
             config = load_config()
