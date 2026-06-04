@@ -4,4 +4,4 @@
 # Задача: регистрация колбэков диагностики
 # ==========================================
 
-from dialogue.admin.diagnostics import register_diagnostics_callbacks as register
+from dialogue.admin.diagnostics import register_diagnostics_callbacks
