@@ -130,6 +130,19 @@ def show_add_post_ui(call, bot):
     safe_delete(call.message, 1)
     bot.register_next_step_handler(msg, process_post_text, bot)
 
+def process_post_text(message, bot):
+    if message.text == "/cancel":
+        msg = bot.reply_to(message, "❌ Добавление поста отменено.", reply_markup=get_admin_menu())
+        safe_delete(message, 3)
+        safe_delete(msg, 5)
+        return
+    if not hasattr(process_post_text, "temp_posts"):
+        process_post_text.temp_posts = {}
+    process_post_text.temp_posts[message.from_user.id] = {"text": message.text}
+    msg = bot.send_message(message.chat.id, "🏷️ Введите теги через пробел (например: #тлеем #ансамбль)\nИли /skip для пропуска")
+    bot.register_next_step_handler(msg, process_post_tags, bot, message.from_user.id)
+    safe_delete(message, 2)
+
 def process_post_tags(message, bot, user_id):
     if message.text == "/skip":
         tags = []
@@ -137,16 +150,6 @@ def process_post_tags(message, bot, user_id):
         msg = bot.reply_to(message, "❌ Добавление поста отменено.", reply_markup=get_admin_menu())
         safe_delete(message, 3)
         safe_delete(msg, 5)
-        return
-    else:
-        tags = message.text.split()
-
-def process_post_tags(message, bot, user_id):
-    if message.text == "/skip":
-        tags = []
-    elif message.text == "/cancel":
-        bot.reply_to(message, "❌ Добавление поста отменено.", reply_markup=get_admin_menu())
-        safe_delete(message, 3)
         return
     else:
         tags = message.text.split()
@@ -201,50 +204,9 @@ def process_publish_choice(message, bot, user_id):
         bot.reply_to(message, "❌ Напишите `сейчас` или `позже`.", reply_markup=get_admin_menu())
     
     safe_delete(message, 5)
-    
-    post_data = getattr(process_post_text, "temp_posts", {}).get(user_id, {})
-    text = post_data.get("text", "")
-    
-    # Сохраняем данные во временное хранилище
-    if not hasattr(process_post_tags, "pending_posts"):
-        process_post_tags.pending_posts = {}
-    process_post_tags.pending_posts[user_id] = {"text": text, "tags": tags}
-    
-    # Спрашиваем: сейчас или отложить
-    keyboard = InlineKeyboardMarkup(row_width=2)
-    keyboard.add(
-        InlineKeyboardButton("📤 Опубликовать сейчас", callback_data="publish_now"),
-        InlineKeyboardButton("⏰ Отложить в пул", callback_data="publish_pool"),
-    )
-    keyboard.add(InlineKeyboardButton("❌ Отмена", callback_data="cancel"))
-    
-    msg = bot.reply_to(message, "📋 *Пост готов.*\n\nОпубликовать сейчас или отложить в пул?", reply_markup=keyboard, parse_mode='Markdown')
-    safe_delete(message, 3)
-    safe_delete(msg, 15)
-
-def process_post_tags(message, bot, user_id):
-    if message.text == "/skip":
-        tags = []
-    elif message.text == "/cancel":
-        msg = bot.reply_to(message, "❌ Добавление поста отменено.", reply_markup=get_admin_menu())
-        safe_delete(message, 3)
-        safe_delete(msg, 5)
-        return
-    else:
-        tags = message.text.split()
-    post_data = getattr(process_post_text, "temp_posts", {}).get(user_id, {})
-    text = post_data.get("text", "")
-    from dialogue.post_manager import add_post_to_pool
-    success = add_post_to_pool(text, tags, author=str(user_id))
-    if success:
-        msg = bot.reply_to(message, "✅ Пост добавлен в пул публикаций!", reply_markup=get_admin_menu())
-    else:
-        msg = bot.reply_to(message, "❌ Ошибка при сохранении поста.", reply_markup=get_admin_menu())
-    safe_delete(message, 3)
-    safe_delete(msg, 5)
 
 def show_vk_post_ui(call, bot):
-    msg = bot.send_message(call.message.chat.id, "🎬 *Пост в VK*\n\nПришлите текст поста (можно с Markdown).\nИли /cancel для отмены.", parse_mode='Markdown')
+    msg = bot.send_message(call.message.chat.id, "🎬 *Пост в VK*\n\nПришлите текст поста.\nИли /cancel для отмены.", parse_mode='Markdown')
     safe_delete(call.message, 1)
     bot.register_next_step_handler(msg, process_vk_post, bot)
 
@@ -379,6 +341,3 @@ def process_dialog_message(message, bot):
     else:
         bot.reply_to(message, "🌙 Старший брат отдыхает.")
     safe_delete(message, 5)
-
-if not hasattr(process_post_text, "temp_posts"):
-    process_post_text.temp_posts = {}
