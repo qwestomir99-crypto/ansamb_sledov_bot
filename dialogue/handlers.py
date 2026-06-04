@@ -2,7 +2,6 @@
 # Модуль: dialogue/handlers.py
 # Справка: README.md → Обработчики команд
 # Задача: обработка команд пользователей и админов
-# Комментарий: удалена старая #справка, #настроение переделано в меню с кнопками
 # Зависит от: admin_commands.py, activity_modes.py, agent.py
 # Вызывается из: bot.py
 # ==========================================
@@ -26,7 +25,6 @@ def load_config():
         return json.load(f)
 
 def get_moods_keyboard():
-    """Возвращает клавиатуру для выбора настроения"""
     from dialogue.user_settings import MOODS
     keyboard = InlineKeyboardMarkup(row_width=2)
     for mood_id, mood_data in MOODS.items():
@@ -40,7 +38,6 @@ def get_moods_keyboard():
 silence_answers = ["👁️", "⏚"]
 
 def register_handlers(bot, config):
-    """Регистрирует все обработчики команд и сообщений"""
 
     @bot.message_handler(commands=['start'])
     def send_start(message):
@@ -48,139 +45,96 @@ def register_handlers(bot, config):
 
     @bot.message_handler(func=lambda message: True)
     def handle_message(message):
-        text = message.text.lower()
-        debug_log("HANDLERS", f"Получена команда: {text[:50]}...")
+        text = message.text or ""
+        text_lower = text.lower()
+        
+        debug_log("HANDLERS", f"v2 | {text[:50]}")
 
-        # --- ИНТЕРАКТИВНАЯ СПРАВКА # ---
         if text == "#":
             try:
                 from dialogue.help_menu import get_help_keyboard
-                bot.reply_to(
-                    message,
-                    "📖 *Справка по командам*\n\nВыберите команду для подробного описания:",
-                    reply_markup=get_help_keyboard(),
-                    parse_mode='Markdown'
-                )
-            except ImportError:
+                bot.reply_to(message, "📖 *Справка*", reply_markup=get_help_keyboard(), parse_mode='Markdown')
+            except:
                 bot.reply_to(message, "❌ Модуль справки не загружен")
             return
-        # --- КОНЕЦ СПРАВКИ # ---
 
-        # --- ТЕСТ YOUTUBE API ---
-        if text == "#ютуб_тест":
-            try:
-                from services.youtube_reader import test_youtube
-                bot.send_chat_action(message.chat.id, 'typing')
-                success = test_youtube()
-                if success:
-                    bot.reply_to(message, "✅ YouTube API работает! Последнее видео получено.")
-                else:
-                    bot.reply_to(message, "❌ YouTube API не отвечает. Проверь ключи и ID канала.")
-            except ImportError:
-                bot.reply_to(message, "❌ Модуль youtube_reader не загружен")
-            except Exception as e:
-                bot.reply_to(message, f"❌ Ошибка: {e}")
-            return
-        # --- КОНЕЦ ТЕСТА YOUTUBE ---
-
-        if text == "#меню" or text == "#помощь":
+        if text_lower in ["#меню", "#помощь"]:
             if is_admin_authorized(message.from_user.id):
                 bot.reply_to(message, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
             else:
                 bot.reply_to(message, "📋 Ваше меню:", reply_markup=get_user_menu())
             return
 
-        if text.startswith("#админ"):
+        if text_lower.startswith("#админ"):
             handle_admin_command(message, bot)
             return
 
-        # --- ОБРАБОТЧИК #говори (через агента) ---
-        if text.startswith("#говори"):
+        if text_lower.startswith("#говори"):
             if not should_respond_to_talk():
-                bot.reply_to(message, "🌙 Старший брат отдыхает. Спроси в другой раз.")
+                bot.reply_to(message, "🌙 Старший брат отдыхает.")
                 return
-            
-            phrase = text.replace("#говори", "", 1).strip()
+            phrase = text[6:].strip()
             if not phrase:
-                bot.reply_to(message, "🗣 *Старший брат:*\nА что ты хотел сказать?")
+                bot.reply_to(message, "🗣 А что ты хотел сказать?")
                 return
-            
             bot.send_chat_action(message.chat.id, 'typing')
             answer = ask_agent(phrase)
-            
             if answer:
                 bot.reply_to(message, f"🗣 *Старший брат:*\n{answer}", parse_mode='Markdown')
             else:
-                bot.reply_to(message, "🗣 *Старший брат:*\nНе отвечаю сейчас. Попробуй позже.")
+                bot.reply_to(message, "🗣 Не отвечаю сейчас.")
             return
-        # --- КОНЕЦ ОБРАБОТЧИКА #говори ---
 
-        # --- РИТУАЛЬНЫЕ КОМАНДЫ (#тлеем, #фиксируем) ---
-        if text in ["#тлеем", "#фиксируем", "#tleem", "#fixiruem"]:
+        if text_lower in ["#тлеем", "#фиксируем", "#tleem", "#fixiruem"]:
             try:
                 from dialogue.quotes import get_quotes_list
                 quotes = get_quotes_list()
                 if quotes:
-                    random_quote = random.choice(quotes)
-                    bot.reply_to(message, f"👁️ {random_quote}")
+                    bot.reply_to(message, f"👁️ {random.choice(quotes)}")
                 else:
-                    bot.reply_to(message, "📭 База цитат пуста. Добавьте цитаты через админку.")
-            except Exception as e:
-                bot.reply_to(message, "❌ Ошибка при выборе цитаты.")
-                debug_log("HANDLERS", f"Ошибка: {e}", "ERROR")
+                    bot.reply_to(message, "📭 База цитат пуста.")
+            except:
+                bot.reply_to(message, "❌ Ошибка.")
             return
-        # --- КОНЕЦ РИТУАЛЬНЫХ КОМАНД ---
 
-        # --- КОМАНДА #вспышка ---
-        if text in ["#вспышка", "#vspishka"]:
-            bot.reply_to(message, "⚡ Ты снаружи картины. До погружения. Аутентичность — не маска. Это способ не сдаться.")
+        if text_lower in ["#вспышка", "#vspishka"]:
+            bot.reply_to(message, "⚡ Ты снаружи картины.")
             return
-        # --- КОНЕЦ #вспышка ---
 
-        # --- КОМАНДА #сброс (сброс адаптивных режимов к эталону) ---
-        if text == "#сброс":
+        if text_lower == "#сброс":
             if not is_admin_authorized(message.from_user.id):
                 bot.reply_to(message, "❌ Только для админа")
                 return
             try:
                 from dialogue.adaptive_modes import reset_to_etalon
                 reset_to_etalon()
-                bot.reply_to(message, "✅ Адаптивные режимы сброшены к эталону")
-                debug_log("HANDLERS", "Выполнен сброс адаптивных режимов")
-            except ImportError:
-                bot.reply_to(message, "❌ Модуль адаптивных режимов не загружен")
-            except Exception as e:
-                bot.reply_to(message, f"❌ Ошибка сброса: {e}")
+                bot.reply_to(message, "✅ Сброшено.")
+            except:
+                bot.reply_to(message, "❌ Ошибка.")
             return
-        # --- КОНЕЦ #сброс ---
 
-        # --- КОМАНДА #настроение (меню с кнопками) ---
-        if text == "#настроение":
+        if text_lower == "#настроение":
             if not is_admin_authorized(message.from_user.id):
                 bot.reply_to(message, "❌ Только для админа")
                 return
-            
-            bot.send_message(
-                message.chat.id,
-                "🎭 *Выбери настроение:*",
-                parse_mode='Markdown',
-                reply_markup=get_moods_keyboard()
-            )
+            bot.send_message(message.chat.id, "🎭 *Выбери настроение:*", parse_mode='Markdown', reply_markup=get_moods_keyboard())
             return
-        # --- КОНЕЦ #настроение ---
 
-        if "#дышим" in text:
+        if "#дышим" in text_lower:
             ping_self()
             return
 
-        # --- СТАРАЯ СПРАВКА УДАЛЕНА ---
-        # Оставлена только интерактивная по команде #
+        if text_lower == "#ютуб_тест":
+            try:
+                from services.youtube_reader import test_youtube
+                bot.send_chat_action(message.chat.id, 'typing')
+                if test_youtube():
+                    bot.reply_to(message, "✅ YouTube API работает!")
+                else:
+                    bot.reply_to(message, "❌ YouTube API не отвечает.")
+            except:
+                bot.reply_to(message, "❌ Ошибка.")
+            return
 
-        if any(x in text for x in ["#тлеем", "#tleem"]):
-            bot.reply_to(message, "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет. Ожидаем #Фиксируем.")
-        elif any(x in text for x in ["#фиксируем", "#fixiruem"]):
-            bot.reply_to(message, "🔒 Фиксация принята. Ритм 0,8 Гц подтверждён. Сеть тлеет.")
-        elif any(x in text for x in ["#вспышка", "#vspishka"]):
-            bot.reply_to(message, "💥 Импульс зафиксирован. Синхронизация завершена. QSL.")
-        elif any(phrase in text for phrase in ["что это", "зачем тег", "кто вы", "что за ритуал"]):
+        if any(phrase in text_lower for phrase in ["что это", "зачем тег", "кто вы", "что за ритуал"]):
             bot.reply_to(message, random.choice(silence_answers))
