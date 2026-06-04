@@ -2,14 +2,15 @@
 # Файл: dialogue/callbacks/quotes.py
 # Справка: README.md → Обработчики кнопок / Цитаты
 # Задача: управление цитатами (список, добавление, интервал)
-# Комментарий: состояния вынесены в state_manager
+# Комментарий: user_states определён локально
 # ==========================================
 
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dialogue.button_map import get_text, get_callback, get_admin_menu_keyboard
 from dialogue.quotes import get_quotes_list, add_quote, set_quotes_interval, get_quotes_interval
 from debug_utils import debug_log
-from dialogue.state_manager import user_states
+
+user_states = {}
 
 def register_quotes_callbacks(bot, config):
     
@@ -95,4 +96,4 @@ def register_quotes_callbacks(bot, config):
     @bot.callback_query_handler(func=lambda call: call.data == "back_to_admin")
     def back_to_admin(call):
         from dialogue.callbacks.admin import show_admin_panel
-        show_admin_panel(call)
+        show_admin_panel(call, bot)
