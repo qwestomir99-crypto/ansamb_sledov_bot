@@ -2,7 +2,7 @@
 # Файл: services/web_api/posts.py
 # Справка: README.md → Веб-морда / API / Посты
 # Задача: эндпоинты для создания постов в TG и VK
-# Комментарий: VK посты — в личный профиль (не группа)
+# Комментарий: VK использует VK_OWNER_ID из переменных окружения
 # Зависит от: flask, debug_utils, services.tg_api
 # Вызывается из: web_api/__init__.py
 # ==========================================
@@ -40,11 +40,11 @@ def create_post():
                 return jsonify({"status": "error", "error": "Ошибка отправки в Telegram"}), 500
                 
         elif platform == 'vk':
-            vk_token = os.environ.get("VK_TOKEN")
-            vk_owner_id = os.environ.get("VK_OWNER_ID", "607754499")
+            vk_token = os.environ.get("VK_USER_TOKEN")
+            vk_owner_id = os.environ.get("VK_OWNER_ID")
             
-            if not vk_token:
-                return jsonify({"status": "error", "error": "VK_TOKEN не задан"}), 500
+            if not vk_token or not vk_owner_id:
+                return jsonify({"status": "error", "error": "VK не настроен"}), 500
             
             params = {
                 "access_token": vk_token,
@@ -72,7 +72,7 @@ def create_post():
 
 @posts_bp.route('/vk', methods=['POST'])
 def post_to_vk():
-    """Пост в VK (текст) — кнопка «Отправить» в карточке VK. Личный профиль."""
+    """Пост в VK (текст) — личный профиль."""
     data = request.json
     text = data.get('text', '').strip()
     
@@ -80,11 +80,11 @@ def post_to_vk():
         return jsonify({"status": "error", "error": "text обязателен"}), 400
     
     try:
-        vk_token = os.environ.get("VK_TOKEN")
-        vk_owner_id = os.environ.get("VK_OWNER_ID", "607754499")
+        vk_token = os.environ.get("VK_USER_TOKEN")
+        vk_owner_id = os.environ.get("VK_OWNER_ID")
         
-        if not vk_token:
-            return jsonify({"status": "error", "error": "VK_TOKEN не задан"}), 500
+        if not vk_token or not vk_owner_id:
+            return jsonify({"status": "error", "error": "VK не настроен"}), 500
         
         params = {
             "access_token": vk_token,
