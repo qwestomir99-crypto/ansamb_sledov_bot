@@ -217,7 +217,7 @@ def process_vk_post(message, bot):
         safe_delete(msg, 5)
         return
     vk_token = os.environ.get("VK_TOKEN")
-    vk_owner_id = os.environ.get("VK_OWNER_ID", "607754499")
+    vk_owner_id = os.environ.get("VK_OWNER_ID")
     if not vk_token:
         bot.reply_to(message, "❌ VK_TOKEN не задан")
         return
