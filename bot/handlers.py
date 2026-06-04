@@ -11,6 +11,7 @@ from dialogue.callbacks import register_callback_handlers
 from dialogue.scheduler import scheduler_loop
 from dialogue.quotes import quotes_loop
 from dialogue.publisher import publish_loop
+from services.autoposter import start_autoposter
 
 def register_all_handlers(bot, config):
     register_handlers(bot, config)
@@ -24,10 +25,14 @@ def register_all_handlers(bot, config):
     # Полуночный ритуал + эволюция
     threading.Thread(target=scheduler_loop, args=(bot, tg_chat_id, admin_id), daemon=True).start()
     
-    # Цитаты по расписанию
+    # Цитаты по расписанию (шаббат внутри)
     threading.Thread(target=quotes_loop, args=(bot, tg_chat_id), daemon=True).start()
     
-    # Автопостинг из пула
+    # Автопостинг из пула (шаббат внутри)
     threading.Thread(target=publish_loop, args=(bot, vk_token, vk_owner_id, tg_chat_id), daemon=True).start()
     
-    print("[HANDLERS] Обработчики, ритуал, цитаты и автопостинг запущены")
+    # YouTube автопостер
+    if config.get("autoposter", {}).get("enabled", True):
+        threading.Thread(target=start_autoposter, args=(config, vk_token, vk_owner_id), daemon=True).start()
+    
+    print("[HANDLERS] Все потоки запущены: ритуал, цитаты, пул, YouTube")
