@@ -1,12 +1,12 @@
 # ==========================================
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
-# Задача: админ-меню, кнопки, управление цитатами, постинг в VK
+# Задача: админ-меню, кнопки, управление цитатами, постинг в VK (личный профиль)
 # Комментарий: использует button_map.py для единого управления кнопками
 #              Добавлены подменю «Настроение» и кнопка диалога (для всех)
 #              Добавлено автоудаление сообщений (safe_delete)
 #              Добавлен вход в админку из гостевого меню
-# Зависит от: telebot, button_map, publisher, quotes, diagnostics
+# Зависит от: telebot, button_map, publisher_utils, quotes, diagnostics
 # Вызывается из: bot.py (handle_message), callbacks.py
 # ==========================================
 
@@ -237,10 +237,10 @@ def process_vk_post(message, bot):
         return
     
     vk_token = os.environ.get("VK_TOKEN")
-    vk_owner_id = os.environ.get("VK_OWNER_ID")
+    vk_owner_id = os.environ.get("VK_OWNER_ID", "607754499")
     
-    if not vk_token or not vk_owner_id:
-        report = "❌ VK_TOKEN или VK_OWNER_ID не заданы"
+    if not vk_token:
+        report = "❌ VK_TOKEN не задан"
         msg = bot.reply_to(message, report)
         safe_delete(message, 3)
         safe_delete(msg, 10)
@@ -267,7 +267,7 @@ def process_vk_post(message, bot):
     success, result = post_to_vk(caption, "", vk_token, vk_owner_id, file_paths if file_paths else None)
     
     if success:
-        report = f"✅ Пост опубликован в VK!\n{result}"
+        report = f"✅ Пост опубликован в VK!"
     else:
         report = f"❌ Ошибка VK: {result}"
     
