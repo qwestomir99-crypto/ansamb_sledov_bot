@@ -13,6 +13,7 @@ from dialogue.admin_commands import (
     show_quotes_panel, list_quotes, add_quote_ui, set_quote_interval_ui,
     show_diagnostics, admin_logout
 )
+from dialogue.button_map import get_admin_menu_keyboard
 from debug_utils import debug_log
 
 def register_admin_callbacks(bot: telebot.TeleBot, config: dict):
