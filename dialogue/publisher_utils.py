@@ -1,7 +1,7 @@
 # ==========================================
 # Файл: dialogue/publisher_utils.py
 # Справка: README.md → Публикатор / Утилиты
-# Задача: отправка постов в Telegram и VK
+# Задача: отправка постов в Telegram и VK (личный профиль)
 # ==========================================
 
 import os
@@ -145,9 +145,8 @@ def post_to_vk(message, tags, access_token, owner_id, file_id=None, auto_quote=T
     params = {
         "access_token": access_token,
         "v": "5.199",
-        "owner_id": owner_id,
-        "message": full_message,
-        "from_group": 1
+        "owner_id": int(owner_id),
+        "message": full_message
     }
     
     attachments = []
