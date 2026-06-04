@@ -2,7 +2,7 @@
 # Файл: bot/handlers/__init__.py
 # Справка: README.md → Обработчики команд / Сборка
 # Задача: собирает все модули handlers в единый регистратор
-# Комментарий: импортирует и экспортирует register_handlers
+# Комментарий: импортирует и экспортирует register_handlers и register_all_handlers
 # ==========================================
 
 import telebot
@@ -51,3 +51,38 @@ def register_handlers(bot: telebot.TeleBot, config: dict):
     register_unknown_handler(bot, config)
     
     debug_log("HANDLERS", "Все обработчики команд зарегистрированы", "INFO")
+
+
+def register_all_handlers(bot, config):
+    """Алиас для register_handlers + колбэки и потоки"""
+    import os
+    import threading
+    from ping_utils import start_background_pinger
+    from services.agent_pinger import start_agent_pinger
+    from services.log_cleaner import start_log_cleaner
+    from dialogue.callbacks import register_callback_handlers
+    from services.autoposter import start_autoposter
+    from dialogue.scheduler import scheduler_loop
+    from dialogue.publisher import publish_loop
+    from dialogue.quotes import quotes_loop
+    
+    register_handlers(bot, config)
+    register_callback_handlers(bot, config)
+    
+    start_background_pinger(60)
+    start_agent_pinger()
+    start_log_cleaner()
+    
+    if config.get("autoposter", {}).get("enabled", True):
+        start_autoposter(config, os.environ.get("VK_TOKEN"), os.environ.get("VK_OWNER_ID"))
+    
+    tg_chat_id = config.get("telegram", {}).get("publish_channel", "@qwestomir")
+    admin_id = int(os.environ.get("ADMIN_USER_ID", 0))
+    vk_token = os.environ.get("VK_TOKEN")
+    vk_owner_id = os.environ.get("VK_OWNER_ID")
+    
+    threading.Thread(target=scheduler_loop, args=(bot, tg_chat_id, admin_id), daemon=True).start()
+    threading.Thread(target=publish_loop, args=(bot, vk_token, vk_owner_id, tg_chat_id), daemon=True).start()
+    threading.Thread(target=quotes_loop, args=(bot, tg_chat_id), daemon=True).start()
+    
+    print("[HANDLERS] Все потоки запущены")
