@@ -2,13 +2,13 @@
 # Файл: services/web_api/__init__.py
 # Справка: README.md → Веб-морда / API / Сборка
 # Задача: собирает все модули web_api в один blueprint
-# Комментарий: quotes временно отключён (переход на SQLite)
+# Комментарий: quotes ВКЛЮЧЁН
 # Зависит от: all modules above
 # Вызывается из: services/app.py
 # ==========================================
 
 from flask import Blueprint
-from .quotes import quotes_bp  # Временно отключено — чиним переход на SQLite
+from .quotes import quotes_bp
 from .modes import modes_bp
 from .ping import ping_bp
 from .posts import posts_bp
@@ -19,7 +19,7 @@ from .youtube_upload import youtube_upload_bp
 
 web_api = Blueprint('web_api', __name__)
 
-# web_api.register_blueprint(quotes_bp, url_prefix='/quotes')  # Временно отключено
+web_api.register_blueprint(quotes_bp, url_prefix='/quotes')
 web_api.register_blueprint(modes_bp, url_prefix='/modes')
 web_api.register_blueprint(ping_bp, url_prefix='/ping')
 web_api.register_blueprint(posts_bp, url_prefix='/posts')
