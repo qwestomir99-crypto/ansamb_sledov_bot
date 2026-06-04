@@ -14,6 +14,7 @@ def register_callback_handlers(bot: telebot.TeleBot, config: dict):
     from .alice import register_alice_callbacks
     from .mail import register_mail_callbacks
     from .mood import register_mood_callbacks
+    from .diagnostics import register_diagnostics_callbacks
     from .youtube_upload import register_youtube_upload_callbacks
     
     register_admin_callbacks(bot, config)
@@ -21,7 +22,8 @@ def register_callback_handlers(bot: telebot.TeleBot, config: dict):
     register_modes_callbacks(bot, config)
     register_alice_callbacks(bot, config)
     register_mail_callbacks(bot, config)
+    
     register_mood_callbacks(bot, config)
     register_youtube_upload_callbacks(bot, config)
-    
+    register_diagnostics_callbacks(bot, config)
     debug_log("CALLBACKS", "Все обработчики кнопок зарегистрированы", "INFO")
