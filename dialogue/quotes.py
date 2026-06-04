@@ -250,4 +250,31 @@ def quotes_loop(bot, TG_CHAT_ID):
     quote_thread.start()
     debug_log("QUOTES", "Цитаты запущены (SQLite + шаббат)")
 
+#==================================
+#   ютуб линки
+#==================================
+def send_quote_with_photo(bot, chat_id, quote):
+    """Отправляет цитату с YouTube-видео из плейлиста"""
+    try:
+        from dialogue.youtube_auto import get_random_video
+        
+        video = get_random_video()
+        if video and video.get('url'):
+            caption = f"📜 {quote}\n\n🎬 {video['title']}\n{video['url']}"
+            if len(caption) > 1024:
+                caption = f"📜 {quote}\n\n🎬 {video['title']}\n{video['url']}"
+                caption = caption[:1024]
+            
+            bot.send_message(chat_id, caption, parse_mode='Markdown')
+            debug_log("QUOTES", f"Цитата отправлена с YouTube-видео")
+            return True
+        else:
+            # Фоллбэк на просто текст
+            bot.send_message(chat_id, f"📜 *Цитата* • {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n{quote}\n\n#Цитата #СапёрыАутентичности", parse_mode='Markdown')
+            return False
+    except Exception as e:
+        debug_log("QUOTES", f"Ошибка отправки цитаты с видео: {e}", "ERROR")
+        bot.send_message(chat_id, f"📜 *Цитата* • {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n{quote}\n\n#Цитата #СапёрыАутентичности", parse_mode='Markdown')
+        return False
+        
 init_db()
