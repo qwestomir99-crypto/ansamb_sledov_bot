@@ -25,7 +25,6 @@ from dialogue.button_map import (
     get_admin_menu_keyboard, get_user_menu_keyboard, 
     get_text, get_callback, get_moods_keyboard, get_dialog_keyboard
 )
-from dialogue.publisher import add_publication
 from dialogue.quotes import get_quotes_list, add_quote, set_quotes_interval, get_quotes_interval
 from debug_utils import debug_log
 from ping_utils import ping_self
