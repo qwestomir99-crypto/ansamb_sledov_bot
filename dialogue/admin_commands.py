@@ -140,6 +140,67 @@ def process_post_tags(message, bot, user_id):
         return
     else:
         tags = message.text.split()
+
+def process_post_tags(message, bot, user_id):
+    if message.text == "/skip":
+        tags = []
+    elif message.text == "/cancel":
+        bot.reply_to(message, "❌ Добавление поста отменено.", reply_markup=get_admin_menu())
+        safe_delete(message, 3)
+        return
+    else:
+        tags = message.text.split()
+    
+    post_data = getattr(process_post_text, "temp_posts", {}).get(user_id, {})
+    text = post_data.get("text", "")
+    
+    if not hasattr(process_post_tags, "pending_posts"):
+        process_post_tags.pending_posts = {}
+    process_post_tags.pending_posts[user_id] = {"text": text, "tags": tags}
+    
+    msg = bot.send_message(
+        message.chat.id,
+        "📋 *Пост готов.*\n\nНапишите `сейчас` чтобы опубликовать немедленно, или `позже` чтобы отложить в пул.\n/cancel для отмены.",
+        parse_mode='Markdown'
+    )
+    bot.register_next_step_handler(msg, process_publish_choice, bot, user_id)
+    safe_delete(message, 3)
+
+def process_publish_choice(message, bot, user_id):
+    choice = message.text.strip().lower()
+    
+    if choice == "/cancel":
+        bot.reply_to(message, "❌ Публикация отменена.", reply_markup=get_admin_menu())
+        safe_delete(message, 3)
+        return
+    
+    post_data = getattr(process_post_tags, "pending_posts", {}).get(user_id, {})
+    text = post_data.get("text", "")
+    tags = post_data.get("tags", [])
+    
+    if choice == "сейчас":
+        from dialogue.publisher_utils import post_to_telegram, get_random_quote
+        config = load_config()
+        tg_chat_id = config.get("telegram", {}).get("publish_channel", "@qwestomir")
+        quote = get_random_quote()
+        full_text = f"{text}\n\n📜 {quote}"
+        tags_str = " ".join(tags)
+        success = post_to_telegram(bot, tg_chat_id, full_text, None, tags_str)
+        if success:
+            bot.reply_to(message, "✅ Пост опубликован!", reply_markup=get_admin_menu())
+        else:
+            bot.reply_to(message, "❌ Ошибка публикации.", reply_markup=get_admin_menu())
+    elif choice == "позже":
+        from dialogue.post_manager import add_post_to_pool
+        success = add_post_to_pool(text, tags, author=str(user_id))
+        if success:
+            bot.reply_to(message, "✅ Пост добавлен в пул!", reply_markup=get_admin_menu())
+        else:
+            bot.reply_to(message, "❌ Ошибка сохранения.", reply_markup=get_admin_menu())
+    else:
+        bot.reply_to(message, "❌ Напишите `сейчас` или `позже`.", reply_markup=get_admin_menu())
+    
+    safe_delete(message, 5)
     
     post_data = getattr(process_post_text, "temp_posts", {}).get(user_id, {})
     text = post_data.get("text", "")
