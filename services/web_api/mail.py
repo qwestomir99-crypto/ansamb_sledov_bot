@@ -18,7 +18,8 @@ def log_m(level, message):
 
 @mail_bp.route('/inbox', methods=['GET'])
 def inbox():
-    return jsonify(fetch_emails(limit=10))
+    emails = fetch_emails(limit=10)
+    return jsonify({"emails": emails})
 
 @mail_bp.route('/send', methods=['POST'])
 def send():
