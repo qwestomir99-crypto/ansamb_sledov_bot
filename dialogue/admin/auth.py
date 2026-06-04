@@ -8,6 +8,7 @@
 import os
 import time
 from datetime import datetime
+from debug_utils import debug_log
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 ADMIN_USER_ID = int(os.environ.get("ADMIN_USER_ID", 0))
@@ -20,6 +21,10 @@ SESSION_TIMEOUT = 1800  # 30 минут
 failed_attempts = {}
 BLOCK_TIME = 3600  # 1 час
 MAX_ATTEMPTS = 3
+
+def log_admin_action(action, user_id):
+    """Логирует действие админа"""
+    debug_log("ADMIN_AUTH", f"Админ {user_id}: {action}")
 
 def is_blocked(user_id):
     if user_id in failed_attempts:
