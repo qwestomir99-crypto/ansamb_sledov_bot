@@ -130,18 +130,36 @@ def show_add_post_ui(call, bot):
     safe_delete(call.message, 1)
     bot.register_next_step_handler(msg, process_post_text, bot)
 
-def process_post_text(message, bot):
-    if message.text == "/cancel":
+def process_post_tags(message, bot, user_id):
+    if message.text == "/skip":
+        tags = []
+    elif message.text == "/cancel":
         msg = bot.reply_to(message, "❌ Добавление поста отменено.", reply_markup=get_admin_menu())
         safe_delete(message, 3)
         safe_delete(msg, 5)
         return
-    if not hasattr(process_post_text, "temp_posts"):
-        process_post_text.temp_posts = {}
-    process_post_text.temp_posts[message.from_user.id] = {"text": message.text}
-    msg = bot.send_message(message.chat.id, "🏷️ Введите теги через пробел (например: #тлеем #ансамбль)\nИли /skip для пропуска")
-    bot.register_next_step_handler(msg, process_post_tags, bot, message.from_user.id)
-    safe_delete(message, 2)
+    else:
+        tags = message.text.split()
+    
+    post_data = getattr(process_post_text, "temp_posts", {}).get(user_id, {})
+    text = post_data.get("text", "")
+    
+    # Сохраняем данные во временное хранилище
+    if not hasattr(process_post_tags, "pending_posts"):
+        process_post_tags.pending_posts = {}
+    process_post_tags.pending_posts[user_id] = {"text": text, "tags": tags}
+    
+    # Спрашиваем: сейчас или отложить
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        InlineKeyboardButton("📤 Опубликовать сейчас", callback_data="publish_now"),
+        InlineKeyboardButton("⏰ Отложить в пул", callback_data="publish_pool"),
+    )
+    keyboard.add(InlineKeyboardButton("❌ Отмена", callback_data="cancel"))
+    
+    msg = bot.reply_to(message, "📋 *Пост готов.*\n\nОпубликовать сейчас или отложить в пул?", reply_markup=keyboard, parse_mode='Markdown')
+    safe_delete(message, 3)
+    safe_delete(msg, 15)
 
 def process_post_tags(message, bot, user_id):
     if message.text == "/skip":
