@@ -18,10 +18,10 @@ def register_all_handlers(bot, config):
     tg_chat_id = config.get("telegram", {}).get("publish_channel", "@qwestomir")
     admin_id = int(os.environ.get("ADMIN_USER_ID", 0))
     
-    # Полуночный ритуал
+    # Полуночный ритуал + эволюция
     threading.Thread(target=scheduler_loop, args=(bot, tg_chat_id, admin_id), daemon=True).start()
     
-    # Цитаты
+    # Цитаты по расписанию
     threading.Thread(target=quotes_loop, args=(bot, tg_chat_id), daemon=True).start()
     
-    print("[HANDLERS] Обработчики и потоки запущены")
+    print("[HANDLERS] Обработчики, колбэки, ритуал и цитаты запущены")
