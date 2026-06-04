@@ -5,13 +5,13 @@
 # ==========================================
 
 from .core import load_config, get_bot
-from .handlers import register_handlers
+from .handlers import register_all_handlers
 
 def main():
     config = load_config()
     bot = get_bot()
     
-    register_handlers(bot, config)
+    register_all_handlers(bot, config)
     
     print("[MAIN] Запуск polling")
     bot.polling()
