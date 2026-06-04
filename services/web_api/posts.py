@@ -26,11 +26,10 @@ def create_post():
         return jsonify({"status": "error", "error": "Platform и text обязательны"}), 400
     
     try:
-        # Сохраняем пост через нашу SQLite-систему
         tags = []
         if media:
             tags.append(platform)
-        success = add_post_to_pool(text, tags, author_id=0)  # 0 = веб-морда
+        success = add_post_to_pool(text, tags, author="web")
         if success:
             log_posts("INFO", f"Пост создан ({platform})")
             return jsonify({"status": "ok", "message": "Пост создан"})
@@ -48,10 +47,8 @@ def post_to_vk():
         return jsonify({"status": "error", "error": "Text обязателен"}), 400
     
     try:
-        # Импортируем VK API
         from services.vk_api import api_vk_comment
         log_posts("INFO", f"Пост в VK: {text[:50]}...")
-        # TODO: реальная отправка через vk_api
         return jsonify({"status": "ok", "message": "Функция в разработке"})
     except Exception as e:
         log_posts("ERROR", str(e))
@@ -65,10 +62,8 @@ def post_to_telegram():
         return jsonify({"status": "error", "error": "Text обязателен"}), 400
     
     try:
-        # Импортируем TG API
         from services.tg_api import api_tg_send_message
         log_posts("INFO", f"Пост в Telegram: {text[:50]}...")
-        # TODO: реальная отправка через tg_api
         return jsonify({"status": "ok", "message": "Функция в разработке"})
     except Exception as e:
         log_posts("ERROR", str(e))
