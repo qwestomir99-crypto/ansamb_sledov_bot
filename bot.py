@@ -9,10 +9,10 @@ import threading
 from services.app import app
 
 if __name__ == "__main__":
-    # Запускаем бота в фоновом потоке
-    from bot.main import main
-    threading.Thread(target=main, daemon=True).start()
-    
-    # Запускаем веб-морду
+    # Веб-морда в фоне
     port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
+    threading.Thread(target=app.run, args=('0.0.0.0', port), daemon=True).start()
+    
+    # Бот в основном потоке — ошибки будут видны
+    from bot.main import main
+    main()
