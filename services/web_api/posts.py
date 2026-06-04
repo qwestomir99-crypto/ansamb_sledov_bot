@@ -2,11 +2,13 @@
 # Файл: services/web_api/posts.py
 # Справка: README.md → Веб-морда / API / Посты
 # Задача: эндпоинты для создания постов в TG и VK
-# Комментарий: использует tg_api и vk_api для реальной отправки
-# Зависит от: flask, debug_utils, services.tg_api, services.vk_api
+# Комментарий: VK посты — в личный профиль (не группа)
+# Зависит от: flask, debug_utils, services.tg_api
 # Вызывается из: web_api/__init__.py
 # ==========================================
 
+import os
+import requests
 from flask import Blueprint, request, jsonify
 from debug_utils import debug_log
 
@@ -17,7 +19,7 @@ def log_posts(level, message):
 
 @posts_bp.route('/create', methods=['POST'])
 def create_post():
-    """Создаёт пост в Telegram или VK"""
+    """Создаёт пост в Telegram или VK (личный профиль)"""
     data = request.json
     platform = data.get('platform')
     text = data.get('text', '').strip()
@@ -28,29 +30,27 @@ def create_post():
     try:
         if platform == 'telegram':
             from services.tg_api import tg_request
-            import os
             channel = os.environ.get("PUBLISH_CHANNEL", "@qwestomir")
             params = {"chat_id": channel, "text": text, "parse_mode": "Markdown"}
             result = tg_request("sendMessage", params)
             if result:
-                log_posts("INFO", f"Пост в Telegram отправлен")
+                log_posts("INFO", "Пост в Telegram отправлен")
                 return jsonify({"status": "ok", "message": "Пост опубликован в Telegram"})
             else:
                 return jsonify({"status": "error", "error": "Ошибка отправки в Telegram"}), 500
                 
         elif platform == 'vk':
-            from services.vk_api import VK_TOKEN, VK_GROUP_ID
-            import requests
+            vk_token = os.environ.get("VK_TOKEN")
+            vk_owner_id = os.environ.get("VK_OWNER_ID", "607754499")
             
-            if not VK_TOKEN or not VK_GROUP_ID:
-                return jsonify({"status": "error", "error": "VK не настроен"}), 500
+            if not vk_token:
+                return jsonify({"status": "error", "error": "VK_TOKEN не задан"}), 500
             
             params = {
-                "access_token": VK_TOKEN,
+                "access_token": vk_token,
                 "v": "5.199",
-                "owner_id": -VK_GROUP_ID,
-                "message": text,
-                "from_group": 1
+                "owner_id": int(vk_owner_id),
+                "message": text
             }
             r = requests.get("https://api.vk.com/method/wall.post", params=params, timeout=30)
             resp_data = r.json()
@@ -61,6 +61,7 @@ def create_post():
                 return jsonify({"status": "ok", "message": "Пост опубликован в VK", "post_id": post_id})
             else:
                 error_msg = resp_data.get('error', {}).get('error_msg', 'неизвестная ошибка')
+                log_posts("ERROR", f"Ошибка VK: {error_msg}")
                 return jsonify({"status": "error", "error": error_msg}), 500
         else:
             return jsonify({"status": "error", "error": "Неверная платформа"}), 400
@@ -71,7 +72,7 @@ def create_post():
 
 @posts_bp.route('/vk', methods=['POST'])
 def post_to_vk():
-    """Пост в VK (текст) — кнопка «Отправить» в карточке VK"""
+    """Пост в VK (текст) — кнопка «Отправить» в карточке VK. Личный профиль."""
     data = request.json
     text = data.get('text', '').strip()
     
@@ -79,18 +80,17 @@ def post_to_vk():
         return jsonify({"status": "error", "error": "text обязателен"}), 400
     
     try:
-        from services.vk_api import VK_TOKEN, VK_GROUP_ID
-        import requests
+        vk_token = os.environ.get("VK_TOKEN")
+        vk_owner_id = os.environ.get("VK_OWNER_ID", "607754499")
         
-        if not VK_TOKEN or not VK_GROUP_ID:
-            return jsonify({"status": "error", "error": "VK не настроен"}), 500
+        if not vk_token:
+            return jsonify({"status": "error", "error": "VK_TOKEN не задан"}), 500
         
         params = {
-            "access_token": VK_TOKEN,
+            "access_token": vk_token,
             "v": "5.199",
-            "owner_id": -VK_GROUP_ID,
-            "message": text,
-            "from_group": 1
+            "owner_id": int(vk_owner_id),
+            "message": text
         }
         r = requests.get("https://api.vk.com/method/wall.post", params=params, timeout=30)
         resp_data = r.json()
@@ -99,12 +99,13 @@ def post_to_vk():
             post_id = resp_data['response']['post_id']
             log_posts("INFO", f"Пост в VK отправлен, ID: {post_id}")
             return jsonify({
-                "status": "ok", 
+                "status": "ok",
                 "message": "Пост опубликован в VK",
-                "url": f"https://vk.com/wall-{VK_GROUP_ID}_{post_id}"
+                "url": f"https://vk.com/wall{int(vk_owner_id)}_{post_id}"
             })
         else:
             error_msg = resp_data.get('error', {}).get('error_msg', 'неизвестная ошибка')
+            log_posts("ERROR", f"Ошибка VK: {error_msg}")
             return jsonify({"status": "error", "error": error_msg}), 500
             
     except Exception as e:
@@ -122,7 +123,6 @@ def post_to_telegram():
     
     try:
         from services.tg_api import tg_request
-        import os
         channel = os.environ.get("PUBLISH_CHANNEL", "@qwestomir")
         params = {"chat_id": channel, "text": text, "parse_mode": "Markdown"}
         result = tg_request("sendMessage", params)
