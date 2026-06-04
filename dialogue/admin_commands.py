@@ -458,7 +458,6 @@ def process_dialog_message(message, bot):
     
     status_msg = bot.reply_to(message, "⏳ Старший брат думает...")
     
-    # Передаём user_id для учёта настроения
     answer = ask_agent(message.text, user_id=message.from_user.id)
     
     try:
