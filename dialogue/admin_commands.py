@@ -207,7 +207,7 @@ def process_post_tags(message, bot, user_id):
     text = post_data.get("text", "")
     
     from dialogue.post_manager import add_post_to_pool
-    success = add_post_to_pool(text, tags, author_id=user_id)
+    success = add_post_to_pool(text, tags, author=str(user_id))
     
     if success:
         msg = bot.reply_to(message, "✅ Пост добавлен в пул публикаций!", reply_markup=get_admin_menu())
