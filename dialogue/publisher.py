@@ -2,10 +2,10 @@
 # Файл: dialogue/publisher.py
 # Справка: README.md → Публикатор
 # Задача: публикация постов из пула (автоматическая и немедленная)
-# Комментарий: публикует посты с цитатами, тегами, фото/видео
-#              Если нет медиа — добавляет тематическое фото
+# Комментарий: для TG — file_id, для VK — media_url (ссылка)
+#              Если нет медиа — тематическое фото
 #              Старший брат ОТКЛЮЧЁН
-#              Лимит пула — 100 постов, старые удаляются
+#              Лимит пула — 100 постов
 # Зависит от: os, json, time, random, threading, debug_utils, publisher_utils, post_manager
 # Вызывается из: bot.py (поток publish_loop)
 # ==========================================
@@ -27,7 +27,6 @@ def load_config():
         return json.load(f)
 
 def clean_pool():
-    """Оставляет последние MAX_POOL_SIZE постов в пуле"""
     pool = load_post_pool()
     if len(pool) > MAX_POOL_SIZE:
         pool = pool[-MAX_POOL_SIZE:]
@@ -35,7 +34,6 @@ def clean_pool():
         debug_log("PUBLISH", f"Пул очищен, оставлено {len(pool)} постов")
 
 def get_theme_photo():
-    """Возвращает случайное тематическое фото если нет медиа"""
     try:
         from services.photo_reader import get_random_post
         post = get_random_post()
@@ -46,7 +44,6 @@ def get_theme_photo():
     return None
 
 def publish_post_immediately(bot, chat_id, text, tags_str, file_id=None):
-    """Публикует пост немедленно в Telegram и VK"""
     config = load_config()
     tg_chat_id = config.get("telegram", {}).get("publish_channel", "@qwestomir")
     vk_token = os.environ.get("VK_TOKEN")
@@ -57,16 +54,13 @@ def publish_post_immediately(bot, chat_id, text, tags_str, file_id=None):
     
     if tg_chat_id:
         success_tg = post_to_telegram(bot, tg_chat_id, text, file_id, tags_str)
-        debug_log("PUBLISH", f"Telegram: {'✅' if success_tg else '❌'}")
     
     if vk_token and vk_owner_id:
-        success_vk, _ = post_to_vk(text, tags_str, vk_token, vk_owner_id, file_id)
-        debug_log("PUBLISH", f"VK: {'✅' if success_vk else '❌'}")
+        success_vk, _ = post_to_vk(text, tags_str, vk_token, vk_owner_id)
     
     return success_tg or success_vk
 
 def publish_delayed(bot, text, tags_str, delay_seconds, file_id=None):
-    """Отложенная публикация"""
     time.sleep(delay_seconds)
     config = load_config()
     tg_chat_id = config.get("telegram", {}).get("publish_channel", "@qwestomir")
@@ -82,55 +76,65 @@ def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
     index = len(pool) - 1
     
     text = post.get("text", "")
-    media_url = post.get("media_url")
+    file_id = post.get("file_id")          # для Telegram
+    media_url = post.get("media_url")       # для VK (ссылка)
     tags = build_tags(post)
     quote = get_random_quote()
     
     full_text = f"{text}\n\n📜 {quote}"
     
-    success = False
+    success_tg = False
+    success_vk = False
     
+    # === TELEGRAM ===
     if tg_chat_id:
         try:
-            if media_url:
+            if file_id:
+                # Пробуем с file_id
+                success_tg = post_to_telegram(bot, tg_chat_id, full_text, file_id, tags)
+            elif media_url and media_url.startswith("http"):
+                # Пробуем с photo_url
                 success_tg = post_to_telegram(bot, tg_chat_id, full_text, media_url, tags)
             else:
+                # Тематическое фото или просто текст
                 theme_photo = get_theme_photo()
-                if theme_photo:
-                    success_tg = post_to_telegram(bot, tg_chat_id, full_text, theme_photo, tags)
-                else:
-                    success_tg = post_to_telegram(bot, tg_chat_id, full_text, None, tags)
+                success_tg = post_to_telegram(bot, tg_chat_id, full_text, theme_photo, tags)
+            
             if success_tg:
-                success = True
                 debug_log("PUBLISH", "Пост опубликован в Telegram")
         except Exception as e:
             debug_log("PUBLISH", f"Ошибка Telegram: {e}", "ERROR")
     
+    # === VK ===
     if vk_token and vk_owner_id:
         try:
-            success_vk, _ = post_to_vk(full_text, tags, vk_token, vk_owner_id, media_url)
+            if media_url and media_url.startswith("http"):
+                # VK: передаём photo_url отдельно
+                success_vk, _ = post_to_vk(full_text, tags, vk_token, vk_owner_id, media_url)
+            else:
+                # Без медиа
+                success_vk, _ = post_to_vk(full_text, tags, vk_token, vk_owner_id)
+            
             if success_vk:
-                success = True
                 debug_log("PUBLISH", "Пост опубликован в VK")
         except Exception as e:
             debug_log("PUBLISH", f"Ошибка VK: {e}", "ERROR")
     
-    if success:
+    if success_tg or success_vk:
         remove_post_from_pool(index)
         debug_log("PUBLISH", f"Пост удалён из пула, осталось {len(load_post_pool())}")
+        return True
     
-    return success
+    return False
 
 def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
-    """Основной цикл автопостинга из пула"""
-    debug_log("PUBLISH", "Цикл публикации запущен (лимит пула: 100, Старший брат отключён)")
+    debug_log("PUBLISH", "Цикл публикации запущен (TG: file_id, VK: media_url)")
     
     while True:
         try:
             try:
                 from dialogue.shabbat_manager import is_shabbat
                 if is_shabbat():
-                    debug_log("PUBLISH", "Шаббат — публикация отложена")
                     time.sleep(3600)
                     continue
             except ImportError:
