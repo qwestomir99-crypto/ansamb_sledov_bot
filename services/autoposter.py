@@ -1,8 +1,8 @@
 # ==========================================
 # Файл: services/autoposter.py
 # Справка: README.md → Автопостинг YouTube
-# Задача: публикация случайного видео из плейлиста в VK (личный профиль)
-# Комментарий: если нет превью — публикуем ссылку + цитату + теги
+# Задача: публикация случайного видео из плейлиста в VK (ГРУППА)
+# Комментарий: использует VK_TOKEN (токен сообщества) и VK_GROUP_ID
 # Зависит от: requests, os, random, json, debug_utils, dialogue.youtube_auto
 # Вызывается из: bot.py (отдельный поток)
 # ==========================================
@@ -28,10 +28,10 @@ def get_random_quote():
     except:
         return "Сеть тлеет. Ритм 0,8 Гц."
 
-def post_to_vk_with_link(message, video_url, access_token, owner_id):
-    """Пост в VK со ссылкой на видео (личный профиль)"""
-    if not access_token or not owner_id:
-        log_auto("ERROR", "Нет токена VK или owner_id")
+def post_to_vk_group(message, video_url, access_token, group_id):
+    """Пост в группу VK со ссылкой на видео"""
+    if not access_token or not group_id:
+        log_auto("ERROR", "Нет токена VK или group_id")
         return False, "Нет авторизации VK"
     
     try:
@@ -46,15 +46,16 @@ def post_to_vk_with_link(message, video_url, access_token, owner_id):
     params = {
         "access_token": access_token,
         "v": "5.199",
-        "owner_id": int(owner_id),
-        "message": full_message
+        "owner_id": -int(group_id),
+        "message": full_message,
+        "from_group": 1
     }
     
     try:
         r = requests.get("https://api.vk.com/method/wall.post", params=params, timeout=30)
         data = r.json()
         if "response" in data:
-            log_auto("INFO", f"Опубликовано в VK: {message[:50]}...")
+            log_auto("INFO", f"Опубликовано в группе VK: {message[:50]}...")
             return True, None
         else:
             error_msg = data.get("error", {}).get("error_msg", "неизвестная ошибка")
@@ -65,8 +66,8 @@ def post_to_vk_with_link(message, video_url, access_token, owner_id):
         return False, str(e)
 
 def check_and_publish():
-    """Публикует случайное видео из плейлиста в VK"""
-    log_auto("INFO", "Публикация случайного видео из плейлиста")
+    """Публикует случайное видео из плейлиста в группу VK"""
+    log_auto("INFO", "Публикация случайного видео из плейлиста в группу VK")
     
     try:
         from dialogue.adaptive_modes import should_adaptive_publish
@@ -85,18 +86,18 @@ def check_and_publish():
     post_text = f"📜 {quote}\n\n🎬 {video['title']}"
     
     vk_token = os.environ.get("VK_TOKEN")
-    vk_owner_id = os.environ.get("VK_OWNER_ID", "607754499")
+    vk_group_id = os.environ.get("VK_GROUP_ID", "239190742")
     
-    success, error = post_to_vk_with_link(post_text, video['url'], vk_token, vk_owner_id)
+    success, error = post_to_vk_group(post_text, video['url'], vk_token, vk_group_id)
     
     if success:
-        log_auto("INFO", "Видео из плейлиста опубликовано в VK")
+        log_auto("INFO", "Видео из плейлиста опубликовано в группе VK")
         return True
     else:
         log_auto("ERROR", f"Ошибка публикации: {error}")
         return False
 
 def start_autoposter(config=None, vk_token=None, vk_owner_id=None):
-    log_auto("INFO", "Автопостинг YouTube настроен (личный профиль)")
+    log_auto("INFO", "Автопостинг YouTube настроен (группа VK)")
     if config and config.get("autoposter", {}).get("test_on_start", False):
         check_and_publish()
