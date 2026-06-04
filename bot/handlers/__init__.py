@@ -11,11 +11,9 @@ import telebot
 from debug_utils import debug_log
 
 def register_handlers(bot: telebot.TeleBot, config: dict):
-    # Основной обработчик всех команд (#тлеем, #говори, #меню, #админ, ...)
     from dialogue.handlers import register_handlers as register_dialogue_handlers
     register_dialogue_handlers(bot, config)
     
-    # Дополнительные обработчики
     from .start import register_start_handler
     from .help import register_help_handler
     from .debug import register_debug_handler
