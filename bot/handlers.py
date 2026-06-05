@@ -1,11 +1,13 @@
 # ==========================================
 # Файл: bot/handlers.py
 # Справка: README.md → Бот / Обработчики
-# Задача: регистрация обработчиков и потоков
+# Задача: регистрация обработчиков и потоков (с пингалками)
 # ==========================================
 
 import os
 import threading
+from ping_utils import start_background_pinger
+from services.agent_pinger import start_agent_pinger
 from .handlers import register_handlers
 from dialogue.callbacks import register_callback_handlers
 from dialogue.scheduler import scheduler_loop
@@ -17,6 +19,10 @@ from dialogue.vk_reader import vk_reader_loop
 def register_all_handlers(bot, config):
     register_handlers(bot, config)
     register_callback_handlers(bot, config)
+    
+    # Пингалки чтобы Render не засыпал
+    start_background_pinger(60)
+    start_agent_pinger()
     
     tg_chat_id = config.get("telegram", {}).get("publish_channel", "@qwestomir")
     admin_id = int(os.environ.get("ADMIN_USER_ID", 0))
@@ -31,4 +37,4 @@ def register_all_handlers(bot, config):
     if config.get("autoposter", {}).get("enabled", True):
         threading.Thread(target=start_autoposter, args=(config, vk_token, vk_owner_id), daemon=True).start()
     
-    print("[HANDLERS] Все потоки запущены: ритуал, цитаты, пул, YouTube, VK Reader")
+    print("[HANDLERS] Все потоки запущены: ритуал, цитаты, пул, YouTube, VK Reader + пингалки")
