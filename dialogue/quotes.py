@@ -1,13 +1,13 @@
 # ==========================================
 # Модуль: dialogue/quotes.py
 # Справка: README.md → Цитаты
-# Задача: публикация цитат с YouTube-видео по расписанию + шаббат
-# Комментарий: одна функция отправки, без дубликатов
+# Задача: публикация цитат с YouTube-видео в TG и VK + шаббат
+# Комментарий: мультиплатформенная отправка
 # ==========================================
 
+import os
 import time
 import random
-import os
 import json
 import sqlite3
 from datetime import datetime
@@ -129,22 +129,35 @@ def get_quotes_interval():
     return get_quotes_interval_minutes()
 
 # ==========================================
-# ОТПРАВКА ЦИТАТЫ С YOUTUBE-ВИДЕО
+# ОТПРАВКА ЦИТАТЫ В TG И VK
 # ==========================================
 def send_quote_with_photo(bot, chat_id, quote):
+    """Отправляет цитату с YouTube-видео в Telegram и VK"""
     try:
         from dialogue.youtube_auto import get_random_video
         video = get_random_video()
-        if video and video.get('url'):
-            caption = f"📜 {quote}\n\n🎬 {video['title']}\n{video['url']}"
-            if len(caption) > 1024:
-                caption = caption[:1024]
-            bot.send_message(chat_id, caption)
-            debug_log("QUOTES", "Цитата отправлена с YouTube-видео")
-            return True
-        else:
-            bot.send_message(chat_id, f"📜 {quote}\n\n#Цитата #СапёрыАутентичности")
-            return False
+        
+        caption = f"📜 {quote}\n\n🎬 {video['title']}\n{video['url']}" if video and video.get('url') else f"📜 {quote}"
+        if len(caption) > 1024:
+            caption = caption[:1024]
+        
+        # Telegram
+        bot.send_message(chat_id, caption)
+        debug_log("QUOTES", "Цитата отправлена в Telegram")
+        
+        # VK
+        vk_token = os.environ.get("VK_TOKEN")
+        vk_owner_id = os.environ.get("VK_OWNER_ID")
+        if vk_token and vk_owner_id:
+            try:
+                from dialogue.publisher_utils import post_to_vk
+                vk_caption = f"📜 {quote}\n\n🎬 {video['title']}\n{video['url']}" if video and video.get('url') else f"📜 {quote}"
+                post_to_vk(vk_caption, "#Цитата #СапёрыАутентичности", vk_token, vk_owner_id)
+                debug_log("QUOTES", "Цитата отправлена в VK")
+            except Exception as e:
+                debug_log("QUOTES", f"Ошибка VK: {e}", "WARNING")
+        
+        return True
     except Exception as e:
         debug_log("QUOTES", f"Ошибка: {e}", "ERROR")
         bot.send_message(chat_id, f"📜 {quote}\n\n#Цитата #СапёрыАутентичности")
@@ -212,6 +225,6 @@ def quotes_loop(bot, TG_CHAT_ID):
     
     quote_thread = threading.Thread(target=_run, daemon=True)
     quote_thread.start()
-    debug_log("QUOTES", "Цитаты запущены (SQLite + шаббат + YouTube)")
+    debug_log("QUOTES", "Цитаты запущены (SQLite + шаббат + TG + VK)")
 
 init_db()
