@@ -2,8 +2,7 @@
 # Файл: dialogue/agent_memory.py
 # Справка: README.md → Агент / Память
 # Задача: хранение важных фраз и диалогов (долговременная память)
-# Комментарий: опциональный модуль, не влияет на основную работу
-#              Сохраняет важные фразы, которые агент «запоминает»
+# Комментарий: хранится в library/agent_memory.json
 # Зависит от: json, os, datetime
 # Вызывается из: agent.py (опционально), evolve_agent.py
 # ==========================================
@@ -13,13 +12,12 @@ import json
 from datetime import datetime
 from debug_utils import debug_log
 
-MEMORY_FILE = "agent_data/memory.json"
+MEMORY_FILE = "library/agent_memory.json"
 
 def _ensure_dir():
     os.makedirs(os.path.dirname(MEMORY_FILE), exist_ok=True)
 
 def get_memory():
-    """Загружает память агента"""
     _ensure_dir()
     if not os.path.exists(MEMORY_FILE):
         return {
@@ -39,7 +37,6 @@ def get_memory():
         }
 
 def save_memory(memory):
-    """Сохраняет память агента"""
     _ensure_dir()
     try:
         with open(MEMORY_FILE, "w", encoding="utf-8") as f:
@@ -48,11 +45,9 @@ def save_memory(memory):
         debug_log("AGENT_MEMORY", f"Ошибка сохранения памяти: {e}", "ERROR")
 
 def remember_phrase(phrase):
-    """Сохраняет важную фразу в память агента"""
     memory = get_memory()
     if phrase not in memory["learned_phrases"]:
         memory["learned_phrases"].append(phrase)
-        # Ограничиваем размер (не более 100 фраз)
         if len(memory["learned_phrases"]) > 100:
             memory["learned_phrases"] = memory["learned_phrases"][-100:]
         save_memory(memory)
@@ -61,7 +56,6 @@ def remember_phrase(phrase):
     return False
 
 def forget_phrase(phrase):
-    """Удаляет фразу из памяти"""
     memory = get_memory()
     if phrase in memory["learned_phrases"]:
         memory["learned_phrases"].remove(phrase)
@@ -71,12 +65,10 @@ def forget_phrase(phrase):
     return False
 
 def get_learned_phrases(limit=10):
-    """Возвращает последние выученные фразы"""
     memory = get_memory()
     return memory.get("learned_phrases", [])[-limit:]
 
 def remember_dialogue(question, answer, user_id=None):
-    """Сохраняет важный диалог (вопрос-ответ)"""
     memory = get_memory()
     dialogue = {
         "timestamp": datetime.now().isoformat(),
@@ -85,19 +77,16 @@ def remember_dialogue(question, answer, user_id=None):
         "user_id": user_id
     }
     memory["important_dialogues"].append(dialogue)
-    # Ограничиваем размер (не более 50 диалогов)
     if len(memory["important_dialogues"]) > 50:
         memory["important_dialogues"] = memory["important_dialogues"][-50:]
     save_memory(memory)
     debug_log("AGENT_MEMORY", f"Диалог запомнен: {question[:50]}...", "INFO")
 
 def get_important_dialogues(limit=5):
-    """Возвращает последние важные диалоги"""
     memory = get_memory()
     return memory.get("important_dialogues", [])[-limit:]
 
 def cleanup_old_memory(days=30):
-    """Удаляет старые диалоги из памяти"""
     memory = get_memory()
     cutoff = datetime.now().timestamp() - (days * 86400)
     new_dialogues = []
@@ -114,7 +103,6 @@ def cleanup_old_memory(days=30):
     debug_log("AGENT_MEMORY", f"Память очищена (старше {days} дней)", "INFO")
 
 def get_memory_stats():
-    """Возвращает статистику памяти агента"""
     memory = get_memory()
     return {
         "phrases_count": len(memory.get("learned_phrases", [])),
@@ -122,9 +110,6 @@ def get_memory_stats():
         "last_cleanup": memory.get("last_cleanup", "никогда")
     }
 
-# ==========================================
-# ТЕСТ
-# ==========================================
 if __name__ == "__main__":
     print("=== ТЕСТ ПАМЯТИ АГЕНТА ===")
     print(f"Статистика: {get_memory_stats()}")
