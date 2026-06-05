@@ -2,8 +2,8 @@
 # Файл: dialogue/publisher_utils.py
 # Справка: README.md → Публикатор / Утилиты
 # Задача: отправка постов в Telegram и VK с поддержкой нескольких файлов (альбомов)
-# Комментарий: VK — личный профиль (from_group убран), JSON с проверкой на пустоту
-# Зависит от: requests, os, random, json, utils
+# Комментарий: логи без персональных данных
+# Зависит от: requests, os, random, json, utils, debug_utils
 # Вызывается из: publisher.py, admin_commands.py
 # ==========================================
 
@@ -12,6 +12,7 @@ import random
 import json
 import requests
 from utils import escape_markdown
+from debug_utils import debug_log
 
 CONFIG_FILE = "config.json"
 QUOTES_FILE = "dialogue/data/quotes.txt"
@@ -84,7 +85,7 @@ def get_vk_upload_url(vk_token, owner_id):
         data = r.json()
         return data.get("response", {}).get("upload_url")
     except Exception as e:
-        print(f"[VK] upload URL ошибка: {e}")
+        debug_log("VK", f"upload URL ошибка: {e}", "ERROR")
         return None
 
 def upload_photo_to_vk(upload_url, file_path, vk_token):
@@ -108,10 +109,10 @@ def upload_photo_to_vk(upload_url, file_path, vk_token):
             photo = photo_data['response'][0]
             return f"photo{photo['owner_id']}_{photo['id']}"
         else:
-            print(f"[VK] save photo ошибка: {photo_data}")
+            debug_log("VK", f"save photo ошибка: {photo_data}", "ERROR")
             return None
     except Exception as e:
-        print(f"[VK] upload photo ошибка: {e}")
+        debug_log("VK", f"upload photo ошибка: {e}", "ERROR")
         return None
 
 def post_to_telegram(bot, chat_id, message, file_paths=None, tags=None, auto_quote=True, auto_tags=True):
@@ -158,7 +159,7 @@ def post_to_telegram(bot, chat_id, message, file_paths=None, tags=None, auto_quo
         elif file_paths and len(file_paths) == 1:
             fp = file_paths[0]
             if not os.path.exists(fp):
-                print(f"[PUBLISHER] Файл не найден: {fp}")
+                debug_log("PUBLISHER", f"Файл не найден: {fp[:50]}...", "WARNING")
                 return False
             ext = os.path.splitext(fp)[1].lower()
             with open(fp, 'rb') as f:
@@ -191,15 +192,15 @@ def post_to_telegram(bot, chat_id, message, file_paths=None, tags=None, auto_quo
                 return False
         return True
     except Exception as e:
-        print(f"[PUBLISHER] Ошибка Telegram: {e}")
+        debug_log("PUBLISHER", f"Ошибка Telegram: {e}", "ERROR")
         return False
 
 def post_to_vk(message, tags, access_token, owner_id, file_paths=None, auto_quote=True, auto_tags=True, repost_from=None):
-    print(f"[VK] post_to_vk вызван: message={message[:50] if message else ''}..., files={len(file_paths) if file_paths else 0}")
+    debug_log("VK", f"post_to_vk: message={message[:50] if message else ''}..., files={len(file_paths) if file_paths else 0}")
     
     if not access_token or not owner_id:
-        print("[VK] Нет токена или owner_id")
-        return False, "❌ Ошибка авторизации VK. Проверь токен."
+        debug_log("VK", "Нет токена или owner_id", "ERROR")
+        return False, "Ошибка авторизации VK"
     
     if auto_quote and message and len(message) < 500:
         quote = get_random_quote()
@@ -245,21 +246,22 @@ def post_to_vk(message, tags, access_token, owner_id, file_paths=None, auto_quot
                     if photo_att:
                         attachments.append(photo_att)
             elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
-                print(f"[VK] Видео пока не поддерживается: {fp}")
+                debug_log("VK", "Видео пока не поддерживается", "WARNING")
     
     if attachments:
         params['attachments'] = ",".join(attachments)
-        print(f"[VK] Прикреплено {len(attachments)} вложений")
+        debug_log("VK", f"Прикреплено {len(attachments)} вложений")
     
     try:
         r = requests.get('https://api.vk.com/method/wall.post', params=params, timeout=30)
         data = r.json()
         if 'response' in data:
-            print(f"[VK] ✅ опубликовано: {message[:50] if message else ''}...")
+            debug_log("VK", f"Опубликовано: {message[:50] if message else ''}...")
             return True, None
         else:
-            print(f"[VK] ошибка: {data}")
-            return False, f"❌ Ошибка VK: {data.get('error', {}).get('error_msg', 'неизвестная')}"
+            error_msg = data.get('error', {}).get('error_msg', 'неизвестная')
+            debug_log("VK", f"Ошибка: {error_msg}", "ERROR")
+            return False, f"Ошибка VK: {error_msg}"
     except Exception as e:
-        print(f"[VK] исключение: {e}")
-        return False, f"❌ Ошибка сети: {e}"
+        debug_log("VK", f"Исключение: {e}", "ERROR")
+        return False, f"Ошибка сети: {e}"
