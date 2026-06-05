@@ -31,7 +31,7 @@ from dialogue.admin.posts import (
     ask_for_post_text,
     handle_vk_post
 )
-from dialogue.admin.diagnostics import handle_errors, handle_log, handle_debug
+# from dialogue.admin.diagnostics import handle_errors, handle_log, handle_debug
 from dialogue.ping_modes import apply_ping_mode
 from ping_utils import ping_self
 from debug_utils import load_config as load_debug_config, save_config as save_debug_config
@@ -656,5 +656,3 @@ def register_callback_handlers(bot, config):
             bot.send_message(chat_id, help_text, parse_mode='Markdown')
         else:
             bot.answer_callback_query(call.id)
-
-        bot.answer_callback_query(call.id)
