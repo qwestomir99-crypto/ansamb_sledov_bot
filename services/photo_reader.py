@@ -1,9 +1,8 @@
 # ==========================================
 # Файл: services/photo_reader.py
 # Справка: README.md → Репосты из VK
-# Задача: получить случайный пост с фото с твоей стены VK
-# Комментарий: без кэша, напрямую из VK, каждый раз.
-#              Используется publisher.py при включённом REPOST_ENABLED.
+# Задача: получить случайный пост с ДОСТУПНЫМ фото с твоей стены VK
+# Комментарий: проверяет что фото реально загружается, битые ссылки пропускает
 # Зависит от: requests, debug_utils
 # Вызывается из: publisher_utils.py (get_random_own_post_from_vk)
 # ==========================================
@@ -14,13 +13,11 @@ import requests
 from debug_utils import debug_log
 
 def get_random_post():
-    """Возвращает случайный пост с фото с твоей стены VK"""
-    
     token = os.environ.get("VK_TOKEN")
     owner_id = os.environ.get("VK_OWNER_ID")
     
     if not token or not owner_id:
-        debug_log("PHOTO_READER", "❌ Нет VK_TOKEN или VK_OWNER_ID", "ERROR")
+        debug_log("PHOTO_READER", "Нет VK_TOKEN или VK_OWNER_ID", "ERROR")
         return None
     
     url = "https://api.vk.com/method/wall.get"
@@ -36,12 +33,11 @@ def get_random_post():
         data = r.json()
         
         if "error" in data:
-            debug_log("PHOTO_READER", f"❌ Ошибка: {data['error']['error_msg']}", "ERROR")
+            debug_log("PHOTO_READER", f"Ошибка: {data['error']['error_msg']}", "ERROR")
             return None
         
         items = data.get("response", {}).get("items", [])
         
-        # Собираем посты с фото
         posts_with_photo = []
         for post in items:
             if post.get("is_pinned"):
@@ -51,28 +47,35 @@ def get_random_post():
             if not text:
                 continue
             
-            # Ищем фото
             attachments = post.get("attachments", [])
             for att in attachments:
                 if att.get("type") == "photo":
                     sizes = att.get("photo", {}).get("sizes", [])
                     if sizes:
                         photo_url = sizes[-1]["url"]
-                        tags = [w for w in text.split() if w.startswith('#')]
-                        posts_with_photo.append({
-                            "text": text,
-                            "photo_url": photo_url,
-                            "tags": tags
-                        })
+                        # Проверяем что фото доступно
+                        try:
+                            head = requests.head(photo_url, timeout=5)
+                            if head.status_code == 200:
+                                tags = [w for w in text.split() if w.startswith('#')]
+                                posts_with_photo.append({
+                                    "text": text,
+                                    "photo_url": photo_url,
+                                    "tags": tags
+                                })
+                            else:
+                                debug_log("PHOTO_READER", f"Фото недоступно (статус {head.status_code}): {photo_url[:60]}...", "WARNING")
+                        except:
+                            debug_log("PHOTO_READER", f"Фото не загружается: {photo_url[:60]}...", "WARNING")
                         break
         
         if not posts_with_photo:
-            debug_log("PHOTO_READER", "❌ Нет постов с фото", "WARNING")
+            debug_log("PHOTO_READER", "Нет доступных постов с фото", "WARNING")
             return None
         
-        debug_log("PHOTO_READER", f"✅ Найдено {len(posts_with_photo)} постов с фото")
+        debug_log("PHOTO_READER", f"Найдено {len(posts_with_photo)} постов с доступными фото")
         return random.choice(posts_with_photo)
         
     except Exception as e:
-        debug_log("PHOTO_READER", f"❌ Ошибка: {e}", "ERROR")
+        debug_log("PHOTO_READER", f"Ошибка: {e}", "ERROR")
         return None
