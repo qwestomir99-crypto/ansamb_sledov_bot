@@ -2,12 +2,7 @@
 # Файл: dialogue/agent.py
 # Справка: README.md → Агент / #говори
 # Задача: лёгкий агент для Yandex GPT с персонажами, библиотекой и чтением из сети
-# Комментарий: весь контент — в library/, правила — в evolve_agent.py,
-#              память — в agent_memory.py, журнал — в agent_journal.py,
-#              настройки — в agent_settings.py.
-#              Добавлена возможность читать ссылки через agent_reader.py
-# Зависит от: requests, os, json, debug_utils, library/, evolve_agent, memory, journal, settings, reader
-# Вызывается из: bot.py (ask_agent), admin_commands.py (process_dialog_message)
+# Комментарий: URL и ключи только из переменных окружения
 # ==========================================
 
 import os
@@ -16,9 +11,6 @@ import requests
 from datetime import datetime
 from debug_utils import debug_log
 
-# ==========================================
-# ВНЕШНИЕ МОДУЛИ
-# ==========================================
 try:
     from dialogue.agent_settings import get_agent_settings
     from dialogue.agent_journal import log as log_to_journal
@@ -39,10 +31,7 @@ except ImportError as e:
     def get_mood_prompt(*args): return ""
     def agent_read_url(*args): return False
 
-# ==========================================
-# КОНСТАНТЫ
-# ==========================================
-YANDEX_GPT_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+YANDEX_GPT_URL = os.environ.get("YANDEX_GPT_URL")
 YC_API_KEY = os.environ.get("YC_API_KEY")
 YC_FOLDER_ID = os.environ.get("YC_FOLDER_ID")
 
@@ -50,11 +39,7 @@ CONTEXT_FILE = "library/context.txt"
 LIBRARY_INDEX = "library/schema.json"
 CHARACTERS_FILE = "library/characters.md"
 
-# ==========================================
-# ЗАГРУЗКА ПЕРСОНАЖЕЙ (из library/)
-# ==========================================
 def load_characters():
-    """Загружает персонажей из schema.json (машиночитаемый индекс)"""
     if not os.path.exists(LIBRARY_INDEX):
         debug_log("AGENT", "schema.json не найден, персонажи не загружены", "WARNING")
         return {}
@@ -67,29 +52,21 @@ def load_characters():
         return {}
 
 def detect_character(prompt):
-    """Определяет персонажа по триггерам из schema.json"""
     characters = load_characters()
     if not characters:
         return None
-    
     best_match = None
     max_hits = 0
-    
     for char_id, char_data in characters.items():
         triggers = char_data.get("triggers", [])
         hits = sum(1 for t in triggers if t.lower() in prompt.lower())
         if hits > max_hits:
             max_hits = hits
             best_match = char_id
-    
     if max_hits == 0:
         return None
-    
     return characters.get(best_match, {})
 
-# ==========================================
-# ЗАГРУЗКА КОНТЕКСТА
-# ==========================================
 def load_context():
     try:
         with open(CONTEXT_FILE, "r", encoding="utf-8") as f:
@@ -97,23 +74,17 @@ def load_context():
     except:
         return None
 
-# ==========================================
-# ОСНОВНАЯ ФУНКЦИЯ
-# ==========================================
 def ask_agent(prompt, user_id=None):
-    """Основной метод агента — запрос к Yandex GPT с персонажами и библиотекой"""
-    if not YC_API_KEY or not YC_FOLDER_ID:
+    if not YC_API_KEY or not YC_FOLDER_ID or not YANDEX_GPT_URL:
         return "⚙️ Агент не настроен. Проверь переменные окружения."
 
     settings = get_agent_settings()
     context = load_context()
     
-    # Определяем персонажа по контексту
     char = detect_character(prompt)
     char_name = char.get("name", "Агент") if char else "Агент"
     char_prompt = f"Ты — {char_name}. " + char.get("prompt", "") if char else ""
     
-    # Загружаем настроение пользователя
     mood_prompt = get_mood_prompt(get_user_mood(user_id))
 
     messages = []
@@ -143,35 +114,21 @@ def ask_agent(prompt, user_id=None):
         }, json=payload, timeout=30)
         r.raise_for_status()
         answer = r.json()['result']['alternatives'][0]['message']['text']
-        
-        # Применяем правила эволюции (из evolve_agent.py)
         answer = apply_rules(prompt, answer)
-        
-        # Логируем в дневник
         log_to_journal(f"User {user_id} | {char_name} | Q: {prompt[:80]} | A: {answer[:80]}")
-        
-        # Сохраняем осадок для эволюции
         add_sediment(prompt, answer, user_id)
-        
-        # Запоминаем важные фразы и диалоги (опционально)
         if len(prompt) > 20 and len(answer) > 20:
             remember_dialogue(prompt, answer, user_id)
-        
         return answer.strip()
     except Exception as e:
         debug_log("AGENT", f"Ошибка: {e}", "ERROR")
         log_to_journal(f"Ошибка: {e}")
         return "🌙 Сеть шумит. Повтори позже."
 
-# ==========================================
-# ЧТЕНИЕ ИЗ СЕТИ (свободный режим)
-# ==========================================
 def agent_visit_url(url, tags=None):
-    """Агент читает ссылку и сохраняет в библиотеку"""
     return agent_read_url(url, tags)
 
 def get_agent_status():
-    """Возвращает статус агента для админки"""
     settings = get_agent_settings()
     journal_lines = 0
     try:
@@ -179,9 +136,7 @@ def get_agent_status():
         journal_lines = get_journal_lines()
     except ImportError:
         pass
-    
     memory_stats = get_memory_stats()
-    
     return {
         "temperature": settings.get("temperature", 0.7),
         "max_tokens": settings.get("max_tokens", 500),
@@ -191,9 +146,6 @@ def get_agent_status():
         "character": "auto-detected"
     }
 
-# ==========================================
-# ТЕСТ
-# ==========================================
 if __name__ == "__main__":
     print("=== ТЕСТ АГЕНТА ===")
     test_prompt = "Что такое разлом?"
