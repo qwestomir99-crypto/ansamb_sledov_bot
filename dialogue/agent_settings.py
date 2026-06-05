@@ -2,16 +2,15 @@
 # Файл: dialogue/agent_settings.py
 # Справка: README.md → Агент / Настройки
 # Задача: загрузка и сохранение настроек агента
-# Комментарий: работает с agent_data/settings.json
+# Комментарий: хранится в library/agent_settings.json
 # ==========================================
 
 import os
 import json
 
-SETTINGS_FILE = "agent_data/settings.json"
+SETTINGS_FILE = "library/agent_settings.json"
 
 def get_agent_settings():
-    """Загружает настройки агента (температура, max_tokens)"""
     if not os.path.exists(SETTINGS_FILE):
         return {"temperature": 0.7, "max_tokens": 500}
     try:
@@ -21,7 +20,6 @@ def get_agent_settings():
         return {"temperature": 0.7, "max_tokens": 500}
 
 def save_agent_settings(settings):
-    """Сохраняет настройки агента"""
     os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
     with open(SETTINGS_FILE, "w") as f:
         json.dump(settings, f, indent=2)
