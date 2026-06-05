@@ -2,7 +2,7 @@
 # Файл: dialogue/agent_journal.py
 # Справка: README.md → Агент / Дневник
 # Задача: запись и очистка дневника агента
-# Комментарий: пишет на диск, не хранит в памяти
+# Комментарий: хранится в library/agent_journal.md
 # Зависит от: os, datetime
 # Вызывается из: agent.py (ask_agent), evolve_agent.py
 # ==========================================
@@ -10,14 +10,12 @@
 import os
 from datetime import datetime
 
-JOURNAL_FILE = "agent_data/journal.txt"
+JOURNAL_FILE = "library/agent_journal.md"
 
 def _ensure_dir():
-    """Создаёт директорию для журнала, если её нет"""
     os.makedirs(os.path.dirname(JOURNAL_FILE), exist_ok=True)
 
 def log(text):
-    """Добавляет запись в дневник агента"""
     _ensure_dir()
     try:
         with open(JOURNAL_FILE, "a", encoding="utf-8") as f:
@@ -27,7 +25,6 @@ def log(text):
         print(f"[AGENT_JOURNAL] Ошибка записи: {e}")
 
 def _cleanup_if_needed(max_lines=500):
-    """Очищает дневник, если превышен лимит строк"""
     try:
         with open(JOURNAL_FILE, "r", encoding="utf-8") as f:
             lines = f.readlines()
@@ -39,7 +36,6 @@ def _cleanup_if_needed(max_lines=500):
         print(f"[AGENT_JOURNAL] Ошибка очистки: {e}")
 
 def get_journal_lines():
-    """Возвращает количество записей в дневнике (для статуса)"""
     try:
         with open(JOURNAL_FILE, "r", encoding="utf-8") as f:
             return sum(1 for _ in f)
@@ -47,7 +43,6 @@ def get_journal_lines():
         return 0
 
 def get_last_entries(limit=10):
-    """Возвращает последние N записей из дневника"""
     try:
         with open(JOURNAL_FILE, "r", encoding="utf-8") as f:
             lines = f.readlines()
@@ -56,15 +51,11 @@ def get_last_entries(limit=10):
         return []
 
 def clear_journal():
-    """Полностью очищает дневник (осторожно!)"""
     _ensure_dir()
     with open(JOURNAL_FILE, "w", encoding="utf-8") as f:
         f.write(f"# Дневник агента\n# Очищен: {datetime.now().isoformat()}\n")
     print(f"[AGENT_JOURNAL] Дневник очищен")
 
-# ==========================================
-# ТЕСТ
-# ==========================================
 if __name__ == "__main__":
     print("=== ТЕСТ ДНЕВНИКА АГЕНТА ===")
     log("Тестовая запись")
