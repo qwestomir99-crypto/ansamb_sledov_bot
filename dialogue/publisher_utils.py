@@ -1,18 +1,21 @@
 # ==========================================
 # Файл: dialogue/publisher_utils.py
 # Справка: README.md → Публикатор / Утилиты
-# Задача: отправка постов в Telegram
-# Комментарий: VK временно отключён (требуется бизнес-верификация)
+# Задача: отправка постов в Telegram и VK с поддержкой нескольких файлов (альбомов)
+# Комментарий: поддерживает одиночные файлы, альбомы (до 10 фото/видео), репосты
+# Зависит от: requests, os, random, json, utils
+# Вызывается из: publisher.py, admin_commands.py
 # ==========================================
 
 import os
 import random
 import json
+import requests
 from utils import escape_markdown
-from debug_utils import debug_log
 
 CONFIG_FILE = "config.json"
 QUOTES_FILE = "dialogue/data/quotes.txt"
+VK_POSTS_FILE = "dialogue/data/vk_posts.json"
 
 def load_config():
     with open(CONFIG_FILE, "r") as f:
@@ -28,35 +31,94 @@ def get_random_quote():
     quotes = load_quotes()
     return random.choice(quotes) if quotes else "Ритм 0,8 Гц стабилен. Сеть тлеет."
 
-def get_auto_tags(text, platform="tg"):
+def load_vk_posts():
+    if not os.path.exists(VK_POSTS_FILE):
+        return []
+    with open(VK_POSTS_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def get_random_own_post_from_vk():
+    posts = load_vk_posts()
+    if not posts:
+        return None
+    posts_with_media = [p for p in posts if p.get("attachments") or p.get("text")]
+    if not posts_with_media:
+        posts_with_media = posts
+    post = random.choice(posts_with_media)
+    return {
+        "post_id": post.get("id"),
+        "text": post.get("text", ""),
+        "attachments": post.get("attachments", []),
+        "date": post.get("date")
+    }
+
+def get_auto_tags(text, platform="vk"):
     config = load_config()
     tags = set()
-    default_tags = config.get("publisher", {}).get("default_tags", "#СапёрыАутентичности #МихоельАв #2026плита")
-    tags.update(default_tags.split())
+    if platform == "vk":
+        vk_tags = config.get("autoposter", {}).get("vk_tags", "#Ансамбль #СледНаКонтаке")
+        tags.update(vk_tags.split())
+    else:
+        default_tags = config.get("publisher", {}).get("default_tags", "#СапёрыАутентичности #МихоельАв #2026плита")
+        tags.update(default_tags.split())
     words = text.split()
     for w in words:
         if w.startswith('#'):
             tags.add(w)
     return " ".join(tags)
 
-def send_media_by_file_id(bot, chat_id, file_id, caption=None):
+def get_vk_upload_url(vk_token, owner_id):
+    params = {
+        "access_token": vk_token,
+        "v": "5.199",
+        "owner_id": owner_id
+    }
     try:
-        file_info = bot.get_file(file_id)
-        downloaded = bot.download_file(file_info.file_path)
-        ext = os.path.splitext(file_info.file_path)[1].lower()
-        
-        if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
-            bot.send_photo(chat_id, downloaded, caption=caption, parse_mode='MarkdownV2')
-        elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
-            bot.send_video(chat_id, downloaded, caption=caption, parse_mode='MarkdownV2')
-        else:
-            bot.send_document(chat_id, downloaded, caption=caption, parse_mode='MarkdownV2')
-        return True
+        r = requests.get("https://api.vk.com/method/photos.getWallUploadServer", params=params, timeout=10)
+        data = r.json()
+        return data.get("response", {}).get("upload_url")
     except Exception as e:
-        debug_log("PUBLISHER_UTILS", f"Ошибка отправки по file_id: {e}", "WARNING")
-        return False
+        print(f"[VK] upload URL ошибка: {e}")
+        return None
 
-def post_to_telegram(bot, chat_id, message, file_id=None, tags=None, auto_quote=True, auto_tags=True):
+def upload_photo_to_vk(upload_url, file_path, vk_token):
+    try:
+        with open(file_path, 'rb') as f:
+            files = {'photo': f}
+            r = requests.post(upload_url, files=files)
+            data = r.json()
+        
+        save_params = {
+            "access_token": vk_token,
+            "v": "5.199",
+            "photo": data['photo'],
+            "server": data['server'],
+            "hash": data['hash']
+        }
+        r = requests.get("https://api.vk.com/method/photos.saveWallPhoto", params=save_params)
+        photo_data = r.json()
+        
+        if 'response' in photo_data and photo_data['response']:
+            photo = photo_data['response'][0]
+            return f"photo{photo['owner_id']}_{photo['id']}"
+        else:
+            print(f"[VK] save photo ошибка: {photo_data}")
+            return None
+    except Exception as e:
+        print(f"[VK] upload photo ошибка: {e}")
+        return None
+
+def post_to_telegram(bot, chat_id, message, file_paths=None, tags=None, auto_quote=True, auto_tags=True):
+    """
+    Отправляет пост в Telegram.
+    Поддерживает:
+    - одиночное фото/видео/документ
+    - несколько фото/видео (альбом, media_group)
+    - текст без медиа
+    """
+    import telebot
+    from telebot.types import InputMediaPhoto, InputMediaVideo
+    
     if auto_quote and message and len(message) < 500:
         quote = get_random_quote()
         message = f"{message}\n\n📜 {quote}"
@@ -72,25 +134,150 @@ def post_to_telegram(bot, chat_id, message, file_id=None, tags=None, auto_quote=
     
     safe_caption = escape_markdown(full_message) if full_message else None
     
+    # Приводим file_paths к списку, если передан один путь
+    if file_paths and not isinstance(file_paths, list):
+        file_paths = [file_paths]
+    
     try:
-        if file_id:
-            success = send_media_by_file_id(bot, chat_id, file_id, safe_caption)
-            if success:
+        # === АЛЬБОМ (несколько фото/видео) ===
+        if file_paths and len(file_paths) > 1:
+            media_group = []
+            for fp in file_paths:
+                if not os.path.exists(fp):
+                    continue
+                ext = os.path.splitext(fp)[1].lower()
+                if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+                    with open(fp, 'rb') as f:
+                        media_group.append(InputMediaPhoto(f.read()))
+                elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
+                    with open(fp, 'rb') as f:
+                        media_group.append(InputMediaVideo(f.read()))
+            if media_group:
+                bot.send_media_group(chat_id, media_group)
+                if safe_caption:
+                    bot.send_message(chat_id, safe_caption, parse_mode='MarkdownV2')
                 return True
         
-        if safe_caption:
-            bot.send_message(chat_id, safe_caption, parse_mode='MarkdownV2')
+        # === ОДИНОЧНЫЙ ФАЙЛ ===
+        elif file_paths and len(file_paths) == 1:
+            fp = file_paths[0]
+            if not os.path.exists(fp):
+                print(f"[PUBLISHER] Файл не найден: {fp}")
+                return False
+            ext = os.path.splitext(fp)[1].lower()
+            with open(fp, 'rb') as f:
+                if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+                    if safe_caption:
+                        bot.send_photo(chat_id, f, caption=safe_caption, parse_mode='MarkdownV2')
+                    else:
+                        bot.send_photo(chat_id, f)
+                elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
+                    if safe_caption:
+                        bot.send_video(chat_id, f, caption=safe_caption, parse_mode='MarkdownV2')
+                    else:
+                        bot.send_video(chat_id, f)
+                elif ext in ['.mp3', '.m4a', '.wav']:
+                    if safe_caption:
+                        bot.send_audio(chat_id, f, caption=safe_caption, parse_mode='MarkdownV2')
+                    else:
+                        bot.send_audio(chat_id, f)
+                else:
+                    if safe_caption:
+                        bot.send_document(chat_id, f, caption=safe_caption, parse_mode='MarkdownV2')
+                    else:
+                        bot.send_document(chat_id, f)
             return True
-        return False
+        
+        # === ТОЛЬКО ТЕКСТ ===
+        else:
+            if safe_caption:
+                bot.send_message(chat_id, safe_caption, parse_mode='MarkdownV2')
+            else:
+                print(f"[PUBLISHER] Нет текста и файлов для публикации")
+                return False
+        return True
     except Exception as e:
-        debug_log("PUBLISHER", f"Ошибка Telegram: {e}", "ERROR")
-        try:
-            bot.send_message(chat_id, full_message[:4000])
-            return True
-        except:
-            return False
+        print(f"[PUBLISHER] Ошибка Telegram: {e}")
+        return False
 
-def post_to_vk(message, tags, access_token, owner_id, file_id=None, auto_quote=True, auto_tags=True, repost_from=None):
-    """VK временно отключён"""
-    debug_log("VK", "VK постинг отключён (требуется бизнес-верификация)", "WARNING")
-    return False, "VK временно отключён"
+def post_to_vk(message, tags, access_token, owner_id, file_paths=None, auto_quote=True, auto_tags=True, repost_from=None):
+    """
+    Отправляет пост в VK.
+    Поддерживает:
+    - несколько фото (до 10)
+    - одно видео (пока только одно, VK ограничивает)
+    - текст без медиа
+    """
+    print(f"[VK] post_to_vk вызван: message={message[:50] if message else ''}..., files={len(file_paths) if file_paths else 0}")
+    
+    if not access_token or not owner_id:
+        print("[VK] Нет токена или owner_id")
+        return False, "❌ Ошибка авторизации VK. Проверь токен."
+    
+    if auto_quote and message and len(message) < 500:
+        quote = get_random_quote()
+        message = f"{message}\n\n📜 {quote}"
+    
+    if auto_tags:
+        tags = get_auto_tags(message, "vk")
+    
+    full_message = f"{message}\n\n{tags}" if message else tags
+    
+    params = {
+        "access_token": access_token,
+        "v": "5.199",
+        "owner_id": owner_id,
+        "message": full_message,
+        "from_group": 1
+    }
+    
+    attachments = []
+    
+    # Приводим file_paths к списку, если передан один путь
+    if file_paths and not isinstance(file_paths, list):
+        file_paths = [file_paths]
+    
+    # === РЕПОСТ ===
+    if repost_from and repost_from.get("attachments"):
+        for att in repost_from["attachments"][:5]:
+            if att.get("type") == "photo":
+                photo = att.get("photo", {})
+                if photo.get("owner_id") and photo.get("id"):
+                    attachments.append(f"photo{photo['owner_id']}_{photo['id']}")
+            elif att.get("type") == "video":
+                video = att.get("video", {})
+                if video.get("owner_id") and video.get("id"):
+                    attachments.append(f"video{video['owner_id']}_{video['id']}")
+    
+    # === НЕСКОЛЬКО ФАЙЛОВ ===
+    elif file_paths:
+        for fp in file_paths:
+            if not os.path.exists(fp):
+                continue
+            ext = os.path.splitext(fp)[1].lower()
+            if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+                upload_url = get_vk_upload_url(access_token, owner_id)
+                if upload_url:
+                    photo_att = upload_photo_to_vk(upload_url, fp, access_token)
+                    if photo_att:
+                        attachments.append(photo_att)
+            elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
+                # VK пока не поддерживает видео через API в постинге
+                print(f"[VK] Видео пока не поддерживается: {fp}")
+    
+    if attachments:
+        params['attachments'] = ",".join(attachments)
+        print(f"[VK] Прикреплено {len(attachments)} вложений")
+    
+    try:
+        r = requests.get('https://api.vk.com/method/wall.post', params=params, timeout=30)
+        data = r.json()
+        if 'response' in data:
+            print(f"[VK] ✅ опубликовано: {message[:50] if message else ''}...")
+            return True, None
+        else:
+            print(f"[VK] ошибка: {data}")
+            return False, f"❌ Ошибка VK: {data.get('error', {}).get('error_msg', 'неизвестная')}"
+    except Exception as e:
+        print(f"[VK] исключение: {e}")
+        return False, f"❌ Ошибка сети: {e}"
