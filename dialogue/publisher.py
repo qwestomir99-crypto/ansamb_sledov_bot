@@ -1,14 +1,10 @@
 # ==========================================
 # Файл: dialogue/publisher.py
 # Справка: README.md → Публикатор
-# Задача: публикация случайных постов из пула (автоматическая и немедленная)
-# Комментарий: для TG — file_id, для VK — media_url (ссылка)
-#              Если нет медиа — тематическое фото
-#              Старший брат ОТКЛЮЧЁН
-#              Лимит пула — 100 постов
-#              Выбор поста — случайный (как YouTube из плейлиста)
+# Задача: публикация постов (немедленная, отложенная, из пула)
+# Комментарий: случайный выбор из пула, лимит 100, шаббат
 # Зависит от: os, json, time, random, threading, debug_utils, publisher_utils, post_manager
-# Вызывается из: bot.py (поток publish_loop)
+# Вызывается из: bot.py, admin_commands.py
 # ==========================================
 
 import os
@@ -17,8 +13,8 @@ import time
 import random
 import threading
 from debug_utils import debug_log
-from dialogue.publisher_utils import post_to_telegram, post_to_vk, get_random_quote
-from dialogue.post_manager import load_post_pool, save_post_pool, build_tags, remove_post_from_pool
+from dialogue.publisher_utils import post_to_telegram, get_random_quote
+from dialogue.post_manager import load_post_pool, save_post_pool, build_tags, remove_post_from_pool, add_post_to_pool
 
 CONFIG_FILE = "config.json"
 MAX_POOL_SIZE = 100
@@ -44,24 +40,23 @@ def get_theme_photo():
         pass
     return None
 
-def publish_post_immediately(bot, chat_id, text, tags_str, file_id=None):
-    config = load_config()
-    tg_chat_id = config.get("telegram", {}).get("publish_channel", "@qwestomir")
-    vk_token = os.environ.get("VK_TOKEN")
-    vk_owner_id = os.environ.get("VK_OWNER_ID")
-    
-    if tg_chat_id:
-        return post_to_telegram(bot, tg_chat_id, text, file_id, tags_str)
-    return False
+def publish_now_or_later(bot, user_id, text, tags, delay):
+    """Публикует сейчас (delay=0) или добавляет в пул"""
+    if delay == 0:
+        config = load_config()
+        tg_chat_id = config.get("telegram", {}).get("publish_channel", "@qwestomir")
+        tags_str = " ".join(tags) if tags else ""
+        return publish_post_immediately(bot, tg_chat_id, text, tags_str)
+    else:
+        return add_post_to_pool(text, tags, author=str(user_id))
 
-def publish_delayed(bot, text, tags_str, delay_seconds, file_id=None):
-    time.sleep(delay_seconds)
-    config = load_config()
-    tg_chat_id = config.get("telegram", {}).get("publish_channel", "@qwestomir")
-    publish_post_immediately(bot, tg_chat_id, text, tags_str, file_id)
+def publish_post_immediately(bot, chat_id, text, tags_str, file_id=None):
+    quote = get_random_quote()
+    full_text = f"{text}\n\n📜 {quote}" if text else quote
+    return post_to_telegram(bot, chat_id, full_text, file_id, tags_str)
 
 def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
-    """Публикует СЛУЧАЙНЫЙ пост из пула и удаляет его"""
+    """Публикует случайный пост из пула и удаляет его"""
     pool = load_post_pool()
     if not pool:
         return False
@@ -84,7 +79,11 @@ def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
             if file_id:
                 success = post_to_telegram(bot, tg_chat_id, full_text, file_id, tags)
             elif media_url and media_url.startswith("http"):
-                success = post_to_telegram(bot, tg_chat_id, full_text, media_url, tags)
+                try:
+                    bot.send_photo(tg_chat_id, media_url, caption=full_text[:1024])
+                    success = True
+                except:
+                    success = post_to_telegram(bot, tg_chat_id, full_text, None, tags)
             else:
                 theme_photo = get_theme_photo()
                 success = post_to_telegram(bot, tg_chat_id, full_text, theme_photo, tags)
