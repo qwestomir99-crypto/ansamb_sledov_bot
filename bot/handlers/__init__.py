@@ -41,6 +41,7 @@ def register_all_handlers(bot, config):
     from dialogue.quotes import quotes_loop
     from dialogue.publisher import publish_loop
     from services.autoposter import start_autoposter
+    from dialogue.vk_reader import vk_reader_loop
     
     register_handlers(bot, config)
     register_callback_handlers(bot, config)
@@ -53,8 +54,9 @@ def register_all_handlers(bot, config):
     threading.Thread(target=scheduler_loop, args=(bot, tg_chat_id, admin_id), daemon=True).start()
     threading.Thread(target=quotes_loop, args=(bot, tg_chat_id), daemon=True).start()
     threading.Thread(target=publish_loop, args=(bot, vk_token, vk_owner_id, tg_chat_id), daemon=True).start()
+    threading.Thread(target=vk_reader_loop, args=(bot, vk_token, vk_owner_id, tg_chat_id), daemon=True).start()
     
     if config.get("autoposter", {}).get("enabled", True):
         threading.Thread(target=start_autoposter, args=(config, vk_token, vk_owner_id), daemon=True).start()
     
-    print("[HANDLERS] Все потоки запущены: ритуал, цитаты, пул, YouTube")
+    print("[HANDLERS] Все потоки запущены: ритуал, цитаты, пул, YouTube, VK Reader")
