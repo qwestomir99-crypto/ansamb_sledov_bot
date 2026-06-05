@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 05.06.2026 07:26:49*
+*Обновлено: 05.06.2026 07:29:05*
 
 | Файл | Статус |
 |------|--------|
@@ -231,7 +231,6 @@
 | `dialogue/agent.py` | ✅ Redmi-шапка |
 | `dialogue/agent_journal.py` | ✅ Redmi-шапка |
 | `dialogue/agent_memory.py` | ✅ Redmi-шапка |
-| `dialogue/agent_memory_supabase.py` | ✅ Redmi-шапка |
 | `dialogue/agent_reader.py` | ✅ Redmi-шапка |
 | `dialogue/agent_settings.py` | ✅ Redmi-шапка |
 | `dialogue/approve_commands.py` | ✅ Redmi-шапка |
