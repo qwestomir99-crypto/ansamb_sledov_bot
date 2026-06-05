@@ -1,8 +1,8 @@
 # ==========================================
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
-# Задача: админ-меню, кнопки, управление цитатами, постинг в VK (личный профиль)
-# Комментарий: использует button_map.py, safe_delete, автоочистку меню
+# Задача: админ-меню, кнопки, управление цитатами
+# Комментарий: публикация делегирована в dialogue/publisher.py
 # ==========================================
 
 import os
@@ -41,19 +41,6 @@ def safe_delete(message, delay=3):
             pass
     threading.Thread(target=_delete, daemon=True).start()
 
-def send_report(bot, chat_id, text, delete_after=5):
-    msg = bot.send_message(chat_id, text)
-    if delete_after > 0:
-        safe_delete(msg, delete_after)
-
-def download_file(bot, file_id, suffix=""):
-    file_info = bot.get_file(file_id)
-    downloaded = bot.download_file(file_info.file_path)
-    temp_path = f"/tmp/telegram_file_{file_id}_{suffix}"
-    with open(temp_path, "wb") as f:
-        f.write(downloaded)
-    return temp_path
-
 authorized_admins = {}
 
 def is_admin_authorized(user_id):
@@ -80,16 +67,13 @@ def get_user_menu():
 def handle_admin_command(message, bot):
     user_id = message.from_user.id
     text = message.text.lower()
-    
     if is_admin_authorized(user_id):
         bot.reply_to(message, "🛡️ Админ-меню:", reply_markup=get_admin_menu())
         safe_delete(message, 3)
         return
-    
     parts = text.split(maxsplit=1)
     if len(parts) > 1:
-        password = parts[1]
-        if authorize_admin(user_id, password):
+        if authorize_admin(user_id, parts[1]):
             bot.reply_to(message, "✅ Авторизация успешна!", reply_markup=get_admin_menu())
             safe_delete(message, 3)
         else:
@@ -97,49 +81,26 @@ def handle_admin_command(message, bot):
             safe_delete(message, 3)
             safe_delete(msg, 5)
         return
-    
-    bot.reply_to(message, "🔐 Введите пароль для входа в админ-панель:\n(или #админ пароль)")
-
-def admin_login_from_menu(call, bot):
-    user_id = call.from_user.id
-    msg = bot.send_message(call.message.chat.id, "🔐 Введите пароль для входа в админ-панель:")
-    safe_delete(call.message, 1)
-    bot.register_next_step_handler(msg, process_admin_password, bot, user_id)
-
-def process_admin_password(message, bot, user_id):
-    password = message.text.strip()
-    if authorize_admin(user_id, password):
-        bot.reply_to(message, "✅ Авторизация успешна!", reply_markup=get_admin_menu())
-    else:
-        msg = bot.reply_to(message, "❌ Неверный пароль.")
-        safe_delete(msg, 5)
-    safe_delete(message, 3)
+    bot.reply_to(message, "🔐 Введите пароль:\n(или #админ пароль)")
 
 def show_admin_panel(call, bot):
-    bot.edit_message_text(
-        "🛡️ *Админ-панель*\n\nВыберите действие:",
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        reply_markup=get_admin_menu(),
-        parse_mode='Markdown'
-    )
+    bot.edit_message_text("🛡️ *Админ-панель*\n\nВыберите действие:", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=get_admin_menu(), parse_mode='Markdown')
     bot.answer_callback_query(call.id)
 
 def show_add_post_ui(call, bot):
-    msg = bot.send_message(call.message.chat.id, "📝 *Добавление поста*\n\nПришлите текст поста (можно с Markdown).\nИли /cancel для отмены.", parse_mode='Markdown')
+    msg = bot.send_message(call.message.chat.id, "📝 *Добавление поста*\n\nПришлите текст.\nИли /cancel.", parse_mode='Markdown')
     safe_delete(call.message, 1)
     bot.register_next_step_handler(msg, process_post_text, bot)
 
 def process_post_text(message, bot):
     if message.text == "/cancel":
-        msg = bot.reply_to(message, "❌ Добавление поста отменено.", reply_markup=get_admin_menu())
+        bot.reply_to(message, "❌ Отменено.", reply_markup=get_admin_menu())
         safe_delete(message, 3)
-        safe_delete(msg, 5)
         return
     if not hasattr(process_post_text, "temp_posts"):
         process_post_text.temp_posts = {}
     process_post_text.temp_posts[message.from_user.id] = {"text": message.text}
-    msg = bot.send_message(message.chat.id, "🏷️ Введите теги через пробел (например: #тлеем #ансамбль)\nИли /skip для пропуска")
+    msg = bot.send_message(message.chat.id, "🏷️ Теги через пробел или /skip")
     bot.register_next_step_handler(msg, process_post_tags, bot, message.from_user.id)
     safe_delete(message, 2)
 
@@ -147,86 +108,43 @@ def process_post_tags(message, bot, user_id):
     if message.text == "/skip":
         tags = []
     elif message.text == "/cancel":
-        msg = bot.reply_to(message, "❌ Добавление поста отменено.", reply_markup=get_admin_menu())
+        bot.reply_to(message, "❌ Отменено.", reply_markup=get_admin_menu())
         safe_delete(message, 3)
-        safe_delete(msg, 5)
         return
     else:
         tags = message.text.split()
-    
     post_data = getattr(process_post_text, "temp_posts", {}).get(user_id, {})
     text = post_data.get("text", "")
-    
     if not hasattr(process_post_tags, "pending_posts"):
         process_post_tags.pending_posts = {}
     process_post_tags.pending_posts[user_id] = {"text": text, "tags": tags}
-    
-    msg = bot.send_message(
-        message.chat.id,
-        "📋 *Пост готов.*\n\nНапишите `сейчас` чтобы опубликовать немедленно, или `позже` чтобы отложить в пул.\n/cancel для отмены.",
-        parse_mode='Markdown'
-    )
+    msg = bot.send_message(message.chat.id, "📋 *Пост готов.*\n`сейчас` — опубликовать\n`позже` — в пул\n/cancel — отмена", parse_mode='Markdown')
     bot.register_next_step_handler(msg, process_publish_choice, bot, user_id)
     safe_delete(message, 3)
 
 def process_publish_choice(message, bot, user_id):
     choice = message.text.strip().lower()
-    
     if choice == "/cancel":
-        bot.reply_to(message, "❌ Публикация отменена.", reply_markup=get_admin_menu())
+        bot.reply_to(message, "❌ Отменена.", reply_markup=get_admin_menu())
         safe_delete(message, 3)
         return
-    
     post_data = getattr(process_post_tags, "pending_posts", {}).get(user_id, {})
     text = post_data.get("text", "")
     tags = post_data.get("tags", [])
-    
     if choice == "сейчас":
-        from dialogue.publisher_utils import post_to_telegram, get_random_quote
+        from dialogue.publisher import publish_post_immediately
         config = load_config()
         tg_chat_id = config.get("telegram", {}).get("publish_channel", "@qwestomir")
-        quote = get_random_quote()
-        full_text = f"{text}\n\n📜 {quote}"
         tags_str = " ".join(tags)
-        success = post_to_telegram(bot, tg_chat_id, full_text, None, tags_str)
-        if success:
-            bot.reply_to(message, "✅ Пост опубликован!", reply_markup=get_admin_menu())
-        else:
-            bot.reply_to(message, "❌ Ошибка публикации.", reply_markup=get_admin_menu())
+        success = publish_post_immediately(bot, tg_chat_id, text, tags_str)
+        bot.reply_to(message, "✅ Опубликовано!" if success else "❌ Ошибка.", reply_markup=get_admin_menu())
     elif choice == "позже":
         from dialogue.post_manager import add_post_to_pool
         success = add_post_to_pool(text, tags, author=str(user_id))
-        if success:
-            bot.reply_to(message, "✅ Пост добавлен в пул!", reply_markup=get_admin_menu())
-        else:
-            bot.reply_to(message, "❌ Ошибка сохранения.", reply_markup=get_admin_menu())
+        bot.reply_to(message, "✅ В пуле!" if success else "❌ Ошибка.", reply_markup=get_admin_menu())
     else:
-        bot.reply_to(message, "❌ Напишите `сейчас` или `позже`.", reply_markup=get_admin_menu())
-    
+        bot.reply_to(message, "❌ `сейчас` или `позже`.", reply_markup=get_admin_menu())
     safe_delete(message, 5)
-
-def show_vk_post_ui(call, bot):
-    msg = bot.send_message(call.message.chat.id, "🎬 *Пост в VK*\n\nПришлите текст поста.\nИли /cancel для отмены.", parse_mode='Markdown')
-    safe_delete(call.message, 1)
-    bot.register_next_step_handler(msg, process_vk_post, bot)
-
-def process_vk_post(message, bot):
-    if message.text == "/cancel":
-        msg = bot.reply_to(message, "❌ Отправка в VK отменена.", reply_markup=get_admin_menu())
-        safe_delete(message, 3)
-        safe_delete(msg, 5)
-        return
-    vk_token = os.environ.get("VK_TOKEN")
-    vk_owner_id = os.environ.get("VK_OWNER_ID")
-    if not vk_token:
-        bot.reply_to(message, "❌ VK_TOKEN не задан")
-        return
-    from dialogue.publisher_utils import post_to_vk
-    success, result = post_to_vk(message.text or "", "", vk_token, vk_owner_id)
-    if success:
-        bot.reply_to(message, "✅ Пост опубликован в VK!")
-    else:
-        bot.reply_to(message, f"❌ Ошибка VK: {result}")
 
 def show_quotes_panel(call, bot):
     keyboard = InlineKeyboardMarkup(row_width=2)
@@ -238,65 +156,55 @@ def show_quotes_panel(call, bot):
         InlineKeyboardButton(get_text("set_quote_interval"), callback_data=get_callback("set_quote_interval")),
         InlineKeyboardButton(get_text("back_to_admin"), callback_data=get_callback("back_to_admin")),
     )
-    bot.edit_message_text(
-        f"📜 *Управление цитатами*\n\n📊 Всего цитат: {len(get_quotes_list())}\n⏱️ Интервал публикации: {get_quotes_interval()} мин.",
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        reply_markup=keyboard,
-        parse_mode='Markdown'
-    )
+    bot.edit_message_text(f"📜 *Цитаты*\n📊 {len(get_quotes_list())}\n⏱ {get_quotes_interval()} мин.", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard, parse_mode='Markdown')
     bot.answer_callback_query(call.id)
 
 def list_quotes(call, bot):
     quotes = get_quotes_list()
     if not quotes:
-        bot.edit_message_text("📭 База цитат пуста.", chat_id=call.message.chat.id, message_id=call.message.message_id)
+        bot.edit_message_text("📭 Пусто.", chat_id=call.message.chat.id, message_id=call.message.message_id)
         return
-    text = "📖 *Последние 20 цитат:*\n\n"
+    text = "📖 *Цитаты:*\n\n"
     for i, q in enumerate(quotes[-20:], 1):
         text += f"{i}. {q[:80]}{'...' if len(q) > 80 else ''}\n"
     bot.edit_message_text(text, chat_id=call.message.chat.id, message_id=call.message.message_id, parse_mode='Markdown')
     bot.answer_callback_query(call.id)
 
 def add_quote_ui(call, bot):
-    msg = bot.send_message(call.message.chat.id, "📜 *Добавление цитаты*\n\nПришлите текст цитаты.\nИли /cancel для отмены.", parse_mode='Markdown')
+    msg = bot.send_message(call.message.chat.id, "📜 Пришлите цитату.\n/cancel.", parse_mode='Markdown')
     safe_delete(call.message, 1)
     bot.register_next_step_handler(msg, process_new_quote, bot)
 
 def process_new_quote(message, bot):
     if message.text == "/cancel":
-        bot.reply_to(message, "❌ Добавление цитаты отменено.", reply_markup=get_admin_menu())
+        bot.reply_to(message, "❌ Отменено.", reply_markup=get_admin_menu())
         safe_delete(message, 3)
         return
-    quote = message.text.strip()
-    if add_quote(quote):
-        bot.reply_to(message, "✅ Цитата добавлена в базу!", reply_markup=get_admin_menu())
+    if add_quote(message.text.strip()):
+        bot.reply_to(message, "✅ Добавлена!", reply_markup=get_admin_menu())
     else:
-        bot.reply_to(message, "❌ Ошибка при сохранении цитаты.", reply_markup=get_admin_menu())
+        bot.reply_to(message, "❌ Ошибка.", reply_markup=get_admin_menu())
     safe_delete(message, 5)
 
 def set_quote_interval_ui(call, bot):
     safe_delete(call.message, 1)
-    msg = bot.send_message(
-        call.message.chat.id,
-        f"⏱️ *Текущий интервал цитат:* {get_quotes_interval()} мин.\n\nВведите новое значение в минутах (число от 5 до 720).\nИли /cancel для отмены.",
-        parse_mode='Markdown'
-    )
+    msg = bot.send_message(call.message.chat.id, f"⏱ Текущий: {get_quotes_interval()} мин.\nВведите от 5 до 720.\n/cancel.", parse_mode='Markdown')
     bot.register_next_step_handler(msg, process_quote_interval, bot)
 
 def process_quote_interval(message, bot):
     if message.text == "/cancel":
-        bot.reply_to(message, "❌ Изменение интервала отменено.", reply_markup=get_admin_menu())
+        bot.reply_to(message, "❌ Отменено.", reply_markup=get_admin_menu())
         safe_delete(message, 3)
         return
     try:
         interval = int(message.text.strip())
-        if interval < 5 or interval > 720:
+        if 5 <= interval <= 720:
+            set_quotes_interval(interval)
+            bot.reply_to(message, f"✅ Интервал: {interval} мин.", reply_markup=get_admin_menu())
+        else:
             raise ValueError
-        set_quotes_interval(interval)
-        bot.reply_to(message, f"✅ Интервал цитат установлен на {interval} минут.", reply_markup=get_admin_menu())
-    except ValueError:
-        bot.reply_to(message, "❌ Ошибка: введите число от 5 до 720.", reply_markup=get_admin_menu())
+    except:
+        bot.reply_to(message, "❌ Число от 5 до 720.", reply_markup=get_admin_menu())
     safe_delete(message, 5)
 
 def show_diagnostics(call, bot):
@@ -305,39 +213,35 @@ def show_diagnostics(call, bot):
     bot.answer_callback_query(call.id)
 
 def admin_logout(call, bot):
-    user_id = call.from_user.id
-    logout_admin(user_id)
+    logout_admin(call.from_user.id)
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except:
         pass
-    msg = bot.send_message(call.message.chat.id, "👋 Вы вышли из админ-панели.")
+    msg = bot.send_message(call.message.chat.id, "👋 Вы вышли.")
     safe_delete(msg, 3)
     bot.answer_callback_query(call.id)
 
 def show_mood_menu(call, bot):
-    bot.edit_message_text("🎭 *Выберите настроение*", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=get_moods_keyboard(with_back=True), parse_mode='Markdown')
+    bot.edit_message_text("🎭 *Настроение*", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=get_moods_keyboard(with_back=True), parse_mode='Markdown')
     bot.answer_callback_query(call.id)
 
 def show_dialog_ui(call, bot):
-    msg = bot.send_message(call.message.chat.id, "🗣 *Начните диалог*\n\nПросто напишите сообщение.", parse_mode='Markdown')
+    msg = bot.send_message(call.message.chat.id, "🗣 Напишите сообщение.", parse_mode='Markdown')
     safe_delete(call.message, 1)
     bot.register_next_step_handler(msg, process_dialog_message, bot)
 
 def process_dialog_message(message, bot):
     if message.text == "/cancel":
-        bot.reply_to(message, "❌ Диалог отменён.")
+        bot.reply_to(message, "❌ Отменён.")
         safe_delete(message, 3)
         return
     from dialogue.agent import ask_agent
-    status_msg = bot.reply_to(message, "⏳ Старший брат думает...")
+    status_msg = bot.reply_to(message, "⏳ Думаю...")
     answer = ask_agent(message.text, user_id=message.from_user.id)
     try:
         bot.delete_message(status_msg.chat.id, status_msg.message_id)
     except:
         pass
-    if answer:
-        bot.reply_to(message, f"🗣 *Старший брат:*\n{answer}", parse_mode='Markdown')
-    else:
-        bot.reply_to(message, "🌙 Старший брат отдыхает.")
+    bot.reply_to(message, f"🗣 {answer}" if answer else "🌙 Отдыхает.")
     safe_delete(message, 5)
