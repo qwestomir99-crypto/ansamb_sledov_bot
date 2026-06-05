@@ -6,21 +6,17 @@
 
 import os
 import tempfile
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dialogue.post_manager import add_post_to_pool, load_post_pool
 from dialogue.publisher_utils import get_auto_tags, get_random_quote, post_to_vk
-from services.vk_uploader import upload_video_to_vk
 from debug_utils import debug_log
 
 def handle_pub_menu(bot, chat_id, message_id, user_id):
-    debug_log("POSTS", f"handle_pub_menu: user={user_id}")
     pubs = load_post_pool()
     if not pubs:
         bot.edit_message_text("📭 Нет отложенных публикаций", chat_id, message_id)
         return
-    
     text = "📋 *Отложенные публикации:*\n\n"
-    for i, p in enumerate(pubs):
+    for p in pubs:
         pub_text = p.get("text", "[Без текста]")
         if pub_text and len(pub_text) > 50:
             pub_text = pub_text[:50] + "..."
@@ -32,7 +28,7 @@ def handle_pub_menu(bot, chat_id, message_id, user_id):
         bot.edit_message_text(text, chat_id, message_id, parse_mode='Markdown')
 
 def ask_for_post_text(bot, chat_id, message_id):
-    msg = bot.send_message(chat_id, "✍️ Введите текст поста (можно с Markdown) или /skip для поста без текста")
+    msg = bot.send_message(chat_id, "✍️ Введите текст поста или /skip")
     bot.register_next_step_handler(msg, process_post_text, bot, chat_id)
 
 def process_post_text(message, bot, chat_id):
@@ -40,7 +36,7 @@ def process_post_text(message, bot, chat_id):
     ask_for_post_file(bot, chat_id, text)
 
 def ask_for_post_file(bot, chat_id, text):
-    msg = bot.send_message(chat_id, "📎 Пришлите файл (фото, видео, документ) или нажмите /skip")
+    msg = bot.send_message(chat_id, "📎 Пришлите файл или /skip")
     bot.register_next_step_handler(msg, process_post_file, bot, chat_id, text)
 
 def process_post_file(message, bot, chat_id, text):
@@ -80,17 +76,15 @@ def process_post_delay(message, bot, chat_id, text, file_path):
     except:
         bot.send_message(chat_id, "❌ Введите положительное число минут")
         return
-    
     from dialogue.admin_commands import load_config
     config = load_config()
     pub_config = config.get("publisher", {})
     default_tags = pub_config.get("default_tags", "#СапёрыАутентичности #МихоельАв #2026плита")
-    
     add_post_to_pool(text or "", default_tags.split(), author=str(message.from_user.id))
     bot.send_message(chat_id, f"✅ Пост запланирован через {delay_minutes} минут")
 
 def handle_vk_post(bot, chat_id, message_id, user_id):
-    msg = bot.send_message(chat_id, "✍️ Введите текст поста для VK (можно с хештегами):")
+    msg = bot.send_message(chat_id, "✍️ Введите текст поста для VK:")
     bot.register_next_step_handler(msg, process_vk_post_text, bot, chat_id, user_id)
 
 def process_vk_post_text(message, bot, chat_id, user_id):
@@ -98,7 +92,7 @@ def process_vk_post_text(message, bot, chat_id, user_id):
     if not text:
         bot.send_message(chat_id, "❌ Текст не может быть пустым")
         return
-    msg = bot.send_message(chat_id, "📎 Пришлите фото, видео или нажмите /skip")
+    msg = bot.send_message(chat_id, "📎 Пришлите фото, видео или /skip")
     bot.register_next_step_handler(msg, process_vk_post_file, bot, chat_id, text, user_id)
 
 def process_vk_post_file(message, bot, chat_id, text, user_id):
@@ -129,18 +123,12 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
     full_text = f"{text}\n\n📜 {quote}"
     auto_tags = get_auto_tags(text, "vk")
     
-    if file_path:
-        success, result = upload_video_to_vk(file_path, vk_token, vk_owner_id, full_text, auto_tags)
-        if success:
-            bot.send_message(chat_id, f"✅ Видео отправлено в VK!")
-        else:
-            bot.send_message(chat_id, f"❌ Ошибка: {result}")
+    success, error_msg = post_to_vk(full_text, auto_tags, vk_token, vk_owner_id, file_path, auto_quote=False, auto_tags=False)
+    
+    if success:
+        bot.send_message(chat_id, "✅ Пост отправлен в VK!")
     else:
-        success, error_msg = post_to_vk(full_text, auto_tags, vk_token, vk_owner_id, file_path, auto_quote=False, auto_tags=False)
-        if success:
-            bot.send_message(chat_id, f"✅ Пост отправлен в VK!")
-        else:
-            bot.send_message(chat_id, error_msg or "❌ Ошибка при отправке в VK")
+        bot.send_message(chat_id, error_msg or "❌ Ошибка при отправке в VK")
     
     if file_path and os.path.exists(file_path):
         os.remove(file_path)
