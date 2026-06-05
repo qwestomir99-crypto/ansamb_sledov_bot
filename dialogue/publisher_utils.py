@@ -2,7 +2,7 @@
 # Файл: dialogue/publisher_utils.py
 # Справка: README.md → Публикатор / Утилиты
 # Задача: отправка постов в Telegram и VK с поддержкой нескольких файлов (альбомов)
-# Комментарий: поддерживает одиночные файлы, альбомы (до 10 фото/видео), репосты
+# Комментарий: VK — личный профиль (from_group убран), JSON с проверкой на пустоту
 # Зависит от: requests, os, random, json, utils
 # Вызывается из: publisher.py, admin_commands.py
 # ==========================================
@@ -34,8 +34,14 @@ def get_random_quote():
 def load_vk_posts():
     if not os.path.exists(VK_POSTS_FILE):
         return []
-    with open(VK_POSTS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(VK_POSTS_FILE, "r", encoding="utf-8") as f:
+            data = f.read().strip()
+            if not data:
+                return []
+            return json.loads(data)
+    except:
+        return []
 
 def get_random_own_post_from_vk():
     posts = load_vk_posts()
@@ -109,13 +115,6 @@ def upload_photo_to_vk(upload_url, file_path, vk_token):
         return None
 
 def post_to_telegram(bot, chat_id, message, file_paths=None, tags=None, auto_quote=True, auto_tags=True):
-    """
-    Отправляет пост в Telegram.
-    Поддерживает:
-    - одиночное фото/видео/документ
-    - несколько фото/видео (альбом, media_group)
-    - текст без медиа
-    """
     import telebot
     from telebot.types import InputMediaPhoto, InputMediaVideo
     
@@ -134,12 +133,10 @@ def post_to_telegram(bot, chat_id, message, file_paths=None, tags=None, auto_quo
     
     safe_caption = escape_markdown(full_message) if full_message else None
     
-    # Приводим file_paths к списку, если передан один путь
     if file_paths and not isinstance(file_paths, list):
         file_paths = [file_paths]
     
     try:
-        # === АЛЬБОМ (несколько фото/видео) ===
         if file_paths and len(file_paths) > 1:
             media_group = []
             for fp in file_paths:
@@ -158,7 +155,6 @@ def post_to_telegram(bot, chat_id, message, file_paths=None, tags=None, auto_quo
                     bot.send_message(chat_id, safe_caption, parse_mode='MarkdownV2')
                 return True
         
-        # === ОДИНОЧНЫЙ ФАЙЛ ===
         elif file_paths and len(file_paths) == 1:
             fp = file_paths[0]
             if not os.path.exists(fp):
@@ -188,12 +184,10 @@ def post_to_telegram(bot, chat_id, message, file_paths=None, tags=None, auto_quo
                         bot.send_document(chat_id, f)
             return True
         
-        # === ТОЛЬКО ТЕКСТ ===
         else:
             if safe_caption:
                 bot.send_message(chat_id, safe_caption, parse_mode='MarkdownV2')
             else:
-                print(f"[PUBLISHER] Нет текста и файлов для публикации")
                 return False
         return True
     except Exception as e:
@@ -201,13 +195,6 @@ def post_to_telegram(bot, chat_id, message, file_paths=None, tags=None, auto_quo
         return False
 
 def post_to_vk(message, tags, access_token, owner_id, file_paths=None, auto_quote=True, auto_tags=True, repost_from=None):
-    """
-    Отправляет пост в VK.
-    Поддерживает:
-    - несколько фото (до 10)
-    - одно видео (пока только одно, VK ограничивает)
-    - текст без медиа
-    """
     print(f"[VK] post_to_vk вызван: message={message[:50] if message else ''}..., files={len(file_paths) if file_paths else 0}")
     
     if not access_token or not owner_id:
@@ -227,17 +214,14 @@ def post_to_vk(message, tags, access_token, owner_id, file_paths=None, auto_quot
         "access_token": access_token,
         "v": "5.199",
         "owner_id": owner_id,
-        "message": full_message,
-        "from_group": 1
+        "message": full_message
     }
     
     attachments = []
     
-    # Приводим file_paths к списку, если передан один путь
     if file_paths and not isinstance(file_paths, list):
         file_paths = [file_paths]
     
-    # === РЕПОСТ ===
     if repost_from and repost_from.get("attachments"):
         for att in repost_from["attachments"][:5]:
             if att.get("type") == "photo":
@@ -249,7 +233,6 @@ def post_to_vk(message, tags, access_token, owner_id, file_paths=None, auto_quot
                 if video.get("owner_id") and video.get("id"):
                     attachments.append(f"video{video['owner_id']}_{video['id']}")
     
-    # === НЕСКОЛЬКО ФАЙЛОВ ===
     elif file_paths:
         for fp in file_paths:
             if not os.path.exists(fp):
@@ -262,7 +245,6 @@ def post_to_vk(message, tags, access_token, owner_id, file_paths=None, auto_quot
                     if photo_att:
                         attachments.append(photo_att)
             elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
-                # VK пока не поддерживает видео через API в постинге
                 print(f"[VK] Видео пока не поддерживается: {fp}")
     
     if attachments:
