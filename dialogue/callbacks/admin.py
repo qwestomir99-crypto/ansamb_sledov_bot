@@ -2,22 +2,19 @@
 # Файл: dialogue/callbacks/admin.py
 # Справка: README.md → Обработчики кнопок / Админ-панель
 # Задача: обработка callback'ов админ-панели
-# Комментарий: вынесен из callbacks.py
-# Зависит от: telebot, dialogue.admin_commands, debug_utils
-# Вызывается из: callbacks/__init__.py
 # ==========================================
 
 import telebot
 from dialogue.admin_commands import (
-    show_admin_panel, show_add_post_ui, show_vk_post_ui,
+    show_admin_panel, show_add_post_ui,
     show_quotes_panel, list_quotes, add_quote_ui, set_quote_interval_ui,
     show_diagnostics, admin_logout
 )
+from dialogue.admin.posts import handle_vk_post
 from dialogue.button_map import get_admin_menu_keyboard
 from debug_utils import debug_log
 
 def register_admin_callbacks(bot: telebot.TeleBot, config: dict):
-    """Регистрирует callback'и для админ-панели"""
     
     @bot.callback_query_handler(func=lambda call: call.data == "admin_panel")
     def callback_manage_bot(call):
@@ -34,7 +31,7 @@ def register_admin_callbacks(bot: telebot.TeleBot, config: dict):
     @bot.callback_query_handler(func=lambda call: call.data == "vk_post")
     def callback_vk_post(call):
         debug_log("CALLBACK", f"Пост в VK от {call.from_user.id}")
-        show_vk_post_ui(call, bot)
+        handle_vk_post(bot, call.message.chat.id, call.message.message_id, call.from_user.id)
         bot.answer_callback_query(call.id)
     
     @bot.callback_query_handler(func=lambda call: call.data == "manage_quotes")
