@@ -6,7 +6,6 @@
 # ==========================================
 
 import os
-import random
 import json
 import threading
 import time
@@ -19,7 +18,6 @@ from dialogue.button_map import (
 )
 from dialogue.quotes import get_quotes_list, add_quote, set_quotes_interval, get_quotes_interval
 from debug_utils import debug_log
-from ping_utils import ping_self
 
 CONFIG_FILE = "config.json"
 
@@ -29,7 +27,6 @@ def load_config():
 
 config = load_config()
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "tleem2026")
-ADMIN_USER_ID = int(os.environ.get("ADMIN_USER_ID", 0))
 
 def safe_delete(message, delay=3):
     def _delete():
@@ -118,7 +115,7 @@ def process_post_tags(message, bot, user_id):
     if not hasattr(process_post_tags, "pending_posts"):
         process_post_tags.pending_posts = {}
     process_post_tags.pending_posts[user_id] = {"text": text, "tags": tags}
-    msg = bot.send_message(message.chat.id, "📋 *Пост готов.*\n`сейчас` — опубликовать\n`позже` — в пул\n/cancel — отмена", parse_mode='Markdown')
+    msg = bot.send_message(message.chat.id, "📋 *Пост готов.*\n`0` — сейчас, или число минут для отложки.\n/cancel — отмена", parse_mode='Markdown')
     bot.register_next_step_handler(msg, process_publish_choice, bot, user_id)
     safe_delete(message, 3)
 
@@ -128,22 +125,26 @@ def process_publish_choice(message, bot, user_id):
         bot.reply_to(message, "❌ Отменена.", reply_markup=get_admin_menu())
         safe_delete(message, 3)
         return
+    
     post_data = getattr(process_post_tags, "pending_posts", {}).get(user_id, {})
     text = post_data.get("text", "")
     tags = post_data.get("tags", [])
-    if choice == "сейчас":
-        from dialogue.publisher import publish_post_immediately
-        config = load_config()
-        tg_chat_id = config.get("telegram", {}).get("publish_channel", "@qwestomir")
-        tags_str = " ".join(tags)
-        success = publish_post_immediately(bot, tg_chat_id, text, tags_str)
+    
+    try:
+        delay = int(choice)
+    except:
+        bot.reply_to(message, "❌ Введите число (0 = сейчас).", reply_markup=get_admin_menu())
+        safe_delete(message, 5)
+        return
+    
+    from dialogue.publisher import publish_now_or_later
+    success = publish_now_or_later(bot, user_id, text, tags, delay)
+    
+    if delay == 0:
         bot.reply_to(message, "✅ Опубликовано!" if success else "❌ Ошибка.", reply_markup=get_admin_menu())
-    elif choice == "позже":
-        from dialogue.post_manager import add_post_to_pool
-        success = add_post_to_pool(text, tags, author=str(user_id))
-        bot.reply_to(message, "✅ В пуле!" if success else "❌ Ошибка.", reply_markup=get_admin_menu())
     else:
-        bot.reply_to(message, "❌ `сейчас` или `позже`.", reply_markup=get_admin_menu())
+        bot.reply_to(message, f"✅ В пул!" if success else "❌ Ошибка.", reply_markup=get_admin_menu())
+    
     safe_delete(message, 5)
 
 def show_quotes_panel(call, bot):
