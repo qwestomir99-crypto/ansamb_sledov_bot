@@ -3,8 +3,6 @@
 # Справка: README.md → Публикатор
 # Задача: публикация постов (немедленная, отложенная, из пула)
 # Комментарий: случайный выбор из пула, лимит 100, шаббат
-# Зависит от: os, json, time, random, threading, debug_utils, publisher_utils, post_manager
-# Вызывается из: bot.py, admin_commands.py
 # ==========================================
 
 import os
@@ -13,7 +11,7 @@ import time
 import random
 import threading
 from debug_utils import debug_log
-from dialogue.publisher_utils import post_to_telegram, get_random_quote
+from dialogue.publisher_utils import get_random_quote
 from dialogue.post_manager import load_post_pool, save_post_pool, build_tags, remove_post_from_pool, add_post_to_pool
 
 CONFIG_FILE = "config.json"
@@ -53,7 +51,13 @@ def publish_now_or_later(bot, user_id, text, tags, delay):
 def publish_post_immediately(bot, chat_id, text, tags_str, file_id=None):
     quote = get_random_quote()
     full_text = f"{text}\n\n📜 {quote}" if text else quote
-    return post_to_telegram(bot, chat_id, full_text, file_id, tags_str)
+    try:
+        bot.send_message(chat_id, full_text)
+        debug_log("PUBLISH", f"Опубликовано в {chat_id}")
+        return True
+    except Exception as e:
+        debug_log("PUBLISH", f"Ошибка: {e}", "ERROR")
+        return False
 
 def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
     """Публикует случайный пост из пула и удаляет его"""
@@ -77,16 +81,24 @@ def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
     if tg_chat_id:
         try:
             if file_id:
-                success = post_to_telegram(bot, tg_chat_id, full_text, file_id, tags)
+                try:
+                    bot.send_photo(tg_chat_id, file_id, caption=full_text[:1024])
+                    success = True
+                except:
+                    success = False
             elif media_url and media_url.startswith("http"):
                 try:
                     bot.send_photo(tg_chat_id, media_url, caption=full_text[:1024])
                     success = True
                 except:
-                    success = post_to_telegram(bot, tg_chat_id, full_text, None, tags)
-            else:
-                theme_photo = get_theme_photo()
-                success = post_to_telegram(bot, tg_chat_id, full_text, theme_photo, tags)
+                    success = False
+            
+            if not success:
+                try:
+                    bot.send_message(tg_chat_id, full_text)
+                    success = True
+                except:
+                    success = False
             
             if success:
                 debug_log("PUBLISH", "Пост опубликован в Telegram")
@@ -121,7 +133,7 @@ def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
             published = publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id)
             
             if published:
-                debug_log("PUBLISH", f"Опубликовано (случайный пост), следующая через {interval} сек")
+                debug_log("PUBLISH", f"Опубликовано, следующая через {interval} сек")
             else:
                 debug_log("PUBLISH", "Нет постов для публикации")
             
