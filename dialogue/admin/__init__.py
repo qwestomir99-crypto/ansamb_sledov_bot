@@ -1,7 +1,6 @@
 # ==========================================
-# Файл: new_debugger/dialogue/admin/__init__.py
+# Файл: dialogue/admin/__init__.py
 # Задача: импорт всех публичных функций из подмодулей админки
-# Комментарий: обновлён для поддержки дебаггера
 # ==========================================
 
 from .menu import (
@@ -31,14 +30,4 @@ from .posts import (
     handle_pub_menu,
     ask_for_post_text,
     handle_vk_post
-)
-from .diagnostics import (
-    handle_errors,
-    handle_log,
-    handle_debug
-)
-from .callbacks import (
-    handle_callback_mode,
-    handle_callback_ping,
-    handle_callback_toggle_alisa
 )
