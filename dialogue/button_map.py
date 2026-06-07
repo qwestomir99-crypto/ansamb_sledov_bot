@@ -2,13 +2,10 @@
 # Файл: dialogue/button_map.py
 # Справка: README.md → Админ-панель / Кнопки
 # Задача: единая таблица всех кнопок (текст + callback)
-# Комментарий: добавлена кнопка интервала постов
-# Зависит от: telebot
-# Вызывается из: dialogue/admin_commands.py, dialogue/callbacks.py
+# Комментарий: добавлена кнопка закрытия меню
 # ==========================================
 
 BUTTONS = {
-    # Основные кнопки админ-меню
     "manage_bot":      {"text": "🔧 Управление ботом",      "callback": "admin_panel"},
     "add_post":        {"text": "📝 Добавить пост",         "callback": "add_post"},
     "vk_post":         {"text": "🎬 Пост в VK (с медиа)",   "callback": "vk_post"},
@@ -33,6 +30,7 @@ BUTTONS = {
     "clear_logs":     {"text": "🧹 Очистить логи", "callback": "clear_logs"},
     "back_to_admin":  {"text": "◀️ Назад в админ-меню", "callback": "back_to_admin"},
     "cancel":         {"text": "❌ Отмена",             "callback": "cancel"},
+    "close_menu":     {"text": "❌ Закрыть",            "callback": "close_menu"},
     "user_help":      {"text": "❓ Помощь",         "callback": "user_help"},
     "user_tleem":     {"text": "🔥 #тлеем",        "callback": "user_tleem"},
     "user_fix":       {"text": "🔒 #фиксируем",    "callback": "user_fix"},
@@ -98,6 +96,7 @@ def get_user_menu_keyboard():
     )
     keyboard.add(
         InlineKeyboardButton(get_text("user_help"), callback_data=get_callback("user_help")),
+        InlineKeyboardButton(get_text("close_menu"), callback_data=get_callback("close_menu")),
     )
     return keyboard
 
