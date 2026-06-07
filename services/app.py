@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, WebSocket, VK OAuth (PKCE)
-# Комментарий: добавлен device_id для VK OAuth
+# Комментарий: device_id сохраняется и используется одинаковым
 # ==========================================
 
 import os
@@ -69,8 +69,11 @@ def vk_callback():
     try:
         with open("/tmp/vk_code_verifier.txt", "r") as f:
             code_verifier = f.read().strip()
+        with open("/tmp/vk_device_id.txt", "r") as f:
+            device_id = f.read().strip()
     except:
         code_verifier = None
+        device_id = secrets.token_hex(16)
     
     token_url = "https://id.vk.com/oauth2/auth"
     params = {
@@ -80,7 +83,7 @@ def vk_callback():
         "redirect_uri": redirect_uri,
         "code": code,
         "state": state,
-        "device_id": secrets.token_hex(16)
+        "device_id": device_id
     }
     if code_verifier:
         params["code_verifier"] = code_verifier
@@ -120,14 +123,16 @@ def vk_auth_link():
         hashlib.sha256(code_verifier.encode()).digest()
     ).rstrip(b'=').decode()
     
-    os.makedirs("/tmp", exist_ok=True)
-    with open("/tmp/vk_code_verifier.txt", "w") as f:
-        f.write(code_verifier)
-    
     state = secrets.token_urlsafe(16)
     device_id = secrets.token_hex(16)
     client_id = os.environ.get("VK_APP_ID")
     redirect_uri = "https://ansamb-sledov-bot-94wz.onrender.com/api/vk/callback"
+    
+    os.makedirs("/tmp", exist_ok=True)
+    with open("/tmp/vk_code_verifier.txt", "w") as f:
+        f.write(code_verifier)
+    with open("/tmp/vk_device_id.txt", "w") as f:
+        f.write(device_id)
     
     auth_url = (
         f"https://id.vk.com/authorize"
