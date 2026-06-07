@@ -2,7 +2,7 @@
 # Модуль: dialogue/quotes.py
 # Справка: README.md → Цитаты
 # Задача: публикация цитат с YouTube-видео в TG и VK + шаббат
-# Комментарий: SQLite в services/sqlite_client.py, миксер в dialogue/content_mixer.py
+# Комментарий: VK с авто-рефрешем токена
 # ==========================================
 
 import os
@@ -36,14 +36,16 @@ def send_quote_with_photo(bot, chat_id, quote):
         bot.send_message(chat_id, caption)
         debug_log("QUOTES", "Цитата отправлена в Telegram")
         
-        vk_token = os.environ.get("VK_TOKEN_USER")
         vk_owner_id = os.environ.get("VK_OWNER_ID")
-        if vk_token and vk_owner_id:
+        if vk_owner_id:
             try:
-                from dialogue.publisher_utils import post_to_vk
-                vk_caption = f"📜 {quote}\n\n🎬 {video['title']}\n{video['url']}" if video and video.get('url') else f"📜 {quote}"
-                post_to_vk(vk_caption, "#Цитата #СапёрыАутентичности", vk_token, vk_owner_id)
-                debug_log("QUOTES", "Цитата отправлена в VK")
+                from services.app import get_vk_token
+                vk_token = get_vk_token()
+                if vk_token:
+                    from dialogue.publisher_utils import post_to_vk
+                    vk_caption = f"📜 {quote}\n\n🎬 {video['title']}\n{video['url']}" if video and video.get('url') else f"📜 {quote}"
+                    post_to_vk(vk_caption, "#Цитата #СапёрыАутентичности", vk_token, vk_owner_id)
+                    debug_log("QUOTES", "Цитата отправлена в VK")
             except Exception as e:
                 debug_log("QUOTES", f"Ошибка VK: {e}", "WARNING")
         return True
