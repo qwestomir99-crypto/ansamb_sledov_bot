@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, WebSocket, VK OAuth (PKCE)
-# Комментарий: device_id из переменной VK_DEVICE_ID
+# Комментарий: device_id берётся из ответа VK
 # ==========================================
 
 import os
@@ -51,20 +51,16 @@ app.register_blueprint(analytics_api, url_prefix='/api/analytics')
 app.register_blueprint(agent_bp, url_prefix='/agent')
 
 # ==========================================
-# VK OAUTH (device_id из переменной VK_DEVICE_ID)
+# VK OAUTH (без SDK, обмен кода на фронтенде)
 # ==========================================
-
-def get_device_id():
-    did = os.environ.get("VK_DEVICE_ID")
-    if not did:
-        did = secrets.token_hex(16)
-        os.environ["VK_DEVICE_ID"] = did
-    return did
 
 @app.route('/api/vk/callback')
 def vk_callback():
     code = flask_request.args.get('code')
     state = flask_request.args.get('state', '')
+    device_id = flask_request.args.get('device_id', '')
+    
+    debug_log("VK_OAUTH", f"Callback: code={bool(code)}, state={state}, device_id={device_id[:20] if device_id else 'нет'}")
     
     if not code:
         return "❌ Нет кода авторизации", 400
@@ -72,13 +68,13 @@ def vk_callback():
     client_id = os.environ.get("VK_APP_ID")
     client_secret = os.environ.get("VK_APP_SECRET")
     redirect_uri = "https://ansamb-sledov-bot-94wz.onrender.com/api/vk/callback"
-    device_id = get_device_id()
     
     try:
         with open("/tmp/vk_code_verifier.txt", "r") as f:
             code_verifier = f.read().strip()
     except:
         code_verifier = None
+        debug_log("VK_OAUTH", "code_verifier не найден", "WARNING")
     
     token_url = "https://id.vk.com/oauth2/auth"
     params = {
@@ -87,11 +83,14 @@ def vk_callback():
         "client_secret": client_secret,
         "redirect_uri": redirect_uri,
         "code": code,
-        "state": state,
-        "device_id": device_id
+        "state": state
     }
+    if device_id:
+        params["device_id"] = device_id
     if code_verifier:
         params["code_verifier"] = code_verifier
+    
+    debug_log("VK_OAUTH", f"Обмен кода: device_id={device_id[:20] if device_id else 'нет'}, verifier={bool(code_verifier)}")
     
     try:
         r = req.post(token_url, data=params, timeout=10)
@@ -107,12 +106,10 @@ def vk_callback():
             return f"""
             <h2>✅ Токен получен!</h2>
             <p><b>User ID:</b> {user_id}</p>
-            <p><b>Device ID (сохранён):</b> {device_id}</p>
             <p><b>Access Token:</b><br><textarea rows="3" style="width:100%">{access_token}</textarea></p>
             <p><b>Длина токена:</b> {len(access_token)}</p>
             <p><b>Refresh Token:</b><br><textarea rows="3" style="width:100%">{refresh_token}</textarea></p>
             <p style="color: green; font-weight: bold;">Скопируй access_token и вставь в переменную VK_TOKEN в Render Dashboard.</p>
-            <p style="color: blue;">Также добавь VK_DEVICE_ID = {device_id}</p>
             """
         else:
             error = data.get("error", "неизвестная ошибка")
@@ -131,7 +128,6 @@ def vk_auth_link():
     ).rstrip(b'=').decode()
     
     state = secrets.token_urlsafe(16)
-    device_id = get_device_id()
     client_id = os.environ.get("VK_APP_ID")
     redirect_uri = "https://ansamb-sledov-bot-94wz.onrender.com/api/vk/callback"
     
@@ -148,12 +144,11 @@ def vk_auth_link():
         f"&state={state}"
         f"&code_challenge={code_challenge}"
         f"&code_challenge_method=S256"
-        f"&device_id={device_id}"
     )
     
     return f"""
     <h2>🔗 Ссылка для авторизации VK</h2>
-    <p>Device ID: {device_id}</p>
+    <p><b>State:</b> {state}</p>
     <p>Открой эту ссылку и разреши доступ:</p>
     <a href="{auth_url}" target="_blank">{auth_url}</a>
     <p><i>После авторизации ты будешь перенаправлен на /api/vk/callback где получишь токен.</i></p>
