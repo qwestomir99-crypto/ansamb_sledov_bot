@@ -2,13 +2,12 @@
 # Модуль: dialogue/quotes.py
 # Справка: README.md → Цитаты
 # Задача: публикация цитат с YouTube-видео в TG и VK + шаббат
-# Комментарий: VK — группа от имени пользователя
 # ==========================================
 
 import os, time, random, json, threading
 from debug_utils import debug_log
 from dialogue.activity_modes import should_publish_quotes, load_config
-from services.sqlite_client import get_quotes
+from services.sqlite_client import get_quotes, get_quotes_list, add_quote
 
 CONFIG_FILE = "config.json"
 
