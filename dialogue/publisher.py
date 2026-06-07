@@ -2,7 +2,7 @@
 # Файл: dialogue/publisher.py
 # Справка: README.md → Публикатор
 # Задача: публикация постов в TG и VK (немедленная, отложенная, из пула)
-# Комментарий: случайный выбор из пула, лимит 100, шаббат
+# Комментарий: VK — группа от имени пользователя
 # ==========================================
 
 import os
@@ -58,8 +58,6 @@ def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
     index = pool.index(post)
     
     text = post.get("text", "")
-    file_id = post.get("file_id")
-    media_url = post.get("media_url")
     tags = build_tags(post)
     quote = get_random_quote()
     full_text = f"{text}\n\n📜 {quote}"
@@ -76,15 +74,17 @@ def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
         except Exception as e:
             debug_log("PUBLISH", f"Ошибка Telegram: {e}", "ERROR")
     
-    # === VK ===
-    if vk_token and vk_owner_id:
+    # === VK (группа от имени пользователя) ===
+    vk_group_id = os.environ.get("VK_GROUP_ID")
+    vk_user_token = os.environ.get("VK_TOKEN")
+    if vk_user_token and vk_group_id:
         try:
             from dialogue.publisher_utils import post_to_vk
-            success_vk, _ = post_to_vk(full_text, tags, vk_token, vk_owner_id)
+            success_vk, _ = post_to_vk(full_text, tags, vk_user_token, vk_group_id)
             if success_vk:
                 debug_log("PUBLISH", "Опубликовано в VK")
             else:
-                debug_log("PUBLISH", "VK не опубликовано (ошибка токена?)", "WARNING")
+                debug_log("PUBLISH", "VK не опубликовано", "WARNING")
         except Exception as e:
             debug_log("PUBLISH", f"Ошибка VK: {e}", "ERROR")
     
@@ -96,7 +96,7 @@ def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
     return False
 
 def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
-    debug_log("PUBLISH", "Цикл публикации запущен (TG + VK, случайный выбор, лимит: 100)")
+    debug_log("PUBLISH", "Цикл публикации запущен (TG + VK группа, случайный выбор, лимит: 100)")
     
     while True:
         try:
