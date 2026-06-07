@@ -5,12 +5,9 @@
 # ==========================================
 
 import telebot
-from dialogue.admin_commands import (
-    show_admin_panel, show_add_post_ui,
-    show_quotes_panel, list_quotes, add_quote_ui, set_quote_interval_ui,
-    show_diagnostics, admin_logout
-)
-from dialogue.admin.posts import handle_vk_post
+from dialogue.admin_commands import show_admin_panel, show_diagnostics, admin_logout
+from dialogue.admin.posts import show_add_post_ui, handle_vk_post, set_publish_interval_ui
+from dialogue.admin.quotes_admin import show_quotes_panel, handle_quotes_list, handle_quotes_add_start, handle_quotes_interval
 from dialogue.button_map import get_admin_menu_keyboard
 from debug_utils import debug_log
 
@@ -38,6 +35,30 @@ def register_admin_callbacks(bot: telebot.TeleBot, config: dict):
     def callback_manage_quotes(call):
         debug_log("CALLBACK", f"Управление цитатами от {call.from_user.id}")
         show_quotes_panel(call, bot)
+        bot.answer_callback_query(call.id)
+    
+    @bot.callback_query_handler(func=lambda call: call.data == "list_quotes")
+    def callback_list_quotes(call):
+        debug_log("CALLBACK", f"Список цитат от {call.from_user.id}")
+        handle_quotes_list(bot, call.message.chat.id, call.message.message_id, call.from_user.id)
+        bot.answer_callback_query(call.id)
+    
+    @bot.callback_query_handler(func=lambda call: call.data == "add_quote")
+    def callback_add_quote(call):
+        debug_log("CALLBACK", f"Добавление цитаты от {call.from_user.id}")
+        handle_quotes_add_start(bot, call.message.chat.id, call.message.message_id, call.from_user.id)
+        bot.answer_callback_query(call.id)
+    
+    @bot.callback_query_handler(func=lambda call: call.data == "set_quote_interval")
+    def callback_set_quote_interval(call):
+        debug_log("CALLBACK", f"Интервал цитат от {call.from_user.id}")
+        handle_quotes_interval(bot, call.message.chat.id, call.message.message_id, call.from_user.id)
+        bot.answer_callback_query(call.id)
+    
+    @bot.callback_query_handler(func=lambda call: call.data == "set_publish_interval")
+    def callback_publish_interval(call):
+        debug_log("CALLBACK", f"Интервал постов от {call.from_user.id}")
+        set_publish_interval_ui(call, bot)
         bot.answer_callback_query(call.id)
     
     @bot.callback_query_handler(func=lambda call: call.data == "diagnostics")
