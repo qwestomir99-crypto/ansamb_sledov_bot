@@ -47,3 +47,11 @@ def get_vk_token():
 
 def get_vk_owner_id():
     return os.environ.get("VK_OWNER_ID")
+
+def get_vk_reader_token():
+    """Короткий сервисный ключ группы (71 символ) — для VK Reader"""
+    return os.environ.get("VK_READER_TOKEN")
+
+def get_vk_group_id():
+    """ID сообщества VK — для публикации в группу"""
+    return os.environ.get("VK_GROUP_ID")
