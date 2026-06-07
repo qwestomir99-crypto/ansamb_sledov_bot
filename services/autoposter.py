@@ -2,14 +2,15 @@
 # Файл: services/autoposter.py
 # Справка: README.md → Автопостинг YouTube
 # Задача: публикация случайного видео из плейлиста в VK (личный профиль)
-# Комментарий: использует VK_TOKEN и VK_OWNER_ID
-# Зависит от: requests, os, random, json, debug_utils, dialogue.youtube_auto
+# Комментарий: запуск раз в день (86400 сек), логи через debug_utils
+# Зависит от: requests, os, random, json, time, debug_utils, dialogue.youtube_auto
 # Вызывается из: bot.py (отдельный поток)
 # ==========================================
 
 import os
 import random
 import json
+import time
 import requests
 from debug_utils import debug_log
 from dialogue.youtube_auto import get_random_video
@@ -29,7 +30,6 @@ def get_random_quote():
         return "Сеть тлеет. Ритм 0,8 Гц."
 
 def post_to_vk_profile(message, video_url, access_token, owner_id):
-    """Пост в личный профиль VK со ссылкой на видео"""
     if not access_token or not owner_id:
         log_auto("ERROR", "Нет токена VK или owner_id")
         return False, "Нет авторизации VK"
@@ -65,7 +65,6 @@ def post_to_vk_profile(message, video_url, access_token, owner_id):
         return False, str(e)
 
 def check_and_publish():
-    """Публикует случайное видео из плейлиста в личный профиль VK"""
     log_auto("INFO", "Проверка видео из плейлиста...")
     
     video = get_random_video()
@@ -85,17 +84,21 @@ def check_and_publish():
         log_auto("ERROR", "VK_TOKEN или VK_OWNER_ID не заданы")
         return False
     
-    log_auto("INFO", f"Публикация в VK (профиль)...")
+    log_auto("INFO", "Публикация в VK (профиль)...")
     success, error = post_to_vk_profile(post_text, video['url'], vk_token, vk_owner_id)
     
     if success:
         log_auto("INFO", "Видео из плейлиста опубликовано в VK")
-        return True
     else:
         log_auto("ERROR", f"Ошибка публикации: {error}")
-        return False
+    
+    return success
 
 def start_autoposter(config=None, vk_token=None, vk_owner_id=None):
-    log_auto("INFO", "Автопостинг YouTube настроен (личный профиль)")
-    if config and config.get("autoposter", {}).get("test_on_start", False):
-        check_and_publish()
+    log_auto("INFO", "Автопостинг YouTube запущен (личный профиль, раз в день)")
+    while True:
+        try:
+            check_and_publish()
+        except Exception as e:
+            log_auto("ERROR", f"Ошибка в цикле: {e}")
+        time.sleep(86400)
