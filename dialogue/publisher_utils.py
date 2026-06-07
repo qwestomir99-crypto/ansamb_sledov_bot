@@ -2,7 +2,8 @@
 # Файл: dialogue/publisher_utils.py
 # Справка: README.md → Публикатор / Утилиты
 # Задача: отправка постов в Telegram и VK
-# Комментарий: VK — сервисный токен сообщества для группы
+# Комментарий: VK — сервисный токен сообщества для группы.
+#              VK_GROUP_ID уже содержит минус — не дублируем.
 # ==========================================
 
 import os, random, json, requests
@@ -71,10 +72,11 @@ def post_to_vk(message, tags, access_token, owner_id, file_id=None, auto_quote=T
     if auto_tags: tags = get_auto_tags(message, "vk")
     full_message = f"{message}\n\n{tags}" if message else tags
     
+    # VK_GROUP_ID уже приходит с минусом — не добавляем лишний
     params = {
         "access_token": access_token,
         "v": "5.199",
-        "owner_id": -int(owner_id),
+        "owner_id": int(owner_id),
         "message": full_message,
         "from_group": 1
     }
