@@ -1,8 +1,8 @@
 # ==========================================
 # Файл: dialogue/publisher.py
 # Справка: README.md → Публикатор
-# Задача: публикация постов в TG и VK (немедленная, отложенная, из пула)
-# Комментарий: VK — только с пользовательским токеном (длина > 80)
+# Задача: публикация постов в TG (немедленная, отложенная, из пула)
+# Комментарий: с фото из VK, автотегами и content_mixer
 # ==========================================
 
 import os
@@ -38,55 +38,97 @@ def publish_now_or_later(bot, user_id, text, tags, delay):
         return add_post_to_pool(text, tags, author=str(user_id))
 
 def publish_post_immediately(bot, chat_id, text, tags_str, file_id=None):
-    quote = get_random_quote()
-    full_text = f"{text}\n\n📜 {quote}" if text else quote
-    try:
-        bot.send_message(chat_id, full_text)
-        debug_log("PUBLISH", f"Опубликовано в {chat_id}")
-        return True
-    except Exception as e:
-        debug_log("PUBLISH", f"Ошибка: {e}", "ERROR")
-        return False
+    # Если есть текст — публикуем с фото и тегами
+    if text and text.strip():
+        quote = get_random_quote()
+        full_text = f"{text}\n\n📜 {quote}" if text else quote
+        
+        theme_photo = None
+        try:
+            from services.photo_reader import get_random_post
+            post = get_random_post()
+            if post and post.get('photo_url'):
+                theme_photo = post['photo_url']
+        except:
+            pass
+        
+        try:
+            from dialogue.publisher_utils import get_auto_tags
+            auto_tags = get_auto_tags(full_text, "tg")
+            if auto_tags:
+                full_text = f"{full_text}\n\n{auto_tags}"
+        except:
+            pass
+        
+        try:
+            if theme_photo:
+                bot.send_photo(chat_id, theme_photo, caption=full_text[:1024])
+            else:
+                bot.send_message(chat_id, full_text)
+            debug_log("PUBLISH", f"Опубликовано в {chat_id}")
+            return True
+        except Exception as e:
+            debug_log("PUBLISH", f"Ошибка: {e}", "ERROR")
+            return False
+    else:
+        # Нет текста — используем content_mixer
+        try:
+            from dialogue.content_mixer import publish_mixed_post
+            return publish_mixed_post(bot, chat_id)
+        except ImportError:
+            bot.send_message(chat_id, "📜 Ритм 0,8 Гц стабилен. Сеть тлеет.")
+            return True
 
 def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
-    """Публикует случайный пост из пула в TG и VK, затем удаляет"""
+    """Публикует случайный пост из пула в TG, затем удаляет"""
     pool = load_post_pool()
     if not pool:
+        # Пул пуст — используем content_mixer
+        try:
+            from dialogue.content_mixer import publish_mixed_post
+            return publish_mixed_post(bot, tg_chat_id)
+        except ImportError:
+            pass
         return False
     
     post = random.choice(pool)
     index = pool.index(post)
     
     text = post.get("text", "")
-    tags = build_tags(post)
     quote = get_random_quote()
     full_text = f"{text}\n\n📜 {quote}"
     
-    success_tg = False
-    success_vk = False
+    theme_photo = None
+    try:
+        from services.photo_reader import get_random_post
+        p = get_random_post()
+        if p and p.get('photo_url'):
+            theme_photo = p['photo_url']
+    except:
+        pass
     
-    # === Telegram ===
+    try:
+        from dialogue.publisher_utils import get_auto_tags
+        auto_tags = get_auto_tags(full_text, "tg")
+        if auto_tags:
+            full_text = f"{full_text}\n\n{auto_tags}"
+    except:
+        pass
+    
+    success_tg = False
+    
     if tg_chat_id:
         try:
-            bot.send_message(tg_chat_id, full_text)
+            if theme_photo:
+                bot.send_photo(tg_chat_id, theme_photo, caption=full_text[:1024])
+            else:
+                bot.send_message(tg_chat_id, full_text)
             success_tg = True
             debug_log("PUBLISH", "Опубликовано в Telegram")
         except Exception as e:
             debug_log("PUBLISH", f"Ошибка Telegram: {e}", "ERROR")
     
-    # === VK (только с пользовательским токеном) ===
-    vk_owner = os.environ.get("VK_OWNER_ID")
-    vk_user_token = os.environ.get("VK_TOKEN")
-    if vk_user_token and vk_owner and len(vk_user_token) > 80:
-        try:
-            from dialogue.publisher_utils import post_to_vk
-            success_vk, _ = post_to_vk(full_text, tags, vk_user_token, vk_owner)
-            if success_vk:
-                debug_log("PUBLISH", "Опубликовано в VK")
-        except Exception as e:
-            debug_log("PUBLISH", f"Ошибка VK: {e}", "ERROR")
-    
-    if success_tg or success_vk:
+    if success_tg:
         remove_post_from_pool(index)
         debug_log("PUBLISH", f"Пост удалён из пула, осталось {len(load_post_pool())}")
         return True
@@ -94,7 +136,7 @@ def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
     return False
 
 def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
-    debug_log("PUBLISH", "Цикл публикации запущен (TG, случайный выбор, лимит: 100)")
+    debug_log("PUBLISH", "Цикл публикации запущен (TG + фото VK + content_mixer, лимит: 100)")
     
     while True:
         try:
