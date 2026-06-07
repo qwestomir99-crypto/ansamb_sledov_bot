@@ -2,15 +2,13 @@
 # Файл: dialogue/admin/quotes_admin.py
 # Справка: README.md → Админка (управление цитатами)
 # Задача: обработчики кнопок для цитат (список, добавление, интервал, панель)
-# Комментарий: единственный источник функций цитат для админки
+# Комментарий: импорты из sqlite_client и quotes
 # ==========================================
 
 import time
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from dialogue.quotes import (
-    get_quotes_list, add_quote, get_quotes_interval_minutes,
-    set_quotes_interval_minutes, get_quotes_interval
-)
+from services.sqlite_client import get_quotes_list, add_quote
+from dialogue.quotes import get_quotes_interval, set_quotes_interval
 from dialogue.admin.auth import log_admin_action
 
 def show_quotes_panel(call, bot):
@@ -59,7 +57,7 @@ def process_quote_add(message, bot, chat_id, user_id):
         bot.send_message(chat_id, f"✅ Цитата добавлена:\n\n{text}")
 
 def handle_quotes_interval(bot, chat_id, message_id, user_id):
-    current = get_quotes_interval_minutes()
+    current = get_quotes_interval()
     keyboard = InlineKeyboardMarkup(row_width=3)
     for minutes in [15, 30, 60, 120, 240, 480]:
         marker = "✅" if minutes == current else ""
@@ -71,7 +69,7 @@ def handle_quotes_interval(bot, chat_id, message_id, user_id):
     )
 
 def handle_quotes_set_interval(interval, bot, chat_id, message_id, user_id):
-    set_quotes_interval_minutes(interval)
+    set_quotes_interval(interval)
     import dialogue.quotes as quotes_module
     quotes_module.quote_thread_running = False
     time.sleep(1)
