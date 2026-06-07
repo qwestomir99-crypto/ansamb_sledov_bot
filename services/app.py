@@ -1,12 +1,16 @@
 # ==========================================
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
-# Задача: запуск, подключение модулей, WebSocket, VK OAuth
-# Комментарий: ВЕРСИЯ С АГЕНТОМ (полная) + VK callback
+# Задача: запуск, подключение модулей, WebSocket, VK OAuth (PKCE)
+# Комментарий: ВЕРСИЯ С АГЕНТОМ (полная) + VK OAuth
 # ==========================================
 
 import os
 import sys
+import hashlib
+import base64
+import secrets
+import json as json_module
 from flask import Flask, request as flask_request
 from flask_socketio import SocketIO
 from debug_utils import debug_log
@@ -63,12 +67,14 @@ app.register_blueprint(analytics_api, url_prefix='/api/analytics')
 app.register_blueprint(agent_bp, url_prefix='/agent')
 
 # ==========================================
-# VK OAUTH CALLBACK
+# VK OAUTH CALLBACK (с PKCE)
 # ==========================================
 
 @app.route('/api/vk/callback')
 def vk_callback():
     code = flask_request.args.get('code')
+    state = flask_request.args.get('state', '')
+    
     if not code:
         return "❌ Нет кода авторизации", 400
     
@@ -76,14 +82,23 @@ def vk_callback():
     client_secret = os.environ.get("VK_APP_SECRET")
     redirect_uri = "https://ansamb-sledov-bot-94wz.onrender.com/api/vk/callback"
     
+    try:
+        with open("/tmp/vk_code_verifier.txt", "r") as f:
+            code_verifier = f.read().strip()
+    except:
+        code_verifier = None
+    
     token_url = "https://id.vk.com/oauth2/auth"
     params = {
         "grant_type": "authorization_code",
         "client_id": client_id,
         "client_secret": client_secret,
         "redirect_uri": redirect_uri,
-        "code": code
+        "code": code,
+        "state": state
     }
+    if code_verifier:
+        params["code_verifier"] = code_verifier
     
     try:
         r = req.post(token_url, data=params, timeout=10)
@@ -99,21 +114,53 @@ def vk_callback():
             return f"""
             <h2>✅ Токен получен!</h2>
             <p><b>User ID:</b> {user_id}</p>
-            <p><b>Access Token (первые 20):</b> {access_token[:20]}...</p>
+            <p><b>Access Token:</b><br><textarea rows="3" style="width:100%">{access_token}</textarea></p>
             <p><b>Длина токена:</b> {len(access_token)}</p>
-            <p><b>Refresh Token (первые 20):</b> {refresh_token[:20] if refresh_token else 'нет'}...</p>
+            <p><b>Refresh Token:</b><br><textarea rows="3" style="width:100%">{refresh_token}</textarea></p>
             <p style="color: green; font-weight: bold;">Скопируй access_token и вставь в переменную VK_TOKEN в Render Dashboard.</p>
             <p>После перезапуска VK-постинг заработает.</p>
-            <p><i>Токен живёт 1 час, refresh_token — 180 дней.</i></p>
             """
         else:
             error = data.get("error", "неизвестная ошибка")
             error_desc = data.get("error_description", "")
             debug_log("VK_OAUTH", f"Ошибка: {error} - {error_desc}", "ERROR")
-            return f"<h2>❌ Ошибка: {error}</h2><p>{error_desc}</p><pre>{data}</pre>", 500
+            return f"<h2>❌ Ошибка: {error}</h2><p>{error_desc}</p><pre>{json_module.dumps(data, indent=2)}</pre>", 500
     except Exception as e:
         debug_log("VK_OAUTH", f"Исключение: {e}", "ERROR")
         return f"<h2>❌ Ошибка: {e}</h2>", 500
+
+@app.route('/api/vk/auth_link')
+def vk_auth_link():
+    code_verifier = secrets.token_urlsafe(64)
+    code_challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(code_verifier.encode()).digest()
+    ).rstrip(b'=').decode()
+    
+    os.makedirs("/tmp", exist_ok=True)
+    with open("/tmp/vk_code_verifier.txt", "w") as f:
+        f.write(code_verifier)
+    
+    state = secrets.token_urlsafe(16)
+    client_id = os.environ.get("VK_APP_ID")
+    redirect_uri = "https://ansamb-sledov-bot-94wz.onrender.com/api/vk/callback"
+    
+    auth_url = (
+        f"https://id.vk.com/authorize"
+        f"?client_id={client_id}"
+        f"&redirect_uri={redirect_uri}"
+        f"&response_type=code"
+        f"&scope=wall,photos,offline"
+        f"&state={state}"
+        f"&code_challenge={code_challenge}"
+        f"&code_challenge_method=S256"
+    )
+    
+    return f"""
+    <h2>🔗 Ссылка для авторизации VK</h2>
+    <p>Открой эту ссылку и разреши доступ:</p>
+    <a href="{auth_url}" target="_blank">{auth_url}</a>
+    <p><i>После авторизации ты будешь перенаправлен на /api/vk/callback где получишь токен.</i></p>
+    """
 
 # ==========================================
 # ЗАПУСК ФОНОВОГО ПОТОКА СООБЩЕНИЙ
