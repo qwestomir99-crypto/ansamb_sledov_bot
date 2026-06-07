@@ -2,14 +2,10 @@
 # Файл: dialogue/publisher.py
 # Справка: README.md → Публикатор
 # Задача: публикация постов в TG и VK (немедленная, отложенная, из пула)
-# Комментарий: VK — группа от имени пользователя
+# Комментарий: VK — группа через VK_TOKEN + VK_GROUP_ID
 # ==========================================
 
-import os
-import json
-import time
-import random
-import threading
+import os, json, time, random, threading
 from debug_utils import debug_log
 from dialogue.publisher_utils import get_random_quote, get_auto_tags
 from dialogue.post_manager import load_post_pool, save_post_pool, build_tags, remove_post_from_pool, add_post_to_pool
@@ -25,7 +21,6 @@ def clean_pool():
     if len(pool) > MAX_POOL_SIZE:
         pool = pool[-MAX_POOL_SIZE:]
         save_post_pool(pool)
-        debug_log("PUBLISH", f"Пул очищен, оставлено {len(pool)} постов")
 
 def publish_now_or_later(bot, user_id, text, tags, delay):
     if delay == 0:
@@ -56,7 +51,7 @@ def publish_post_immediately(bot, chat_id, text, tags_str=None, file_id=None):
         debug_log("PUBLISH", f"Ошибка: {e}", "ERROR")
         return False
 
-def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
+def publish_from_pool(bot, vk_token, vk_group_id, tg_chat_id):
     pool = load_post_pool()
     if not pool:
         try:
@@ -87,22 +82,18 @@ def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
             success = True
         except Exception as e: debug_log("PUBLISH", f"Ошибка TG: {e}", "ERROR")
     
-    vk_group_id = os.environ.get("VK_GROUP_ID")
-    if vk_group_id:
+    if vk_token and vk_group_id:
         try:
-            from services.app import get_vk_token
-            token = get_vk_token()
-            if token:
-                from dialogue.publisher_utils import post_to_vk
-                tags = build_tags(post)
-                sv, _ = post_to_vk(full_text, tags, token, vk_group_id)
-                if sv: success = True
+            from dialogue.publisher_utils import post_to_vk
+            tags = build_tags(post)
+            sv, _ = post_to_vk(full_text, tags, vk_token, vk_group_id)
+            if sv: success = True
         except Exception as e: debug_log("PUBLISH", f"Ошибка VK: {e}", "ERROR")
     
     if success: remove_post_from_pool(index)
     return success
 
-def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
+def publish_loop(bot, vk_token, vk_group_id, tg_chat_id):
     debug_log("PUBLISH", "Цикл публикации запущен (TG + VK группа)")
     while True:
         try:
@@ -112,7 +103,7 @@ def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
             except ImportError: pass
             clean_pool()
             interval = load_config().get("publisher", {}).get("interval_seconds", 7200)
-            if publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
+            if publish_from_pool(bot, vk_token, vk_group_id, tg_chat_id):
                 debug_log("PUBLISH", f"Опубликовано, следующая через {interval} сек")
             else: debug_log("PUBLISH", "Нет постов")
             time.sleep(interval)
