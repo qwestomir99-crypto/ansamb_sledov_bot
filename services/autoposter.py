@@ -1,10 +1,8 @@
 # ==========================================
 # Файл: services/autoposter.py
 # Справка: README.md → Автопостинг YouTube
-# Задача: публикация случайного видео из плейлиста в VK (личный профиль)
-# Комментарий: запуск раз в день (86400 сек), логи через debug_utils
-# Зависит от: requests, os, random, json, time, debug_utils, dialogue.youtube_auto
-# Вызывается из: bot.py (отдельный поток)
+# Задача: публикация случайного видео из плейлиста в TG и VK
+# Комментарий: TG — всегда, VK — ждёт пользовательский токен
 # ==========================================
 
 import os
@@ -29,10 +27,23 @@ def get_random_quote():
     except:
         return "Сеть тлеет. Ритм 0,8 Гц."
 
+def post_to_tg(bot, tg_chat_id, message, video_url):
+    """Публикует видео в Telegram-канал"""
+    quote = get_random_quote()
+    full_text = f"📜 {quote}\n\n🎬 {message}\n{video_url}"
+    try:
+        bot.send_message(tg_chat_id, full_text)
+        log_auto("INFO", f"Видео опубликовано в TG: {message[:50]}...")
+        return True
+    except Exception as e:
+        log_auto("ERROR", f"Ошибка TG: {e}")
+        return False
+
 def post_to_vk_profile(message, video_url, access_token, owner_id):
-    if not access_token or not owner_id:
-        log_auto("ERROR", "Нет токена VK или owner_id")
-        return False, "Нет авторизации VK"
+    """Пост в личный профиль VK (если токен рабочий)"""
+    if not access_token or not owner_id or len(access_token) <= 80:
+        log_auto("WARNING", "VK отключён (нужен пользовательский токен)")
+        return False, "VK отключён"
     
     try:
         with open("config.json", "r") as f:
@@ -64,41 +75,37 @@ def post_to_vk_profile(message, video_url, access_token, owner_id):
         log_auto("ERROR", f"Исключение VK: {e}")
         return False, str(e)
 
-def check_and_publish():
+def check_and_publish(bot, tg_chat_id):
+    """Проверяет видео и публикует в TG (и VK если можно)"""
     log_auto("INFO", "Проверка видео из плейлиста...")
     
     video = get_random_video()
     if not video:
         log_auto("WARNING", "Не удалось получить видео из плейлиста")
-        return False
+        return
     
     log_auto("INFO", f"Получено видео: {video['title'][:50]}...")
     
-    quote = get_random_quote()
-    post_text = f"📜 {quote}\n\n🎬 {video['title']}"
+    # TG — всегда
+    post_to_tg(bot, tg_chat_id, video['title'], video['url'])
     
+    # VK — если есть токен
     vk_token = os.environ.get("VK_TOKEN")
     vk_owner_id = os.environ.get("VK_OWNER_ID")
-    
-    if not vk_token or not vk_owner_id:
-        log_auto("ERROR", "VK_TOKEN или VK_OWNER_ID не заданы")
-        return False
-    
-    log_auto("INFO", "Публикация в VK (профиль)...")
-    success, error = post_to_vk_profile(post_text, video['url'], vk_token, vk_owner_id)
-    
-    if success:
-        log_auto("INFO", "Видео из плейлиста опубликовано в VK")
-    else:
-        log_auto("ERROR", f"Ошибка публикации: {error}")
-    
-    return success
+    if vk_token and vk_owner_id:
+        post_to_vk_profile(video['title'], video['url'], vk_token, vk_owner_id)
 
 def start_autoposter(config=None, vk_token=None, vk_owner_id=None):
-    log_auto("INFO", "Автопостинг YouTube запущен (личный профиль, раз в день)")
+    log_auto("INFO", "Автопостинг YouTube запущен (TG + VK, раз в день)")
+    import bot
+    # Получаем бота и канал
+    from bot.core import get_bot
+    bot_instance = get_bot()
+    tg_chat_id = config.get("telegram", {}).get("publish_channel", "@qwestomir") if config else "@qwestomir"
+    
     while True:
         try:
-            check_and_publish()
+            check_and_publish(bot_instance, tg_chat_id)
         except Exception as e:
             log_auto("ERROR", f"Ошибка в цикле: {e}")
         time.sleep(86400)
