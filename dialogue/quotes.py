@@ -2,7 +2,7 @@
 # Модуль: dialogue/quotes.py
 # Справка: README.md → Цитаты
 # Задача: публикация цитат с YouTube-видео в TG и VK + шаббат
-# Комментарий: VK — личный профиль
+# Комментарий: VK — только с пользовательским токеном (длина > 80)
 # ==========================================
 
 import os
@@ -129,7 +129,7 @@ def get_quotes_interval():
     return get_quotes_interval_minutes()
 
 # ==========================================
-# ОТПРАВКА ЦИТАТЫ В TG И VK (личный профиль)
+# ОТПРАВКА ЦИТАТЫ В TG И VK
 # ==========================================
 def send_quote_with_photo(bot, chat_id, quote):
     """Отправляет цитату с YouTube-видео в Telegram и VK"""
@@ -145,10 +145,10 @@ def send_quote_with_photo(bot, chat_id, quote):
         bot.send_message(chat_id, caption)
         debug_log("QUOTES", "Цитата отправлена в Telegram")
         
-        # VK (личный профиль)
+        # VK — только с пользовательским токеном
         vk_token = os.environ.get("VK_TOKEN")
         vk_owner_id = os.environ.get("VK_OWNER_ID")
-        if vk_token and vk_owner_id:
+        if vk_token and vk_owner_id and len(vk_token) > 80:
             try:
                 from dialogue.publisher_utils import post_to_vk
                 vk_caption = f"📜 {quote}\n\n🎬 {video['title']}\n{video['url']}" if video and video.get('url') else f"📜 {quote}"
