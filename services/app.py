@@ -1,8 +1,7 @@
 # ==========================================
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
-# Задача: запуск, подключение модулей, WebSocket, VK OAuth (PKCE)
-# Комментарий: device_id берётся из ответа VK
+# Задача: запуск, подключение модулей, WebSocket, VK OAuth + авто-рефреш
 # ==========================================
 
 import os
@@ -51,17 +50,50 @@ app.register_blueprint(analytics_api, url_prefix='/api/analytics')
 app.register_blueprint(agent_bp, url_prefix='/agent')
 
 # ==========================================
-# VK OAUTH (без SDK, обмен кода на фронтенде)
+# VK OAUTH + АВТО-ОБНОВЛЕНИЕ ТОКЕНА
 # ==========================================
+
+def refresh_vk_token():
+    refresh_token = os.environ.get("VK_REFRESH_TOKEN")
+    if not refresh_token:
+        return None
+    client_id = os.environ.get("VK_APP_ID")
+    client_secret = os.environ.get("VK_APP_SECRET")
+    device_id = hashlib.sha256(b"ansamb-sledov-bot-94wz.onrender.com").hexdigest()[:32]
+    
+    try:
+        r = req.post("https://id.vk.com/oauth2/auth", data={
+            "grant_type": "refresh_token",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "refresh_token": refresh_token,
+            "device_id": device_id
+        }, timeout=10)
+        data = r.json()
+        if "access_token" in data:
+            debug_log("VK_REFRESH", "Токен обновлён!", "INFO")
+            os.environ["VK_TOKEN_USER"] = data["access_token"]
+            if "refresh_token" in data:
+                os.environ["VK_REFRESH_TOKEN"] = data["refresh_token"]
+            return data["access_token"]
+        else:
+            debug_log("VK_REFRESH", f"Ошибка: {data.get('error')}", "ERROR")
+            return None
+    except Exception as e:
+        debug_log("VK_REFRESH", f"Исключение: {e}", "ERROR")
+        return None
+
+def get_vk_token():
+    token = os.environ.get("VK_TOKEN_USER")
+    if not token:
+        return refresh_vk_token()
+    return token
 
 @app.route('/api/vk/callback')
 def vk_callback():
     code = flask_request.args.get('code')
     state = flask_request.args.get('state', '')
     device_id = flask_request.args.get('device_id', '')
-    
-    debug_log("VK_OAUTH", f"Callback: code={bool(code)}, state={state}, device_id={device_id[:20] if device_id else 'нет'}")
-    
     if not code:
         return "❌ Нет кода авторизации", 400
     
@@ -74,95 +106,56 @@ def vk_callback():
             code_verifier = f.read().strip()
     except:
         code_verifier = None
-        debug_log("VK_OAUTH", "code_verifier не найден", "WARNING")
     
-    token_url = "https://id.vk.com/oauth2/auth"
     params = {
         "grant_type": "authorization_code",
         "client_id": client_id,
         "client_secret": client_secret,
         "redirect_uri": redirect_uri,
-        "code": code,
-        "state": state
+        "code": code, "state": state
     }
-    if device_id:
-        params["device_id"] = device_id
-    if code_verifier:
-        params["code_verifier"] = code_verifier
-    
-    debug_log("VK_OAUTH", f"Обмен кода: device_id={device_id[:20] if device_id else 'нет'}, verifier={bool(code_verifier)}")
+    if device_id: params["device_id"] = device_id
+    if code_verifier: params["code_verifier"] = code_verifier
     
     try:
-        r = req.post(token_url, data=params, timeout=10)
+        r = req.post("https://id.vk.com/oauth2/auth", data=params, timeout=10)
         data = r.json()
-        
         if "access_token" in data:
-            access_token = data["access_token"]
-            refresh_token = data.get("refresh_token", "")
-            user_id = data.get("user_id", "")
-            
-            debug_log("VK_OAUTH", f"Токен получен! user_id={user_id}, длина={len(access_token)}", "INFO")
-            
             return f"""
             <h2>✅ Токен получен!</h2>
-            <p><b>User ID:</b> {user_id}</p>
-            <p><b>Access Token:</b><br><textarea rows="3" style="width:100%">{access_token}</textarea></p>
-            <p><b>Длина токена:</b> {len(access_token)}</p>
-            <p><b>Refresh Token:</b><br><textarea rows="3" style="width:100%">{refresh_token}</textarea></p>
-            <p style="color: green; font-weight: bold;">Скопируй access_token и вставь в переменную VK_TOKEN в Render Dashboard.</p>
+            <p><b>Access Token:</b><br><textarea rows="3" style="width:100%">{data['access_token']}</textarea></p>
+            <p><b>Refresh Token:</b><br><textarea rows="3" style="width:100%">{data.get('refresh_token', '')}</textarea></p>
+            <p style="color: green;">Скопируй в VK_TOKEN_USER и VK_REFRESH_TOKEN в Render.</p>
             """
         else:
-            error = data.get("error", "неизвестная ошибка")
-            error_desc = data.get("error_description", "")
-            debug_log("VK_OAUTH", f"Ошибка: {error} - {error_desc}", "ERROR")
-            return f"<h2>❌ Ошибка: {error}</h2><p>{error_desc}</p><pre>{json_module.dumps(data, indent=2)}</pre>", 500
+            return f"<h2>❌ Ошибка: {data.get('error')}</h2><pre>{json_module.dumps(data, indent=2)}</pre>", 500
     except Exception as e:
-        debug_log("VK_OAUTH", f"Исключение: {e}", "ERROR")
         return f"<h2>❌ Ошибка: {e}</h2>", 500
 
 @app.route('/api/vk/auth_link')
 def vk_auth_link():
     code_verifier = secrets.token_urlsafe(64)
-    code_challenge = base64.urlsafe_b64encode(
-        hashlib.sha256(code_verifier.encode()).digest()
-    ).rstrip(b'=').decode()
-    
+    code_challenge = base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest()).rstrip(b'=').decode()
     state = secrets.token_urlsafe(16)
     client_id = os.environ.get("VK_APP_ID")
     redirect_uri = "https://ansamb-sledov-bot-94wz.onrender.com/api/vk/callback"
     
     os.makedirs("/tmp", exist_ok=True)
-    with open("/tmp/vk_code_verifier.txt", "w") as f:
-        f.write(code_verifier)
+    with open("/tmp/vk_code_verifier.txt", "w") as f: f.write(code_verifier)
     
-    auth_url = (
-        f"https://id.vk.com/authorize"
-        f"?client_id={client_id}"
-        f"&redirect_uri={redirect_uri}"
-        f"&response_type=code"
-        f"&scope=wall,photos,offline"
-        f"&state={state}"
-        f"&code_challenge={code_challenge}"
-        f"&code_challenge_method=S256"
-    )
+    auth_url = f"https://id.vk.com/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope=wall,photos,offline&state={state}&code_challenge={code_challenge}&code_challenge_method=S256"
     
     return f"""
     <h2>🔗 Ссылка для авторизации VK</h2>
-    <p><b>State:</b> {state}</p>
-    <p>Открой эту ссылку и разреши доступ:</p>
     <a href="{auth_url}" target="_blank">{auth_url}</a>
-    <p><i>После авторизации ты будешь перенаправлен на /api/vk/callback где получишь токен.</i></p>
+    <p><i>После авторизации скопируй оба токена в Render.</i></p>
     """
 
 # ==========================================
-# ЗАПУСК ФОНОВОГО ПОТОКА СООБЩЕНИЙ
+# ЗАПУСК
 # ==========================================
 
 start_background_thread()
-
-# ==========================================
-# ЗАПУСК (для локальной разработки)
-# ==========================================
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
