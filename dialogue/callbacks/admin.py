@@ -1,11 +1,11 @@
 # ==========================================
 # Файл: dialogue/callbacks/admin.py
 # Справка: README.md → Обработчики кнопок / Админ-панель
-# Задача: обработка callback'ов админ-панели
+# Задача: обработка callback'ов админ-панели с автоочисткой
 # ==========================================
 
 import telebot
-from dialogue.admin_commands import show_admin_panel, show_diagnostics, admin_logout
+from dialogue.admin_commands import show_admin_panel, show_diagnostics, admin_logout, safe_delete
 from dialogue.admin.posts import show_add_post_ui, handle_vk_post, set_publish_interval_ui
 from dialogue.admin.quotes_admin import show_quotes_panel, handle_quotes_list, handle_quotes_add_start, handle_quotes_interval
 from dialogue.button_map import get_admin_menu_keyboard
@@ -22,12 +22,14 @@ def register_admin_callbacks(bot: telebot.TeleBot, config: dict):
     @bot.callback_query_handler(func=lambda call: call.data == "add_post")
     def callback_add_post(call):
         debug_log("CALLBACK", f"Добавление поста от {call.from_user.id}")
+        safe_delete(call.message, 0)
         show_add_post_ui(call, bot)
         bot.answer_callback_query(call.id)
     
     @bot.callback_query_handler(func=lambda call: call.data == "vk_post")
     def callback_vk_post(call):
         debug_log("CALLBACK", f"Пост в VK от {call.from_user.id}")
+        safe_delete(call.message, 0)
         handle_vk_post(bot, call.message.chat.id, call.message.message_id, call.from_user.id)
         bot.answer_callback_query(call.id)
     
@@ -46,18 +48,21 @@ def register_admin_callbacks(bot: telebot.TeleBot, config: dict):
     @bot.callback_query_handler(func=lambda call: call.data == "add_quote")
     def callback_add_quote(call):
         debug_log("CALLBACK", f"Добавление цитаты от {call.from_user.id}")
+        safe_delete(call.message, 0)
         handle_quotes_add_start(bot, call.message.chat.id, call.message.message_id, call.from_user.id)
         bot.answer_callback_query(call.id)
     
     @bot.callback_query_handler(func=lambda call: call.data == "set_quote_interval")
     def callback_set_quote_interval(call):
         debug_log("CALLBACK", f"Интервал цитат от {call.from_user.id}")
+        safe_delete(call.message, 0)
         handle_quotes_interval(bot, call.message.chat.id, call.message.message_id, call.from_user.id)
         bot.answer_callback_query(call.id)
     
     @bot.callback_query_handler(func=lambda call: call.data == "set_publish_interval")
     def callback_publish_interval(call):
         debug_log("CALLBACK", f"Интервал постов от {call.from_user.id}")
+        safe_delete(call.message, 0)
         set_publish_interval_ui(call, bot)
         bot.answer_callback_query(call.id)
     
@@ -82,10 +87,7 @@ def register_admin_callbacks(bot: telebot.TeleBot, config: dict):
     @bot.callback_query_handler(func=lambda call: call.data == "cancel")
     def callback_cancel(call):
         debug_log("CALLBACK", f"Отмена от {call.from_user.id}")
-        bot.edit_message_text(
-            "❌ Действие отменено.",
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            reply_markup=get_admin_menu_keyboard()
-        )
+        safe_delete(call.message, 0)
+        msg = bot.send_message(call.message.chat.id, "❌ Действие отменено.")
+        safe_delete(msg, 3)
         bot.answer_callback_query(call.id)
