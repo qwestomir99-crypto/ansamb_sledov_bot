@@ -2,7 +2,7 @@
 # Файл: dialogue/publisher.py
 # Справка: README.md → Публикатор
 # Задача: публикация постов в TG и VK (немедленная, отложенная, из пула)
-# Комментарий: VK использует VK_TOKEN_USER
+# Комментарий: VK с авто-рефрешем токена
 # ==========================================
 
 import os
@@ -105,14 +105,16 @@ def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
         except Exception as e:
             debug_log("PUBLISH", f"Ошибка Telegram: {e}", "ERROR")
     
-    vk_user_token = os.environ.get("VK_TOKEN_USER")
     vk_owner = os.environ.get("VK_OWNER_ID")
-    if vk_user_token and vk_owner and len(vk_user_token) > 80:
+    if vk_owner:
         try:
-            from dialogue.publisher_utils import post_to_vk
-            tags = build_tags(post)
-            success_vk, _ = post_to_vk(full_text, tags, vk_user_token, vk_owner)
-            if success_vk: debug_log("PUBLISH", "Опубликовано в VK")
+            from services.app import get_vk_token
+            vk_user_token = get_vk_token()
+            if vk_user_token:
+                from dialogue.publisher_utils import post_to_vk
+                tags = build_tags(post)
+                success_vk, _ = post_to_vk(full_text, tags, vk_user_token, vk_owner)
+                if success_vk: debug_log("PUBLISH", "Опубликовано в VK")
         except Exception as e:
             debug_log("PUBLISH", f"Ошибка VK: {e}", "ERROR")
     
