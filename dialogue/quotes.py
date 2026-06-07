@@ -2,7 +2,7 @@
 # Модуль: dialogue/quotes.py
 # Справка: README.md → Цитаты
 # Задача: публикация цитат с YouTube-видео в TG и VK + шаббат
-# Комментарий: VK — группа от имени пользователя
+# Комментарий: VK — личный профиль
 # ==========================================
 
 import os
@@ -129,7 +129,7 @@ def get_quotes_interval():
     return get_quotes_interval_minutes()
 
 # ==========================================
-# ОТПРАВКА ЦИТАТЫ В TG И VK (группа)
+# ОТПРАВКА ЦИТАТЫ В TG И VK (личный профиль)
 # ==========================================
 def send_quote_with_photo(bot, chat_id, quote):
     """Отправляет цитату с YouTube-видео в Telegram и VK"""
@@ -145,14 +145,14 @@ def send_quote_with_photo(bot, chat_id, quote):
         bot.send_message(chat_id, caption)
         debug_log("QUOTES", "Цитата отправлена в Telegram")
         
-        # VK (группа)
+        # VK (личный профиль)
         vk_token = os.environ.get("VK_TOKEN")
-        vk_group_id = os.environ.get("VK_GROUP_ID")
-        if vk_token and vk_group_id:
+        vk_owner_id = os.environ.get("VK_OWNER_ID")
+        if vk_token and vk_owner_id:
             try:
                 from dialogue.publisher_utils import post_to_vk
                 vk_caption = f"📜 {quote}\n\n🎬 {video['title']}\n{video['url']}" if video and video.get('url') else f"📜 {quote}"
-                post_to_vk(vk_caption, "#Цитата #СапёрыАутентичности", vk_token, vk_group_id)
+                post_to_vk(vk_caption, "#Цитата #СапёрыАутентичности", vk_token, vk_owner_id)
                 debug_log("QUOTES", "Цитата отправлена в VK")
             except Exception as e:
                 debug_log("QUOTES", f"Ошибка VK: {e}", "WARNING")
