@@ -2,7 +2,7 @@
 # Файл: dialogue/publisher.py
 # Справка: README.md → Публикатор
 # Задача: публикация постов в TG и VK (немедленная, отложенная, из пула)
-# Комментарий: VK — личный профиль
+# Комментарий: VK — только с пользовательским токеном (длина > 80)
 # ==========================================
 
 import os
@@ -74,17 +74,15 @@ def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
         except Exception as e:
             debug_log("PUBLISH", f"Ошибка Telegram: {e}", "ERROR")
     
-    # === VK (личный профиль) ===
+    # === VK (только с пользовательским токеном) ===
     vk_owner = os.environ.get("VK_OWNER_ID")
     vk_user_token = os.environ.get("VK_TOKEN")
-    if vk_user_token and vk_owner:
+    if vk_user_token and vk_owner and len(vk_user_token) > 80:
         try:
             from dialogue.publisher_utils import post_to_vk
             success_vk, _ = post_to_vk(full_text, tags, vk_user_token, vk_owner)
             if success_vk:
                 debug_log("PUBLISH", "Опубликовано в VK")
-            else:
-                debug_log("PUBLISH", "VK не опубликовано", "WARNING")
         except Exception as e:
             debug_log("PUBLISH", f"Ошибка VK: {e}", "ERROR")
     
@@ -96,7 +94,7 @@ def publish_from_pool(bot, vk_token, vk_owner_id, tg_chat_id):
     return False
 
 def publish_loop(bot, vk_token, vk_owner_id, tg_chat_id):
-    debug_log("PUBLISH", "Цикл публикации запущен (TG + VK личный, случайный выбор, лимит: 100)")
+    debug_log("PUBLISH", "Цикл публикации запущен (TG, случайный выбор, лимит: 100)")
     
     while True:
         try:
