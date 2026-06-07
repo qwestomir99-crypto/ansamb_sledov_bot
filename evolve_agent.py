@@ -4,6 +4,7 @@
 # Задача: анализ «осадка» диалогов и генерация новых правил поведения
 # Комментарий: добавлены лимиты (1000 осадков, 7 правил) и планировщик (раз в сутки)
 #              совместим с существующими вызовами из agent.py и admin_commands.py
+#              ИСПРАВЛЕНО: поддержка rules.json в формате {"rules": [...]}
 # Зависит от: json, os, datetime, threading, time
 # Вызывается из: dialogue/agent.py, admin_commands.py, bot/main.py
 # ==========================================
@@ -113,7 +114,19 @@ def generate_rule_from_sediment(sediment):
 def evolve_agent():
     """Анализирует осадок, генерирует правила, применяет лимиты"""
     sediment_data = load_json(SEDIMENT_FILE, {"sediments": [], "evolution_rules": []})
-    rules_data = load_json(RULES_FILE, [])
+    
+    # Загружаем контейнер правил (словарь с ключом "rules")
+    rules_container = load_json(RULES_FILE, {"rules": []})
+    if not isinstance(rules_container, dict):
+        log_evolution(f"Ошибка: rules_container не словарь, а {type(rules_container)}. Сбрасываю в {{'rules': []}}")
+        rules_container = {"rules": []}
+    
+    # Извлекаем список правил
+    rules_data = rules_container.get("rules", [])
+    if not isinstance(rules_data, list):
+        log_evolution(f"Ошибка: rules_data не список, а {type(rules_data)}. Сбрасываю в []")
+        rules_data = []
+        rules_container["rules"] = rules_data
     
     new_sediments = sediment_data.get("sediments", [])
     new_rules = []
@@ -138,7 +151,18 @@ def evolve_agent():
         if len(rules_data) > RULES_LIMIT:
             rules_data = rules_data[-RULES_LIMIT:]
         
-        save_json(RULES_FILE, rules_data)
+        # Обновляем контейнер
+        rules_container["rules"] = rules_data
+        rules_container["version"] = "1.0"
+        rules_container["last_updated"] = datetime.now().isoformat()
+        rules_container["stats"] = {
+            "total_rules": len(rules_data),
+            "enabled_rules": sum(1 for r in rules_data if r.get("enabled", True)),
+            "disabled_rules": sum(1 for r in rules_data if not r.get("enabled", True)),
+            "last_evolution": datetime.now().isoformat()
+        }
+        
+        save_json(RULES_FILE, rules_container)
         
         sediment_data["evolution_rules"].extend(new_rules)
         sediment_data["stats"] = {
@@ -191,6 +215,10 @@ def add_sediment(prompt, answer, user_id, tags=None):
         "processed": False
     }
     
+    # Убеждаемся, что "sediments" — список
+    if not isinstance(sediment_data.get("sediments"), list):
+        sediment_data["sediments"] = []
+    
     sediment_data["sediments"].append(sediment)
     
     # Ограничиваем количество осадков
@@ -209,7 +237,13 @@ def add_sediment(prompt, answer, user_id, tags=None):
 def get_evolution_stats():
     """Возвращает статистику эволюции"""
     sediment_data = load_json(SEDIMENT_FILE, {})
-    rules_data = load_json(RULES_FILE, [])
+    rules_container = load_json(RULES_FILE, {"rules": []})
+    
+    # Извлекаем список правил
+    rules_data = rules_container.get("rules", [])
+    if not isinstance(rules_data, list):
+        rules_data = []
+    
     return {
         "total_sediments": len(sediment_data.get("sediments", [])),
         "processed_sediments": sum(1 for s in sediment_data.get("sediments", []) if s.get("processed")),
@@ -262,6 +296,7 @@ if __name__ == "__main__":
     print(get_evolution_stats())
     
     print("\nПоследние правила:")
-    rules = load_json(RULES_FILE, [])
+    rules_container = load_json(RULES_FILE, {"rules": []})
+    rules = rules_container.get("rules", [])
     for rule in rules[-3:]:
         print(f"  - {rule.get('condition')} → {rule.get('action')}")
