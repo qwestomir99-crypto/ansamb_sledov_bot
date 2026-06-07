@@ -2,7 +2,7 @@
 # Файл: dialogue/button_map.py
 # Справка: README.md → Админ-панель / Кнопки
 # Задача: единая таблица всех кнопок (текст + callback)
-# Комментарий: кнопка НАСТРОЕНИЕ ВКЛЮЧЕНА
+# Комментарий: добавлена кнопка интервала постов
 # Зависит от: telebot
 # Вызывается из: dialogue/admin_commands.py, dialogue/callbacks.py
 # ==========================================
@@ -27,6 +27,7 @@ BUTTONS = {
     "list_quotes":    {"text": "📖 Список цитат",        "callback": "list_quotes"},
     "add_quote":      {"text": "➕ Добавить цитату",     "callback": "add_quote"},
     "set_quote_interval": {"text": "⏱️ Интервал цитат", "callback": "set_quote_interval"},
+    "set_publish_interval": {"text": "⏱️ Интервал постов", "callback": "set_publish_interval"},
     "view_admin_log": {"text": "📋 admin.log", "callback": "view_admin_log"},
     "view_error_log": {"text": "❌ error.log", "callback": "view_error_log"},
     "clear_logs":     {"text": "🧹 Очистить логи", "callback": "clear_logs"},
@@ -43,9 +44,6 @@ BUTTONS = {
     "youtube_upload": {"text": "🎬 Загрузить на YouTube", "callback": "youtube_upload"},
 }
 
-# ==========================================
-# 2. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
-# ==========================================
 def get_button(button_id: str) -> dict:
     return BUTTONS.get(button_id, {"text": "⚠️ Ошибка", "callback": "error"})
 
@@ -55,9 +53,6 @@ def get_text(button_id: str) -> str:
 def get_callback(button_id: str) -> str:
     return get_button(button_id)["callback"]
 
-# ==========================================
-# 3. АДМИН-МЕНЮ
-# ==========================================
 def get_admin_menu_keyboard():
     from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
     keyboard = InlineKeyboardMarkup(row_width=2)
@@ -70,8 +65,8 @@ def get_admin_menu_keyboard():
         InlineKeyboardButton(get_text("manage_quotes"), callback_data=get_callback("manage_quotes")),
     )
     keyboard.add(
+        InlineKeyboardButton(get_text("set_publish_interval"), callback_data=get_callback("set_publish_interval")),
         InlineKeyboardButton(get_text("diagnostics"), callback_data=get_callback("diagnostics")),
-        InlineKeyboardButton(get_text("logout"), callback_data=get_callback("logout")),
     )
     keyboard.add(
         InlineKeyboardButton(get_text("mood"), callback_data=get_callback("mood")),
@@ -81,13 +76,11 @@ def get_admin_menu_keyboard():
         InlineKeyboardButton(get_text("toggle_alice"), callback_data=get_callback("toggle_alice")),
     )
     keyboard.add(
+        InlineKeyboardButton(get_text("logout"), callback_data=get_callback("logout")),
         InlineKeyboardButton(get_text("youtube_upload"), callback_data=get_callback("youtube_upload")),
     )
     return keyboard
 
-# ==========================================
-# 4. ГОСТЕВОЕ МЕНЮ (для пользователей)
-# ==========================================
 def get_user_menu_keyboard():
     from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
     keyboard = InlineKeyboardMarkup(row_width=2)
@@ -108,9 +101,6 @@ def get_user_menu_keyboard():
     )
     return keyboard
 
-# ==========================================
-# 5. КЛАВИАТУРА НАСТРОЕНИЙ
-# ==========================================
 def get_moods_keyboard(with_back=True):
     from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
     keyboard = InlineKeyboardMarkup(row_width=2)
@@ -126,9 +116,6 @@ def get_moods_keyboard(with_back=True):
         keyboard.add(InlineKeyboardButton("◀️ Назад", callback_data="back_to_admin"))
     return keyboard
 
-# ==========================================
-# 6. КЛАВИАТУРА ДИАЛОГА
-# ==========================================
 def get_dialog_keyboard():
     from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
     keyboard = InlineKeyboardMarkup()
