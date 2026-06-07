@@ -1,7 +1,7 @@
 # ==========================================
 # Файл: dialogue/admin/posts.py
 # Справка: README.md → Админка (публикации)
-# Задача: отложенные публикации и постинг в VK (группа)
+# Задача: отложенные публикации и постинг в VK (личный профиль)
 # ==========================================
 
 import os
@@ -113,9 +113,9 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
             f.write(downloaded_file)
     
     vk_token = os.environ.get("VK_TOKEN")
-    vk_group_id = os.environ.get("VK_GROUP_ID")
+    vk_owner_id = os.environ.get("VK_OWNER_ID")
     
-    if not vk_token or not vk_group_id:
+    if not vk_token or not vk_owner_id:
         bot.send_message(chat_id, "❌ Нет токена VK.")
         return
     
@@ -123,7 +123,7 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
     full_text = f"{text}\n\n📜 {quote}"
     auto_tags = get_auto_tags(text, "vk")
     
-    success, error_msg = post_to_vk(full_text, auto_tags, vk_token, vk_group_id, file_path, auto_quote=False, auto_tags=False)
+    success, error_msg = post_to_vk(full_text, auto_tags, vk_token, vk_owner_id, file_path, auto_quote=False, auto_tags=False)
     
     if success:
         bot.send_message(chat_id, "✅ Пост отправлен в VK!")
