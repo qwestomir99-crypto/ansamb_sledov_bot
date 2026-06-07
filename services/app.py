@@ -1,7 +1,8 @@
 # ==========================================
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
-# Задача: запуск, подключение модулей, VK OAuth + авто-рефреш с логами
+# Задача: запуск, подключение модулей, VK OAuth + авто-рефреш
+# Комментарий: device_id сохраняется при авторизации
 # ==========================================
 
 import os, sys, hashlib, base64, secrets, json as json_module, time as time_module
@@ -37,7 +38,7 @@ app.register_blueprint(analytics_api, url_prefix='/api/analytics')
 app.register_blueprint(agent_bp, url_prefix='/agent')
 
 # ==========================================
-# VK OAUTH + АВТО-РЕФРЕШ С ЛОГАМИ
+# VK OAUTH + АВТО-РЕФРЕШ
 # ==========================================
 
 _vk_token_cache = {"token": None, "expires_at": 0}
@@ -70,18 +71,28 @@ def refresh_vk_token():
     
     client_id = os.environ.get("VK_APP_ID")
     client_secret = os.environ.get("VK_APP_SECRET")
-    device_id = hashlib.sha256(b"ansamb-sledov-bot-94wz.onrender.com").hexdigest()[:32]
+    
+    device_id = None
+    try:
+        with open("/tmp/vk_device_id.txt", "r") as f:
+            device_id = f.read().strip()
+        debug_log("VK_REFRESH", f"Использую сохранённый device_id: {device_id[:20]}...")
+    except:
+        debug_log("VK_REFRESH", "device_id не найден", "WARNING")
     
     debug_log("VK_REFRESH", "Запрос рефреша...")
     
+    params = {
+        "grant_type": "refresh_token",
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "refresh_token": refresh_token
+    }
+    if device_id:
+        params["device_id"] = device_id
+    
     try:
-        r = req.post("https://id.vk.com/oauth2/auth", data={
-            "grant_type": "refresh_token",
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "refresh_token": refresh_token,
-            "device_id": device_id
-        }, timeout=10)
+        r = req.post("https://id.vk.com/oauth2/auth", data=params, timeout=10)
         data = r.json()
         debug_log("VK_REFRESH", f"Ответ: {str(data)[:200]}")
         
@@ -103,6 +114,13 @@ def vk_callback():
     code = flask_request.args.get('code')
     state = flask_request.args.get('state', '')
     device_id = flask_request.args.get('device_id', '')
+    
+    if device_id:
+        os.makedirs("/tmp", exist_ok=True)
+        with open("/tmp/vk_device_id.txt", "w") as f:
+            f.write(device_id)
+        debug_log("VK_OAUTH", f"device_id сохранён: {device_id[:20]}...")
+    
     if not code: return "❌ Нет кода авторизации", 400
     
     client_id = os.environ.get("VK_APP_ID")
