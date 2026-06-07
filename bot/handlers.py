@@ -2,7 +2,7 @@
 # Файл: bot/handlers.py
 # Справка: README.md → Бот / Обработчики
 # Задача: регистрация обработчиков и потоков
-# Комментарий: VK_READER_TOKEN для ридера, VK_TOKEN для постинга
+# Комментарий: ридер: VK_READER_TOKEN + VK_OWNER_ID, постинг: VK_TOKEN + VK_GROUP_ID
 # ==========================================
 
 import os
@@ -26,16 +26,21 @@ def register_all_handlers(bot, config):
     
     tg_chat_id = config.get("telegram", {}).get("publish_channel", "@qwestomir")
     admin_id = int(os.environ.get("ADMIN_USER_ID", 0))
+    
+    # Для постинга в группу
     vk_token = os.environ.get("VK_TOKEN")
-    vk_owner_id = os.environ.get("VK_OWNER_ID")
+    vk_group_id = os.environ.get("VK_GROUP_ID")
+    
+    # Для чтения личного профиля
     vk_reader_token = os.environ.get("VK_READER_TOKEN")
+    vk_owner_id = os.environ.get("VK_OWNER_ID")
     
     threading.Thread(target=scheduler_loop, args=(bot, tg_chat_id, admin_id), daemon=True).start()
     threading.Thread(target=quotes_loop, args=(bot, tg_chat_id), daemon=True).start()
-    threading.Thread(target=publish_loop, args=(bot, vk_token, vk_owner_id, tg_chat_id), daemon=True).start()
+    threading.Thread(target=publish_loop, args=(bot, vk_token, vk_group_id, tg_chat_id), daemon=True).start()
     threading.Thread(target=vk_reader_loop, args=(bot, vk_reader_token, vk_owner_id, tg_chat_id), daemon=True).start()
     
     if config.get("autoposter", {}).get("enabled", True):
-        threading.Thread(target=start_autoposter, args=(config, vk_token, vk_owner_id), daemon=True).start()
+        threading.Thread(target=start_autoposter, args=(config, vk_token, vk_group_id), daemon=True).start()
     
-    print("[HANDLERS] Все потоки запущены")
+    print("[HANDLERS] Все потоки запущены: ридер, постинг, цитаты, пул")
