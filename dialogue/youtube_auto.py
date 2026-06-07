@@ -2,7 +2,7 @@
 # Файл: dialogue/youtube_auto.py
 # Справка: README.md → YouTube автопостинг
 # Задача: выбор случайного видео из плейлиста
-# Комментарий: кэширует список видео на час, не гоняется за новинками.
+# Комментарий: кэширует список видео на час. Приоритет: свежий API → старый кэш → None.
 #              Возвращает случайное видео (id, title, url).
 # Зависит от: requests, json, os, time, random
 # Вызывается из: services/autoposter.py (check_and_publish)
@@ -95,6 +95,20 @@ def load_cached_playlist():
         log(f"Ошибка чтения кэша: {e}", "ERROR")
         return None
 
+def load_cached_playlist_force():
+    """Загружает кэш плейлиста, даже если он устарел"""
+    if not os.path.exists(CACHE_FILE):
+        return None
+    
+    try:
+        with open(CACHE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        log(f"Загружен СТАРЫЙ кэш: {len(data['items'])} видео")
+        return data["items"]
+    except Exception as e:
+        log(f"Ошибка чтения старого кэша: {e}", "ERROR")
+        return None
+
 def save_cached_playlist(items):
     """Сохраняет плейлист в кэш"""
     os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
@@ -111,7 +125,7 @@ def save_cached_playlist(items):
 def get_random_video():
     """
     Возвращает случайное видео из плейлиста.
-    Кэширует список на CACHE_TTL секунд.
+    Приоритет: свежий API → старый кэш → None.
     """
     api_key = get_youtube_api_key()
     playlist_id = get_youtube_playlist_id()
@@ -119,18 +133,22 @@ def get_random_video():
     if not api_key or not playlist_id:
         return None
     
-    # Пытаемся загрузить из кэша
+    # 1. Пробуем свежий кэш
     items = load_cached_playlist()
     
+    # 2. Если кэш устарел или пуст — пробуем API
     if items is None:
         items = fetch_playlist_items(playlist_id, api_key)
         if items:
             save_cached_playlist(items)
-        else:
-            return None
     
+    # 3. Если API не дал — пробуем старый кэш (игнорируем TTL)
     if not items:
-        log("Плейлист пуст", "WARNING")
+        items = load_cached_playlist_force()
+    
+    # 4. Совсем ничего — None
+    if not items:
+        log("Плейлист пуст даже из старого кэша", "WARNING")
         return None
     
     video = random.choice(items)
