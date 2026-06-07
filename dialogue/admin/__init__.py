@@ -21,13 +21,14 @@ from .auth import (
     log_admin_action
 )
 from .quotes_admin import (
+    show_quotes_panel,
     handle_quotes_list,
     handle_quotes_add_start,
     handle_quotes_interval,
     handle_quotes_set_interval
 )
 from .posts import (
-    handle_pub_menu,
-    ask_for_post_text,
-    handle_vk_post
+    show_add_post_ui,
+    handle_vk_post,
+    set_publish_interval_ui
 )
