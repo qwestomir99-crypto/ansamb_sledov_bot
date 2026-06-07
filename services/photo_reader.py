@@ -1,10 +1,8 @@
 # ==========================================
 # Файл: services/photo_reader.py
 # Справка: README.md → Репосты из VK
-# Задача: получить случайный пост с ДОСТУПНЫМ фото с твоей стены VK
-# Комментарий: проверяет что фото реально загружается, битые ссылки пропускает
-# Зависит от: requests, debug_utils
-# Вызывается из: publisher_utils.py (get_random_own_post_from_vk)
+# Задача: получить случайный пост с доступным фото с твоей стены VK
+# Комментарий: использует VK_READER_TOKEN
 # ==========================================
 
 import os
@@ -13,11 +11,11 @@ import requests
 from debug_utils import debug_log
 
 def get_random_post():
-    token = os.environ.get("VK_TOKEN")
+    token = os.environ.get("VK_READER_TOKEN")
     owner_id = os.environ.get("VK_OWNER_ID")
     
     if not token or not owner_id:
-        debug_log("PHOTO_READER", "Нет VK_TOKEN или VK_OWNER_ID", "ERROR")
+        debug_log("PHOTO_READER", "Нет VK_READER_TOKEN или VK_OWNER_ID", "ERROR")
         return None
     
     url = "https://api.vk.com/method/wall.get"
@@ -37,23 +35,19 @@ def get_random_post():
             return None
         
         items = data.get("response", {}).get("items", [])
-        
         posts_with_photo = []
         for post in items:
             if post.get("is_pinned"):
                 continue
-            
             text = post.get("text", "").strip()
             if not text:
                 continue
-            
             attachments = post.get("attachments", [])
             for att in attachments:
                 if att.get("type") == "photo":
                     sizes = att.get("photo", {}).get("sizes", [])
                     if sizes:
                         photo_url = sizes[-1]["url"]
-                        # Проверяем что фото доступно
                         try:
                             head = requests.head(photo_url, timeout=5)
                             if head.status_code == 200:
@@ -63,10 +57,8 @@ def get_random_post():
                                     "photo_url": photo_url,
                                     "tags": tags
                                 })
-                            else:
-                                debug_log("PHOTO_READER", f"Фото недоступно (статус {head.status_code}): {photo_url[:60]}...", "WARNING")
                         except:
-                            debug_log("PHOTO_READER", f"Фото не загружается: {photo_url[:60]}...", "WARNING")
+                            pass
                         break
         
         if not posts_with_photo:
