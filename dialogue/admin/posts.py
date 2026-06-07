@@ -2,7 +2,7 @@
 # Файл: dialogue/admin/posts.py
 # Справка: README.md → Админка (публикации)
 # Задача: TG-посты, отложенные публикации, интервал, VK
-# Комментарий: VK — группа от имени пользователя
+# Комментарий: VK — группа через VK_GROUP_ID
 # ==========================================
 
 import os, json, tempfile
@@ -107,8 +107,7 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
         file_path = os.path.join(tempfile.gettempdir(), f"temp_vk_{message.video.file_id}.mp4")
         with open(file_path, 'wb') as f: f.write(bot.download_file(file_info.file_path))
     
-    from services.app import get_vk_token
-    vk_token = get_vk_token()
+    vk_token = os.environ.get("VK_TOKEN")
     vk_group_id = os.environ.get("VK_GROUP_ID")
     if not vk_token or not vk_group_id:
         bot.send_message(chat_id, "❌ VK отключён."); return
