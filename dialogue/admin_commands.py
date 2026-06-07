@@ -1,8 +1,8 @@
 # ==========================================
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
-# Задача: админ-меню, кнопки, управление цитатами и интервалом постов
-# Комментарий: публикация делегирована в dialogue/publisher.py
+# Задача: авторизация, главное меню, вызов модулей
+# Комментарий: TG-посты и интервал → admin/posts.py
 # ==========================================
 
 import os
@@ -84,69 +84,9 @@ def show_admin_panel(call, bot):
     bot.edit_message_text("🛡️ *Админ-панель*\n\nВыберите действие:", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=get_admin_menu(), parse_mode='Markdown')
     bot.answer_callback_query(call.id)
 
-def show_add_post_ui(call, bot):
-    msg = bot.send_message(call.message.chat.id, "📝 *Добавление поста*\n\nПришлите текст.\nИли /cancel.", parse_mode='Markdown')
-    safe_delete(call.message, 1)
-    bot.register_next_step_handler(msg, process_post_text, bot)
-
-def process_post_text(message, bot):
-    if message.text == "/cancel":
-        bot.reply_to(message, "❌ Отменено.", reply_markup=get_admin_menu())
-        safe_delete(message, 3)
-        return
-    if not hasattr(process_post_text, "temp_posts"):
-        process_post_text.temp_posts = {}
-    process_post_text.temp_posts[message.from_user.id] = {"text": message.text}
-    msg = bot.send_message(message.chat.id, "🏷️ Теги через пробел или /skip")
-    bot.register_next_step_handler(msg, process_post_tags, bot, message.from_user.id)
-    safe_delete(message, 2)
-
-def process_post_tags(message, bot, user_id):
-    if message.text == "/skip":
-        tags = []
-    elif message.text == "/cancel":
-        bot.reply_to(message, "❌ Отменено.", reply_markup=get_admin_menu())
-        safe_delete(message, 3)
-        return
-    else:
-        tags = message.text.split()
-    post_data = getattr(process_post_text, "temp_posts", {}).get(user_id, {})
-    text = post_data.get("text", "")
-    if not hasattr(process_post_tags, "pending_posts"):
-        process_post_tags.pending_posts = {}
-    process_post_tags.pending_posts[user_id] = {"text": text, "tags": tags}
-    msg = bot.send_message(message.chat.id, "📋 *Пост готов.*\n`0` — сейчас, или число минут для отложки.\n/cancel — отмена", parse_mode='Markdown')
-    bot.register_next_step_handler(msg, process_publish_choice, bot, user_id)
-    safe_delete(message, 3)
-
-def process_publish_choice(message, bot, user_id):
-    choice = message.text.strip().lower()
-    if choice == "/cancel":
-        bot.reply_to(message, "❌ Отменена.", reply_markup=get_admin_menu())
-        safe_delete(message, 3)
-        return
-    
-    post_data = getattr(process_post_tags, "pending_posts", {}).get(user_id, {})
-    text = post_data.get("text", "")
-    tags = post_data.get("tags", [])
-    
-    try:
-        delay = int(choice)
-    except:
-        bot.reply_to(message, "❌ Введите число (0 = сейчас).", reply_markup=get_admin_menu())
-        safe_delete(message, 5)
-        return
-    
-    from dialogue.publisher import publish_now_or_later
-    success = publish_now_or_later(bot, user_id, text, tags, delay)
-    
-    if delay == 0:
-        bot.reply_to(message, "✅ Опубликовано!" if success else "❌ Ошибка.", reply_markup=get_admin_menu())
-    else:
-        bot.reply_to(message, f"✅ В пул!" if success else "❌ Ошибка.", reply_markup=get_admin_menu())
-    
-    safe_delete(message, 5)
-
+# ==========================================
+# ЦИТАТЫ
+# ==========================================
 def show_quotes_panel(call, bot):
     keyboard = InlineKeyboardMarkup(row_width=2)
     keyboard.add(
@@ -209,41 +149,8 @@ def process_quote_interval(message, bot):
     safe_delete(message, 5)
 
 # ==========================================
-# ИНТЕРВАЛ ПОСТОВ
+# ДИАГНОСТИКА, ВЫХОД, НАСТРОЕНИЕ, ДИАЛОГ
 # ==========================================
-def set_publish_interval_ui(call, bot):
-    config = load_config()
-    current = config.get("publisher", {}).get("interval_minutes", 120)
-    msg = bot.send_message(
-        call.message.chat.id,
-        f"⏱️ *Интервал постов*\nТекущий: {current} мин.\nВведите от 10 до 1440.\n/cancel.",
-        parse_mode='Markdown'
-    )
-    safe_delete(call.message, 1)
-    bot.register_next_step_handler(msg, process_publish_interval, bot)
-
-def process_publish_interval(message, bot):
-    if message.text == "/cancel":
-        bot.reply_to(message, "❌ Отменено.", reply_markup=get_admin_menu())
-        safe_delete(message, 3)
-        return
-    try:
-        interval = int(message.text.strip())
-        if 10 <= interval <= 1440:
-            config = load_config()
-            if "publisher" not in config:
-                config["publisher"] = {}
-            config["publisher"]["interval_minutes"] = interval
-            config["publisher"]["interval_seconds"] = interval * 60
-            with open(CONFIG_FILE, "w") as f:
-                json.dump(config, f, indent=2)
-            bot.reply_to(message, f"✅ Интервал постов: {interval} мин.", reply_markup=get_admin_menu())
-        else:
-            raise ValueError
-    except:
-        bot.reply_to(message, "❌ Число от 10 до 1440.", reply_markup=get_admin_menu())
-    safe_delete(message, 5)
-
 def show_diagnostics(call, bot):
     from dialogue.admin.diagnostics import get_diagnostics_menu
     bot.edit_message_text("📋 *Диагностика*", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=get_diagnostics_menu(), parse_mode='Markdown')
