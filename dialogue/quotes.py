@@ -2,7 +2,7 @@
 # Модуль: dialogue/quotes.py
 # Справка: README.md → Цитаты
 # Задача: публикация цитат с YouTube-видео в TG и VK + шаббат
-# Комментарий: VK — только с пользовательским токеном (длина > 80)
+# Комментарий: VK использует VK_TOKEN_USER
 # ==========================================
 
 import os
@@ -66,16 +66,8 @@ def get_quotes(limit=10):
                 return [line.strip() for line in f.readlines() if line.strip()][-limit:]
         return []
 
-def get_all_quotes():
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute("SELECT id, text, created_at FROM quotes ORDER BY id DESC")
-        rows = c.fetchall()
-        conn.close()
-        return [{"id": row[0], "text": row[1], "created_at": row[2]} for row in rows]
-    except:
-        return []
+def get_all_quotes(): return []
+def delete_quote_by_id(quote_id): return False
 
 def add_quote(text):
     try:
@@ -87,25 +79,11 @@ def add_quote(text):
         return True
     except:
         try:
-            with open(QUOTES_FALLBACK_FILE, "a", encoding="utf-8") as f:
-                f.write(text + "\n")
+            with open(QUOTES_FALLBACK_FILE, "a", encoding="utf-8") as f: f.write(text + "\n")
             return True
-        except:
-            return False
+        except: return False
 
-def delete_quote_by_id(quote_id):
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute("DELETE FROM quotes WHERE id = ?", (quote_id,))
-        conn.commit()
-        conn.close()
-        return True
-    except:
-        return False
-
-def get_quotes_list():
-    return get_quotes(10000)
+def get_quotes_list(): return get_quotes(10000)
 
 def get_quotes_interval_minutes():
     config = load_config()
@@ -113,42 +91,29 @@ def get_quotes_interval_minutes():
 
 def set_quotes_interval_minutes(minutes):
     config = load_config()
-    if "quotes" not in config:
-        config["quotes"] = {}
+    if "quotes" not in config: config["quotes"] = {}
     config["quotes"]["interval_minutes"] = minutes
     save_config(config)
 
 def save_config(config):
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=4, ensure_ascii=False)
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f: json.dump(config, f, indent=4, ensure_ascii=False)
 
-def set_quotes_interval(minutes):
-    return set_quotes_interval_minutes(minutes)
+def set_quotes_interval(minutes): return set_quotes_interval_minutes(minutes)
+def get_quotes_interval(): return get_quotes_interval_minutes()
 
-def get_quotes_interval():
-    return get_quotes_interval_minutes()
-
-# ==========================================
-# ОТПРАВКА ЦИТАТЫ В TG И VK
-# ==========================================
 def send_quote_with_photo(bot, chat_id, quote):
-    """Отправляет цитату с YouTube-видео в Telegram и VK"""
     try:
         from dialogue.youtube_auto import get_random_video
         video = get_random_video()
-        
         caption = f"📜 {quote}\n\n🎬 {video['title']}\n{video['url']}" if video and video.get('url') else f"📜 {quote}"
-        if len(caption) > 1024:
-            caption = caption[:1024]
+        if len(caption) > 1024: caption = caption[:1024]
         
-        # Telegram
         bot.send_message(chat_id, caption)
         debug_log("QUOTES", "Цитата отправлена в Telegram")
         
-        # VK — только с пользовательским токеном
-        vk_token = os.environ.get("VK_TOKEN")
+        vk_token = os.environ.get("VK_TOKEN_USER")
         vk_owner_id = os.environ.get("VK_OWNER_ID")
-        if vk_token and vk_owner_id and len(vk_token) > 80:
+        if vk_token and vk_owner_id:
             try:
                 from dialogue.publisher_utils import post_to_vk
                 vk_caption = f"📜 {quote}\n\n🎬 {video['title']}\n{video['url']}" if video and video.get('url') else f"📜 {quote}"
@@ -156,24 +121,19 @@ def send_quote_with_photo(bot, chat_id, quote):
                 debug_log("QUOTES", "Цитата отправлена в VK")
             except Exception as e:
                 debug_log("QUOTES", f"Ошибка VK: {e}", "WARNING")
-        
         return True
     except Exception as e:
         debug_log("QUOTES", f"Ошибка: {e}", "ERROR")
         bot.send_message(chat_id, f"📜 {quote}\n\n#Цитата #СапёрыАутентичности")
         return False
 
-# ==========================================
-# ЦИКЛ ПУБЛИКАЦИИ ЦИТАТ (с шаббатом)
-# ==========================================
 quote_thread_running = False
 quote_thread = None
 
 def quotes_loop(bot, TG_CHAT_ID):
     global quote_thread_running, quote_thread
     quote_thread_running = False
-    if quote_thread and quote_thread.is_alive():
-        time.sleep(1)
+    if quote_thread and quote_thread.is_alive(): time.sleep(1)
     quote_thread_running = True
     
     def _run():
@@ -184,44 +144,28 @@ def quotes_loop(bot, TG_CHAT_ID):
                 if is_shabbat():
                     time.sleep(3600)
                     continue
-            except ImportError:
-                pass
-            
+            except ImportError: pass
             if not should_publish_quotes():
                 time.sleep(60)
                 continue
-            
             base_interval = get_quotes_interval()
-            current_interval = base_interval
-            
-            if current_interval != last_interval:
-                last_interval = current_interval
-                debug_log("QUOTES", f"Интервал обновлён: {current_interval} минут")
-            
-            if current_interval <= 0:
+            if base_interval != last_interval:
+                last_interval = base_interval
+                debug_log("QUOTES", f"Интервал обновлён: {base_interval} минут")
+            if base_interval <= 0:
                 time.sleep(60)
                 continue
-            
-            interval_seconds = current_interval * 60
-            time.sleep(interval_seconds)
-            
-            if not quote_thread_running or not should_publish_quotes():
-                continue
-            
+            time.sleep(base_interval * 60)
+            if not quote_thread_running or not should_publish_quotes(): continue
             try:
                 from dialogue.shabbat_manager import is_shabbat
-                if is_shabbat():
-                    continue
-            except ImportError:
-                pass
-            
+                if is_shabbat(): continue
+            except ImportError: pass
             quotes = get_quotes()
-            if not quotes:
-                continue
-            
+            if not quotes: continue
             quote = random.choice(quotes)
             send_quote_with_photo(bot, TG_CHAT_ID, quote)
-            debug_log("QUOTES", f"Цитата отправлена (интервал {current_interval} мин)")
+            debug_log("QUOTES", f"Цитата отправлена (интервал {base_interval} мин)")
     
     quote_thread = threading.Thread(target=_run, daemon=True)
     quote_thread.start()
