@@ -2,104 +2,29 @@
 # Модуль: dialogue/quotes.py
 # Справка: README.md → Цитаты
 # Задача: публикация цитат с YouTube-видео в TG и VK + шаббат
-# Комментарий: VK использует VK_TOKEN_USER
+# Комментарий: SQLite в services/sqlite_client.py, миксер в dialogue/content_mixer.py
 # ==========================================
 
 import os
 import time
 import random
 import json
-import sqlite3
-from datetime import datetime
 import threading
 from debug_utils import debug_log
-from dialogue.activity_modes import should_publish_quotes, get_quotes_interval, load_config
+from dialogue.activity_modes import should_publish_quotes, load_config
+from services.sqlite_client import get_quotes, get_quotes_list, add_quote
 
 CONFIG_FILE = "config.json"
-QUOTES_FALLBACK_FILE = "dialogue/data/quotes.txt"
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'quotes.db')
 
-def init_db():
-    try:
-        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute('''CREATE TABLE IF NOT EXISTS quotes (id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL, created_at TEXT)''')
-        conn.commit()
-        conn.close()
-        debug_log("QUOTES", "Таблица quotes создана/подтверждена")
-        migrate_from_file()
-    except Exception as e:
-        debug_log("QUOTES", f"Ошибка инициализации БД: {e}", "ERROR")
-
-def migrate_from_file():
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute("SELECT COUNT(*) FROM quotes")
-        count = c.fetchone()[0]
-        conn.close()
-        if count == 0 and os.path.exists(QUOTES_FALLBACK_FILE):
-            with open(QUOTES_FALLBACK_FILE, "r", encoding="utf-8") as f:
-                quotes = [line.strip() for line in f.readlines() if line.strip()]
-            conn = sqlite3.connect(DB_PATH)
-            c = conn.cursor()
-            for quote in quotes:
-                c.execute("INSERT INTO quotes (text, created_at) VALUES (?, ?)", (quote, datetime.now().isoformat()))
-            conn.commit()
-            conn.close()
-            debug_log("QUOTES", f"Мигрировано {len(quotes)} цитат из файла")
-    except Exception as e:
-        debug_log("QUOTES", f"Ошибка миграции: {e}", "ERROR")
-
-def get_quotes(limit=10):
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute("SELECT text FROM quotes ORDER BY id DESC LIMIT ?", (limit,))
-        rows = c.fetchall()
-        conn.close()
-        return [row[0] for row in rows]
-    except:
-        if os.path.exists(QUOTES_FALLBACK_FILE):
-            with open(QUOTES_FALLBACK_FILE, "r", encoding="utf-8") as f:
-                return [line.strip() for line in f.readlines() if line.strip()][-limit:]
-        return []
-
-def get_all_quotes(): return []
-def delete_quote_by_id(quote_id): return False
-
-def add_quote(text):
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute("INSERT INTO quotes (text, created_at) VALUES (?, ?)", (text, datetime.now().isoformat()))
-        conn.commit()
-        conn.close()
-        return True
-    except:
-        try:
-            with open(QUOTES_FALLBACK_FILE, "a", encoding="utf-8") as f: f.write(text + "\n")
-            return True
-        except: return False
-
-def get_quotes_list(): return get_quotes(10000)
-
-def get_quotes_interval_minutes():
-    config = load_config()
-    return config.get("quotes", {}).get("interval_minutes", 60)
-
-def set_quotes_interval_minutes(minutes):
+def set_quotes_interval(minutes):
     config = load_config()
     if "quotes" not in config: config["quotes"] = {}
     config["quotes"]["interval_minutes"] = minutes
-    save_config(config)
-
-def save_config(config):
     with open(CONFIG_FILE, "w", encoding="utf-8") as f: json.dump(config, f, indent=4, ensure_ascii=False)
 
-def set_quotes_interval(minutes): return set_quotes_interval_minutes(minutes)
-def get_quotes_interval(): return get_quotes_interval_minutes()
+def get_quotes_interval():
+    config = load_config()
+    return config.get("quotes", {}).get("interval_minutes", 60)
 
 def send_quote_with_photo(bot, chat_id, quote):
     try:
@@ -169,6 +94,4 @@ def quotes_loop(bot, TG_CHAT_ID):
     
     quote_thread = threading.Thread(target=_run, daemon=True)
     quote_thread.start()
-    debug_log("QUOTES", "Цитаты запущены (SQLite + шаббат + TG + VK)")
-
-init_db()
+    debug_log("QUOTES", "Цитаты запущены (TG + VK + шаббат)")
