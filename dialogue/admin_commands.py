@@ -1,7 +1,7 @@
 # ==========================================
 # Файл: dialogue/admin_commands.py
 # Справка: README.md → Админ-панель
-# Задача: админ-меню, кнопки, управление цитатами
+# Задача: админ-меню, кнопки, управление цитатами и интервалом постов
 # Комментарий: публикация делегирована в dialogue/publisher.py
 # ==========================================
 
@@ -206,6 +206,42 @@ def process_quote_interval(message, bot):
             raise ValueError
     except:
         bot.reply_to(message, "❌ Число от 5 до 720.", reply_markup=get_admin_menu())
+    safe_delete(message, 5)
+
+# ==========================================
+# ИНТЕРВАЛ ПОСТОВ
+# ==========================================
+def set_publish_interval_ui(call, bot):
+    config = load_config()
+    current = config.get("publisher", {}).get("interval_minutes", 120)
+    msg = bot.send_message(
+        call.message.chat.id,
+        f"⏱️ *Интервал постов*\nТекущий: {current} мин.\nВведите от 10 до 1440.\n/cancel.",
+        parse_mode='Markdown'
+    )
+    safe_delete(call.message, 1)
+    bot.register_next_step_handler(msg, process_publish_interval, bot)
+
+def process_publish_interval(message, bot):
+    if message.text == "/cancel":
+        bot.reply_to(message, "❌ Отменено.", reply_markup=get_admin_menu())
+        safe_delete(message, 3)
+        return
+    try:
+        interval = int(message.text.strip())
+        if 10 <= interval <= 1440:
+            config = load_config()
+            if "publisher" not in config:
+                config["publisher"] = {}
+            config["publisher"]["interval_minutes"] = interval
+            config["publisher"]["interval_seconds"] = interval * 60
+            with open(CONFIG_FILE, "w") as f:
+                json.dump(config, f, indent=2)
+            bot.reply_to(message, f"✅ Интервал постов: {interval} мин.", reply_markup=get_admin_menu())
+        else:
+            raise ValueError
+    except:
+        bot.reply_to(message, "❌ Число от 10 до 1440.", reply_markup=get_admin_menu())
     safe_delete(message, 5)
 
 def show_diagnostics(call, bot):
