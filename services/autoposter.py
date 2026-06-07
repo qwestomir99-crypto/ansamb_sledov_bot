@@ -2,7 +2,7 @@
 # Файл: services/autoposter.py
 # Справка: README.md → Автопостинг YouTube
 # Задача: публикация случайного видео из плейлиста в TG и VK
-# Комментарий: TG всегда, VK с VK_TOKEN_USER, цитаты из publisher_utils
+# Комментарий: TG всегда, VK в группу с VK_TOKEN + VK_GROUP_ID, цитаты из publisher_utils
 # ==========================================
 
 import os
@@ -35,8 +35,8 @@ def check_and_publish(bot, tg_chat_id):
         log_auto("ERROR", f"Ошибка TG: {e}")
     
     # VK
-    vk_token = os.environ.get("VK_TOKEN_USER")
-    vk_owner_id = os.environ.get("VK_OWNER_ID")
+    vk_token = os.environ.get("VK_TOKEN")
+    vk_owner_id = os.environ.get("VK_GROUP_ID")
     if vk_token and vk_owner_id:
         try:
             success, _ = post_to_vk(full_text, "", vk_token, vk_owner_id)
