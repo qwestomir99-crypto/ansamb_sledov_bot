@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, VK OAuth + авто-рефреш
-# Комментарий: device_id сохраняется при авторизации
+# Комментарий: device_id из переменной VK_DEVICE_ID
 # ==========================================
 
 import os, sys, hashlib, base64, secrets, json as json_module, time as time_module
@@ -38,7 +38,7 @@ app.register_blueprint(analytics_api, url_prefix='/api/analytics')
 app.register_blueprint(agent_bp, url_prefix='/agent')
 
 # ==========================================
-# VK OAUTH + АВТО-РЕФРЕШ
+# VK OAUTH + АВТО-РЕФРЕШ (device_id из переменной)
 # ==========================================
 
 _vk_token_cache = {"token": None, "expires_at": 0}
@@ -52,7 +52,7 @@ def get_vk_token():
     if token and len(token) > 80:
         _vk_token_cache["token"] = token
         _vk_token_cache["expires_at"] = now + 3000
-        debug_log("VK_TOKEN", f"Токен из кэша, годен до {_vk_token_cache['expires_at']}")
+        debug_log("VK_TOKEN", f"Токен из кэша")
         return token
     
     debug_log("VK_TOKEN", "Токен истёк, пробую рефреш...")
@@ -71,14 +71,12 @@ def refresh_vk_token():
     
     client_id = os.environ.get("VK_APP_ID")
     client_secret = os.environ.get("VK_APP_SECRET")
+    device_id = os.environ.get("VK_DEVICE_ID")
     
-    device_id = None
-    try:
-        with open("/tmp/vk_device_id.txt", "r") as f:
-            device_id = f.read().strip()
-        debug_log("VK_REFRESH", f"Использую сохранённый device_id: {device_id[:20]}...")
-    except:
-        debug_log("VK_REFRESH", "device_id не найден", "WARNING")
+    if device_id:
+        debug_log("VK_REFRESH", f"device_id из переменной: {device_id[:20]}...")
+    else:
+        debug_log("VK_REFRESH", "VK_DEVICE_ID не задан", "WARNING")
     
     debug_log("VK_REFRESH", "Запрос рефреша...")
     
@@ -116,10 +114,7 @@ def vk_callback():
     device_id = flask_request.args.get('device_id', '')
     
     if device_id:
-        os.makedirs("/tmp", exist_ok=True)
-        with open("/tmp/vk_device_id.txt", "w") as f:
-            f.write(device_id)
-        debug_log("VK_OAUTH", f"device_id сохранён: {device_id[:20]}...")
+        debug_log("VK_OAUTH", f"device_id получен: {device_id[:20]}... Сохрани в VK_DEVICE_ID в Render!")
     
     if not code: return "❌ Нет кода авторизации", 400
     
@@ -141,9 +136,10 @@ def vk_callback():
         if "access_token" in data:
             return f"""
             <h2>✅ Токен получен!</h2>
+            <p><b>Device ID:</b> {device_id}</p>
             <p><b>Access Token:</b><br><textarea rows="3" style="width:100%">{data['access_token']}</textarea></p>
             <p><b>Refresh Token:</b><br><textarea rows="3" style="width:100%">{data.get('refresh_token', '')}</textarea></p>
-            <p style="color: green;">Скопируй в VK_TOKEN_USER и VK_REFRESH_TOKEN в Render.</p>
+            <p style="color: green;">Скопируй все три значения в Render.</p>
             """
         else:
             return f"<h2>❌ Ошибка: {data.get('error')}</h2>", 500
@@ -166,7 +162,7 @@ def vk_auth_link():
     return f"""
     <h2>🔗 Ссылка для авторизации VK</h2>
     <a href="{auth_url}" target="_blank">{auth_url}</a>
-    <p><i>После авторизации скопируй оба токена в Render.</i></p>
+    <p><i>После авторизации скопируй Access Token, Refresh Token и Device ID в Render.</i></p>
     """
 
 start_background_thread()
