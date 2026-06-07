@@ -2,6 +2,7 @@
 # Модуль: dialogue/quotes.py
 # Справка: README.md → Цитаты
 # Задача: публикация цитат с YouTube-видео в TG и VK + шаббат
+# Комментарий: VK — группа через VK_GROUP_ID
 # ==========================================
 
 import os, time, random, json, threading
@@ -29,15 +30,13 @@ def send_quote_with_photo(bot, chat_id, quote):
         bot.send_message(chat_id, caption)
         debug_log("QUOTES", "Цитата отправлена в Telegram")
         
+        vk_token = os.environ.get("VK_TOKEN")
         vk_group_id = os.environ.get("VK_GROUP_ID")
-        if vk_group_id:
+        if vk_token and vk_group_id:
             try:
-                from services.app import get_vk_token
                 from dialogue.publisher_utils import post_to_vk
-                token = get_vk_token()
-                if token:
-                    post_to_vk(caption, "#Цитата #СапёрыАутентичности", token, vk_group_id)
-                    debug_log("QUOTES", "Цитата отправлена в VK")
+                post_to_vk(caption, "#Цитата #СапёрыАутентичности", vk_token, vk_group_id)
+                debug_log("QUOTES", "Цитата отправлена в VK")
             except Exception as e: debug_log("QUOTES", f"Ошибка VK: {e}", "WARNING")
         return True
     except Exception as e:
@@ -64,7 +63,6 @@ def quotes_loop(bot, TG_CHAT_ID):
             base_interval = get_quotes_interval()
             if base_interval != last_interval:
                 last_interval = base_interval
-                debug_log("QUOTES", f"Интервал обновлён: {base_interval} минут")
             if base_interval <= 0: time.sleep(60); continue
             time.sleep(base_interval * 60)
             if not quote_thread_running or not should_publish_quotes(): continue
