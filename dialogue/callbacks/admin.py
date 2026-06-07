@@ -1,7 +1,7 @@
 # ==========================================
 # Файл: dialogue/callbacks/admin.py
 # Справка: README.md → Обработчики кнопок / Админ-панель
-# Задача: обработка callback'ов админ-панели с автоочисткой
+# Задача: обработка callback'ов админ-панели с автоочисткой и закрытием
 # ==========================================
 
 import telebot
@@ -91,3 +91,10 @@ def register_admin_callbacks(bot: telebot.TeleBot, config: dict):
         msg = bot.send_message(call.message.chat.id, "❌ Действие отменено.")
         safe_delete(msg, 3)
         bot.answer_callback_query(call.id)
+    
+    @bot.callback_query_handler(func=lambda call: call.data == "close_menu")
+    def callback_close_menu(call):
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except: pass
+        bot.answer_callback_query(call.id, "Меню закрыто")
