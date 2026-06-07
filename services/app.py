@@ -50,11 +50,11 @@ def get_vk_token():
     token = os.environ.get("VK_TOKEN_USER")
     if token and len(token) > 80:
         _vk_token_cache["token"] = token
-        _vk_token_cache["expires_at"] = now + 3000  # 50 минут
+        _vk_token_cache["expires_at"] = now + 3000
         debug_log("VK_TOKEN", f"Токен из кэша, годен до {_vk_token_cache['expires_at']}")
         return token
     
-    debug_log("VK_TOKEN", "Токен истёк или отсутствует, пробую рефреш...")
+    debug_log("VK_TOKEN", "Токен истёк, пробую рефреш...")
     new_token = refresh_vk_token()
     if new_token:
         _vk_token_cache["token"] = new_token
@@ -72,7 +72,7 @@ def refresh_vk_token():
     client_secret = os.environ.get("VK_APP_SECRET")
     device_id = hashlib.sha256(b"ansamb-sledov-bot-94wz.onrender.com").hexdigest()[:32]
     
-    debug_log("VK_REFRESH", f"Запрос рефреша... client_id={client_id}")
+    debug_log("VK_REFRESH", "Запрос рефреша...")
     
     try:
         r = req.post("https://id.vk.com/oauth2/auth", data={
@@ -92,7 +92,7 @@ def refresh_vk_token():
             debug_log("VK_REFRESH", f"Токен обновлён! Длина: {len(data['access_token'])}", "INFO")
             return data["access_token"]
         else:
-            debug_log("VK_REFRESH", f"Ошибка: {data.get('error')} - {data.get('error_description')}", "ERROR")
+            debug_log("VK_REFRESH", f"Ошибка: {data.get('error')}", "ERROR")
             return None
     except Exception as e:
         debug_log("VK_REFRESH", f"Исключение: {e}", "ERROR")
@@ -128,11 +128,31 @@ def vk_callback():
             <p style="color: green;">Скопируй в VK_TOKEN_USER и VK_REFRESH_TOKEN в Render.</p>
             """
         else:
-            return f"<h2>❌ Ошибка: {data.get('error')}</h2><pre>{json_module.dumps(data, indent=2)}</pre>", 500
+            return f"<h2>❌ Ошибка: {data.get('error')}</h2>", 500
     except Exception as e:
         return f"<h2>❌ Ошибка: {e}</h2>", 500
 
 @app.route('/api/vk/auth_link')
 def vk_auth_link():
     code_verifier = secrets.token_urlsafe(64)
-    code_challenge = base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest()).rstrip(b
+    code_challenge = base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest()).rstrip(b'=').decode()
+    state = secrets.token_urlsafe(16)
+    client_id = os.environ.get("VK_APP_ID")
+    redirect_uri = "https://ansamb-sledov-bot-94wz.onrender.com/api/vk/callback"
+    
+    os.makedirs("/tmp", exist_ok=True)
+    with open("/tmp/vk_code_verifier.txt", "w") as f: f.write(code_verifier)
+    
+    auth_url = f"https://id.vk.com/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope=wall,photos,offline&state={state}&code_challenge={code_challenge}&code_challenge_method=S256"
+    
+    return f"""
+    <h2>🔗 Ссылка для авторизации VK</h2>
+    <a href="{auth_url}" target="_blank">{auth_url}</a>
+    <p><i>После авторизации скопируй оба токена в Render.</i></p>
+    """
+
+start_background_thread()
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 10000))
+    socketio.run(app, host='0.0.0.0', port=port, debug=False)
