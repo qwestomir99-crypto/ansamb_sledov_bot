@@ -2,7 +2,7 @@
 # Файл: dialogue/publisher_utils.py
 # Справка: README.md → Публикатор / Утилиты
 # Задача: отправка постов в Telegram и VK с поддержкой нескольких файлов (альбомов)
-# Комментарий: VK — группа от имени пользователя (from_group: 0)
+# Комментарий: VK — личный профиль
 # Зависит от: requests, os, random, json, utils, debug_utils
 # Вызывается из: publisher.py, admin_commands.py
 # ==========================================
@@ -214,9 +214,8 @@ def post_to_vk(message, tags, access_token, owner_id, file_paths=None, auto_quot
     params = {
         "access_token": access_token,
         "v": "5.199",
-        "owner_id": -int(owner_id),
-        "message": full_message,
-        "from_group": 0
+        "owner_id": int(owner_id),
+        "message": full_message
     }
     
     attachments = []
