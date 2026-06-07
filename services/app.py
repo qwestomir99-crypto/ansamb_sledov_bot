@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, WebSocket, VK OAuth (PKCE)
-# Комментарий: ВЕРСИЯ С АГЕНТОМ (полная) + VK OAuth
+# Комментарий: добавлен device_id для VK OAuth
 # ==========================================
 
 import os
@@ -16,16 +16,8 @@ from flask_socketio import SocketIO
 from debug_utils import debug_log
 import requests as req
 
-# ==========================================
-# КОРЕНЬ ПРОЕКТА (на Render)
-# ==========================================
-
 PROJECT_ROOT = '/opt/render/project/src'
 sys.path.insert(0, PROJECT_ROOT)
-
-# ==========================================
-# ИМПОРТЫ
-# ==========================================
 
 from services.app_modules.auth import auth_bp
 from services.app_modules.static import static_bp
@@ -36,10 +28,6 @@ from services.app_modules.background import background_bp, start_background_thre
 from services.web_api import web_api
 from services.analytics_api import analytics_api
 from services.agent import agent_bp
-
-# ==========================================
-# FLASK ПРИЛОЖЕНИЕ С ПРАВИЛЬНЫМИ ПУТЯМИ
-# ==========================================
 
 app = Flask(__name__,
     template_folder=os.path.join(PROJECT_ROOT, 'templates'),
@@ -53,10 +41,6 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 socketio.init_app(app, cors_allowed_origins="*")
 
-# ==========================================
-# РЕГИСТРАЦИЯ BLUEPRINT'ОВ
-# ==========================================
-
 app.register_blueprint(auth_bp, url_prefix='/auth')
 app.register_blueprint(static_bp, url_prefix='/static')
 app.register_blueprint(youtube_bp, url_prefix='/youtube')
@@ -67,7 +51,7 @@ app.register_blueprint(analytics_api, url_prefix='/api/analytics')
 app.register_blueprint(agent_bp, url_prefix='/agent')
 
 # ==========================================
-# VK OAUTH CALLBACK (с PKCE)
+# VK OAUTH CALLBACK (с PKCE + device_id)
 # ==========================================
 
 @app.route('/api/vk/callback')
@@ -95,7 +79,8 @@ def vk_callback():
         "client_secret": client_secret,
         "redirect_uri": redirect_uri,
         "code": code,
-        "state": state
+        "state": state,
+        "device_id": secrets.token_hex(16)
     }
     if code_verifier:
         params["code_verifier"] = code_verifier
@@ -118,7 +103,6 @@ def vk_callback():
             <p><b>Длина токена:</b> {len(access_token)}</p>
             <p><b>Refresh Token:</b><br><textarea rows="3" style="width:100%">{refresh_token}</textarea></p>
             <p style="color: green; font-weight: bold;">Скопируй access_token и вставь в переменную VK_TOKEN в Render Dashboard.</p>
-            <p>После перезапуска VK-постинг заработает.</p>
             """
         else:
             error = data.get("error", "неизвестная ошибка")
@@ -141,6 +125,7 @@ def vk_auth_link():
         f.write(code_verifier)
     
     state = secrets.token_urlsafe(16)
+    device_id = secrets.token_hex(16)
     client_id = os.environ.get("VK_APP_ID")
     redirect_uri = "https://ansamb-sledov-bot-94wz.onrender.com/api/vk/callback"
     
@@ -153,6 +138,7 @@ def vk_auth_link():
         f"&state={state}"
         f"&code_challenge={code_challenge}"
         f"&code_challenge_method=S256"
+        f"&device_id={device_id}"
     )
     
     return f"""
