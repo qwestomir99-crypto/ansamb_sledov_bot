@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 07.06.2026 06:16:01*
+*Обновлено: 07.06.2026 06:24:33*
 
 | Файл | Статус |
 |------|--------|
@@ -281,7 +281,6 @@
 | `services/app_modules/youtube.py` | ✅ Redmi-шапка |
 | `services/apply_changes.py` | ✅ Redmi-шапка |
 | `services/approval_dialogue.py` | ✅ Redmi-шапка |
-| `services/autoposter.py` | ✅ Redmi-шапка |
 | `services/big_video_uploader.py` | ✅ Redmi-шапка |
 | `services/dialogue/exception_handler.py` | ✅ Redmi-шапка |
 | `services/draft_bulder.py` | ✅ Redmi-шапка |
