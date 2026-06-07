@@ -2,7 +2,7 @@
 # Файл: dialogue/admin/posts.py
 # Справка: README.md → Админка (публикации)
 # Задача: TG-посты, отложенные публикации, интервал, VK
-# Комментарий: VK использует VK_TOKEN_USER
+# Комментарий: VK с авто-рефрешем токена
 # ==========================================
 
 import os
@@ -18,9 +18,6 @@ def load_config():
     with open(CONFIG_FILE, "r") as f:
         return json.load(f)
 
-# ==========================================
-# TG-ПОСТЫ
-# ==========================================
 def show_add_post_ui(call, bot):
     msg = bot.send_message(call.message.chat.id, "📝 *Добавление поста*\n\nПришлите текст.\nИли /cancel.", parse_mode='Markdown')
     from dialogue.admin_commands import safe_delete
@@ -83,9 +80,6 @@ def process_publish_choice(message, bot, user_id):
         bot.reply_to(message, "✅ В пул!" if success else "❌ Ошибка.", reply_markup=get_admin_menu())
     safe_delete(message, 5)
 
-# ==========================================
-# ИНТЕРВАЛ ПОСТОВ
-# ==========================================
 def set_publish_interval_ui(call, bot):
     from dialogue.admin_commands import safe_delete, get_admin_menu
     config = load_config()
@@ -115,9 +109,6 @@ def process_publish_interval(message, bot):
         bot.reply_to(message, "❌ Число от 10 до 1440.", reply_markup=get_admin_menu())
     safe_delete(message, 5)
 
-# ==========================================
-# VK-ПОСТЫ
-# ==========================================
 def handle_vk_post(bot, chat_id, message_id, user_id):
     msg = bot.send_message(chat_id, "✍️ Введите текст поста для VK:")
     bot.register_next_step_handler(msg, process_vk_post_text, bot, chat_id, user_id)
@@ -145,7 +136,8 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
         downloaded_file = bot.download_file(file_info.file_path)
         with open(file_path, 'wb') as f: f.write(downloaded_file)
     
-    vk_token = os.environ.get("VK_TOKEN_USER")
+    from services.app import get_vk_token
+    vk_token = get_vk_token()
     vk_owner_id = os.environ.get("VK_OWNER_ID")
     
     if not vk_token or not vk_owner_id:
