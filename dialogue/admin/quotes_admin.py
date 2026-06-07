@@ -1,31 +1,47 @@
 # ==========================================
 # Файл: dialogue/admin/quotes_admin.py
 # Справка: README.md → Админка (управление цитатами)
-# Задача: обработчики кнопок для цитат (список, добавление, интервал)
-# Комментарий: вызывается из callbacks.py
+# Задача: обработчики кнопок для цитат (список, добавление, интервал, панель)
+# Комментарий: единственный источник функций цитат для админки
 # ==========================================
 
 import time
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dialogue.quotes import (
     get_quotes_list, add_quote, get_quotes_interval_minutes,
-    set_quotes_interval_minutes, quotes_loop, load_config as load_cfg
+    set_quotes_interval_minutes, get_quotes_interval
 )
 from dialogue.admin.auth import log_admin_action
+
+def show_quotes_panel(call, bot):
+    from dialogue.button_map import get_text, get_callback
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        InlineKeyboardButton(get_text("list_quotes"), callback_data=get_callback("list_quotes")),
+        InlineKeyboardButton(get_text("add_quote"), callback_data=get_callback("add_quote")),
+    )
+    keyboard.add(
+        InlineKeyboardButton(get_text("set_quote_interval"), callback_data=get_callback("set_quote_interval")),
+        InlineKeyboardButton(get_text("back_to_admin"), callback_data=get_callback("back_to_admin")),
+    )
+    bot.edit_message_text(
+        f"📜 *Цитаты*\n📊 {len(get_quotes_list())}\n⏱ {get_quotes_interval()} мин.",
+        chat_id=call.message.chat.id, message_id=call.message.message_id,
+        reply_markup=keyboard, parse_mode='Markdown'
+    )
+    bot.answer_callback_query(call.id)
 
 def handle_quotes_list(bot, chat_id, message_id, user_id):
     quotes = get_quotes_list()
     if not quotes:
         bot.edit_message_text("📭 Список цитат пуст", chat_id, message_id)
         return
-    
     text = "📜 *Список цитат:*\n\n"
     for i, q in enumerate(quotes):
         text += f"`{i+1}.` {q[:60]}{'...' if len(q) > 60 else ''}\n"
         if len(text) > 3500:
             bot.send_message(user_id, text, parse_mode='Markdown')
             text = ""
-    
     if text:
         bot.edit_message_text(text, chat_id, message_id, parse_mode='Markdown')
 
@@ -59,6 +75,7 @@ def handle_quotes_set_interval(interval, bot, chat_id, message_id, user_id):
     import dialogue.quotes as quotes_module
     quotes_module.quote_thread_running = False
     time.sleep(1)
+    from dialogue.quotes import load_config as load_cfg
     cfg = load_cfg()
     TG_CHAT_ID = cfg.get("telegram", {}).get("publish_channel", "@qwestomir")
     quotes_module.quotes_loop(bot, TG_CHAT_ID)
