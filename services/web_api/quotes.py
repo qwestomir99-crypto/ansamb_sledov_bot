@@ -2,12 +2,12 @@
 # Файл: services/web_api/quotes.py
 # Справка: README.md → Веб-морда / API / Цитаты
 # Задача: эндпоинты для работы с цитатами
-# Комментарий: переписан на SQLite (dialogue.quotes)
+# Комментарий: использует services/sqlite_client
 # ==========================================
 
 from flask import Blueprint, request, jsonify
 from debug_utils import debug_log
-from dialogue.quotes import get_quotes_list, add_quote
+from services.sqlite_client import get_quotes_list, add_quote
 
 quotes_bp = Blueprint('quotes', __name__)
 
@@ -17,7 +17,7 @@ def log_q(level, message):
 @quotes_bp.route('/list', methods=['GET'])
 def list_quotes():
     try:
-        quotes = get_quotes_list(limit=50)
+        quotes = get_quotes_list()
         return jsonify({"status": "ok", "data": quotes})
     except Exception as e:
         log_q("ERROR", str(e))
