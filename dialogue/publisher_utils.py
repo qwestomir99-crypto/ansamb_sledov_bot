@@ -2,7 +2,7 @@
 # Файл: dialogue/publisher_utils.py
 # Справка: README.md → Публикатор / Утилиты
 # Задача: отправка постов в Telegram и VK с авто-обновлением токена
-# Комментарий: VK использует VK_TOKEN_USER с авто-рефрешем
+# Комментарий: VK — группа от имени пользователя
 # ==========================================
 
 import os
@@ -17,8 +17,7 @@ QUOTES_FILE = "dialogue/data/quotes.txt"
 VK_POSTS_FILE = "dialogue/data/vk_posts.json"
 
 def load_config():
-    with open(CONFIG_FILE, "r") as f:
-        return json.load(f)
+    with open(CONFIG_FILE, "r") as f: return json.load(f)
 
 def load_quotes():
     if not os.path.exists(QUOTES_FILE): return []
@@ -50,7 +49,6 @@ def get_auto_tags(text, platform="vk"):
     return " ".join(tags)
 
 def get_vk_token():
-    """Возвращает VK токен, обновляет если истёк"""
     token = os.environ.get("VK_TOKEN_USER")
     if not token:
         try:
@@ -60,17 +58,15 @@ def get_vk_token():
     return token
 
 def post_to_vk(message, tags, access_token, owner_id, file_paths=None, auto_quote=True, auto_tags=True, repost_from=None):
-    if not access_token:
-        access_token = get_vk_token()
-    if not access_token or not owner_id:
-        return False, "Ошибка авторизации VK"
+    if not access_token: access_token = get_vk_token()
+    if not access_token or not owner_id: return False, "Ошибка авторизации VK"
     
     if auto_quote and message and len(message) < 500:
         message = f"{message}\n\n📜 {get_random_quote()}"
     if auto_tags: tags = get_auto_tags(message, "vk")
     full_message = f"{message}\n\n{tags}" if message else tags
     
-    params = {"access_token": access_token, "v": "5.199", "owner_id": int(owner_id), "message": full_message}
+    params = {"access_token": access_token, "v": "5.199", "owner_id": -int(owner_id), "message": full_message, "from_group": 0}
     
     try:
         r = requests.get('https://api.vk.com/method/wall.post', params=params, timeout=30)
@@ -80,7 +76,6 @@ def post_to_vk(message, tags, access_token, owner_id, file_paths=None, auto_quot
             return True, None
         else:
             error_msg = data.get('error', {}).get('error_msg', 'неизвестная')
-            # Если токен истёк — пробуем обновить и повторить
             if 'expired' in error_msg.lower():
                 try:
                     from services.app import refresh_vk_token
