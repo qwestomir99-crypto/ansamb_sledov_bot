@@ -1,8 +1,8 @@
 # ==========================================
 # Файл: bot/handlers/__init__.py
 # Справка: README.md → Обработчики команд / Сборка
-# Задача: собирает все модули handlers
-# Комментарий: основной обработчик — dialogue/handlers.py
+# Задача: собирает все модули handlers и запускает потоки
+# Комментарий: VK_READER_TOKEN (короткий) → vk_reader_loop, VK_TOKEN (длинный) → publish_loop и autoposter
 # ==========================================
 
 import os
@@ -48,15 +48,20 @@ def register_all_handlers(bot, config):
     
     tg_chat_id = config.get("telegram", {}).get("publish_channel", "@qwestomir")
     admin_id = int(os.environ.get("ADMIN_USER_ID", 0))
-    vk_token = os.environ.get("VK_TOKEN")
-    vk_owner_id = os.environ.get("VK_OWNER_ID")
     
+    # Ключи VK — каждый для своего дела
+    vk_token = os.environ.get("VK_TOKEN")              # длинный, 85+ — для публикации в группу
+    vk_reader_token = os.environ.get("VK_READER_TOKEN") # короткий, 71 — для чтения стены
+    vk_group_id = os.environ.get("VK_GROUP_ID")         # ID сообщества — для публикации в группу
+    vk_owner_id = os.environ.get("VK_OWNER_ID")         # твой личный ID — для VK Reader
+    
+    # Потоки
     threading.Thread(target=scheduler_loop, args=(bot, tg_chat_id, admin_id), daemon=True).start()
     threading.Thread(target=quotes_loop, args=(bot, tg_chat_id), daemon=True).start()
-    threading.Thread(target=publish_loop, args=(bot, vk_token, vk_owner_id, tg_chat_id), daemon=True).start()
-    threading.Thread(target=vk_reader_loop, args=(bot, vk_token, vk_owner_id, tg_chat_id), daemon=True).start()
+    threading.Thread(target=publish_loop, args=(bot, vk_token, vk_group_id, tg_chat_id), daemon=True).start()
+    threading.Thread(target=vk_reader_loop, args=(bot, vk_reader_token, vk_owner_id, tg_chat_id), daemon=True).start()
     
     if config.get("autoposter", {}).get("enabled", True):
-        threading.Thread(target=start_autoposter, args=(config, vk_token, vk_owner_id), daemon=True).start()
+        threading.Thread(target=start_autoposter, args=(config, vk_token, vk_group_id), daemon=True).start()
     
     print("[HANDLERS] Все потоки запущены: ритуал, цитаты, пул, YouTube, VK Reader")
