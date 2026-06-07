@@ -2,7 +2,7 @@
 # Модуль: dialogue/vk_reader.py
 # Справка: README.md → VK Reader
 # Задача: читает посты с твоей стены ВК, сохраняет в кэш (текст + фото)
-# Комментарий: ритм 0,8 Гц. При первом запуске грузит 100 постов — чтобы архив не пылился.
+# Комментарий: ритм 0,8 Гц. При первом запуске грузит 100 постов.
 # Зависит от: config.json, VK_TOKEN, VK_OWNER_ID
 # Вызывается из: bot.py
 # ==========================================
@@ -22,20 +22,23 @@ def load_config():
         return json.load(f)
 
 def load_vk_posts():
-    """Загружает сохранённые посты VK из файла (кэш для фото)"""
     if not os.path.exists(VK_POSTS_FILE):
         return []
-    with open(VK_POSTS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(VK_POSTS_FILE, "r", encoding="utf-8") as f:
+            data = f.read().strip()
+            if not data:
+                return []
+            return json.loads(data)
+    except:
+        return []
 
 def save_vk_posts(posts):
-    """Сохраняет посты VK в файл — кэш живёт здесь"""
     os.makedirs(os.path.dirname(VK_POSTS_FILE), exist_ok=True)
     with open(VK_POSTS_FILE, "w", encoding="utf-8") as f:
         json.dump(posts, f, indent=2, ensure_ascii=False)
 
 def add_vk_post(post):
-    """Добавляет пост в кэш. Если уже есть — не дублируем (Сапёр не любит повторов)"""
     posts = load_vk_posts()
     for p in posts:
         if p.get("id") == post.get("id"):
@@ -45,7 +48,6 @@ def add_vk_post(post):
     debug_log("VK_READER", f"📥 Пост сохранён: {post.get('text', '')[:50]}...")
 
 def fetch_last_posts(vk_token, owner_id, count=5):
-    """Получает последние посты из VK (с фото)"""
     params = {
         "access_token": vk_token,
         "v": "5.199",
@@ -56,11 +58,11 @@ def fetch_last_posts(vk_token, owner_id, count=5):
     try:
         r = requests.get("https://api.vk.com/method/wall.get", params=params, timeout=10)
         data = r.json()
+        debug_log("VK_READER", f"wall.get ответ: {str(data)[:200]}")
         if "response" in data:
             items = data["response"].get("items", [])
             posts = []
             for item in items:
-                # Извлекаем фото, если есть
                 photo_url = None
                 attachments = item.get("attachments", [])
                 for att in attachments:
@@ -69,7 +71,6 @@ def fetch_last_posts(vk_token, owner_id, count=5):
                         if sizes:
                             photo_url = sizes[-1]["url"]
                             break
-                
                 posts.append({
                     "id": item["id"],
                     "text": item.get("text", ""),
@@ -89,28 +90,25 @@ def fetch_last_posts(vk_token, owner_id, count=5):
         return []
 
 def vk_reader_loop(bot, vk_token, owner_id, tg_chat_id):
-    """
-    Главный цикл VK Reader.
-    Ритм: проверка каждую минуту. При первом запуске грузим 100 постов,
-    чтобы старые картины не пылились в архиве, а шли в дело.
-    """
     if not vk_token or not owner_id:
         debug_log("VK_READER", "❌ Нет токена или owner_id — выходим.", "ERROR")
         return
 
-    debug_log("VK_READER", "🔁 Поток запущен. Сапёр на посту. Последний ID = 0")
+    debug_log("VK_READER", f"🔁 Поток запущен. owner_id={owner_id}, токен длиной={len(vk_token)}")
 
     last_post_id = None
     posts = load_vk_posts()
+    debug_log("VK_READER", f"📦 Загружено из кэша: {len(posts)} постов")
+    
     if posts:
         last_post_id = posts[-1].get("id")
-        debug_log("VK_READER", f"📦 Загружено {len(posts)} постов из кэша")
 
     initial_load_done = len(posts) > 0
+    debug_log("VK_READER", f"initial_load_done={initial_load_done}")
 
+    debug_log("VK_READER", "Вход в цикл...")
     while True:
         try:
-            # Первый запуск: тянем 100 постов, чтобы наполнить кэш
             if not initial_load_done:
                 debug_log("VK_READER", "🚀 Первый запуск: загружаю 100 постов с твоей стены...")
                 new_posts = fetch_last_posts(vk_token, owner_id, count=100)
@@ -118,6 +116,8 @@ def vk_reader_loop(bot, vk_token, owner_id, tg_chat_id):
             else:
                 new_posts = fetch_last_posts(vk_token, owner_id, count=3)
 
+            debug_log("VK_READER", f"Получено {len(new_posts) if new_posts else 0} новых постов")
+            
             if not new_posts:
                 time.sleep(60)
                 continue
@@ -134,4 +134,4 @@ def vk_reader_loop(bot, vk_token, owner_id, tg_chat_id):
         except Exception as e:
             debug_log("VK_READER", f"❌ Ошибка цикла: {e}", "ERROR")
 
-        time.sleep(60)  # Ритм 0,8 Гц = проверка раз в минуту
+        time.sleep(60)
