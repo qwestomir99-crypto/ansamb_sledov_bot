@@ -1,7 +1,8 @@
 # ==========================================
 # Файл: dialogue/admin/posts.py
 # Справка: README.md → Админка (публикации)
-# Задача: отложенные публикации и постинг в VK (личный профиль)
+# Задача: отложенные публикации и постинг в VK
+# Комментарий: VK — только с пользовательским токеном (длина > 80)
 # ==========================================
 
 import os
@@ -115,8 +116,8 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
     vk_token = os.environ.get("VK_TOKEN")
     vk_owner_id = os.environ.get("VK_OWNER_ID")
     
-    if not vk_token or not vk_owner_id:
-        bot.send_message(chat_id, "❌ Нет токена VK.")
+    if not vk_token or not vk_owner_id or len(vk_token) <= 80:
+        bot.send_message(chat_id, "❌ VK отключён (нужен пользовательский токен).")
         return
     
     quote = get_random_quote()
