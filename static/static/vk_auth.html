@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Получить токен VK</title>
+    <style>
+        body { font-family: monospace; background: #111; color: #0f0; padding: 20px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+        #result { margin-top: 20px; word-break: break-all; }
+        textarea { width: 100%; height: 60px; margin-top: 10px; background: #222; color: #0f0; border: 1px solid #0f0; }
+    </style>
+</head>
+<body>
+    <h1>🔑 Получить токен VK</h1>
+    <p>Нажми кнопку, разреши доступ, скопируй токен.</p>
+    <button id="loginBtn">Войти через VK ID</button>
+    <div id="result"></div>
+
+    <script>
+        const APP_ID = '54615315';
+        const REDIRECT_URI = 'https://ansamb-sledov-bot-94wz.onrender.com/static/vk_auth.html';
+        
+        document.getElementById('loginBtn').onclick = function() {
+            const authUrl = 'https://id.vk.com/authorize' +
+                '?client_id=' + APP_ID +
+                '&redirect_uri=' + encodeURIComponent(REDIRECT_URI) +
+                '&response_type=token' +
+                '&scope=wall,photos,offline' +
+                '&v=5.199';
+            window.location.href = authUrl;
+        };
+
+        // Ловим токен из адресной строки
+        const hash = window.location.hash.substring(1);
+        const params = new URLSearchParams(hash);
+        const token = params.get('access_token');
+        const userId = params.get('user_id');
+        
+        if (token) {
+            document.getElementById('result').innerHTML = 
+                '<h2 style="color: #0f0;">✅ Токен получен!</h2>' +
+                '<p><b>User ID:</b> ' + userId + '</p>' +
+                '<p><b>Токен (скопируй и вставь в VK_TOKEN в Render):</b></p>' +
+                '<textarea id="tokenArea">' + token + '</textarea>' +
+                '<p><b>Длина токена:</b> ' + token.length + ' символов</p>' +
+                '<p style="color: gold;">Если длина > 80 — токен пользовательский, всё работает!</p>';
+        }
+    </script>
+</body>
+</html>
