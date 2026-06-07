@@ -1,15 +1,128 @@
 # ==========================================
 # Файл: dialogue/admin/posts.py
 # Справка: README.md → Админка (публикации)
-# Задача: отложенные публикации и постинг в VK
-# Комментарий: VK — только с пользовательским токеном (длина > 80)
+# Задача: TG-посты, отложенные публикации, интервал, VK
+# Комментарий: VK — только с пользовательским токеном
 # ==========================================
 
 import os
+import json
 import tempfile
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dialogue.post_manager import add_post_to_pool, load_post_pool
 from dialogue.publisher_utils import get_auto_tags, get_random_quote, post_to_vk
 from debug_utils import debug_log
+
+CONFIG_FILE = "config.json"
+
+def load_config():
+    with open(CONFIG_FILE, "r") as f:
+        return json.load(f)
+
+# ==========================================
+# TG-ПОСТЫ (добавление через админку)
+# ==========================================
+
+def show_add_post_ui(call, bot):
+    msg = bot.send_message(call.message.chat.id, "📝 *Добавление поста*\n\nПришлите текст.\nИли /cancel.", parse_mode='Markdown')
+    from dialogue.admin_commands import safe_delete
+    safe_delete(call.message, 1)
+    bot.register_next_step_handler(msg, process_post_text, bot)
+
+def process_post_text(message, bot):
+    from dialogue.admin_commands import safe_delete, get_admin_menu
+    if message.text == "/cancel":
+        bot.reply_to(message, "❌ Отменено.", reply_markup=get_admin_menu())
+        safe_delete(message, 3)
+        return
+    if not hasattr(process_post_text, "temp_posts"):
+        process_post_text.temp_posts = {}
+    process_post_text.temp_posts[message.from_user.id] = {"text": message.text}
+    msg = bot.send_message(message.chat.id, "🏷️ Теги через пробел или /skip")
+    bot.register_next_step_handler(msg, process_post_tags, bot, message.from_user.id)
+    safe_delete(message, 2)
+
+def process_post_tags(message, bot, user_id):
+    from dialogue.admin_commands import safe_delete, get_admin_menu
+    if message.text == "/skip":
+        tags = []
+    elif message.text == "/cancel":
+        bot.reply_to(message, "❌ Отменено.", reply_markup=get_admin_menu())
+        safe_delete(message, 3)
+        return
+    else:
+        tags = message.text.split()
+    post_data = getattr(process_post_text, "temp_posts", {}).get(user_id, {})
+    text = post_data.get("text", "")
+    if not hasattr(process_post_tags, "pending_posts"):
+        process_post_tags.pending_posts = {}
+    process_post_tags.pending_posts[user_id] = {"text": text, "tags": tags}
+    msg = bot.send_message(message.chat.id, "📋 *Пост готов.*\n`0` — сейчас, или число минут для отложки.\n/cancel — отмена", parse_mode='Markdown')
+    bot.register_next_step_handler(msg, process_publish_choice, bot, user_id)
+    safe_delete(message, 3)
+
+def process_publish_choice(message, bot, user_id):
+    from dialogue.admin_commands import safe_delete, get_admin_menu
+    choice = message.text.strip().lower()
+    if choice == "/cancel":
+        bot.reply_to(message, "❌ Отменена.", reply_markup=get_admin_menu())
+        safe_delete(message, 3)
+        return
+    post_data = getattr(process_post_tags, "pending_posts", {}).get(user_id, {})
+    text = post_data.get("text", "")
+    tags = post_data.get("tags", [])
+    try:
+        delay = int(choice)
+    except:
+        bot.reply_to(message, "❌ Введите число (0 = сейчас).", reply_markup=get_admin_menu())
+        safe_delete(message, 5)
+        return
+    from dialogue.publisher import publish_now_or_later
+    success = publish_now_or_later(bot, user_id, text, tags, delay)
+    if delay == 0:
+        bot.reply_to(message, "✅ Опубликовано!" if success else "❌ Ошибка.", reply_markup=get_admin_menu())
+    else:
+        bot.reply_to(message, "✅ В пул!" if success else "❌ Ошибка.", reply_markup=get_admin_menu())
+    safe_delete(message, 5)
+
+# ==========================================
+# ИНТЕРВАЛ ПОСТОВ
+# ==========================================
+
+def set_publish_interval_ui(call, bot):
+    from dialogue.admin_commands import safe_delete, get_admin_menu
+    config = load_config()
+    current = config.get("publisher", {}).get("interval_minutes", 120)
+    msg = bot.send_message(call.message.chat.id, f"⏱️ *Интервал постов*\nТекущий: {current} мин.\nВведите от 10 до 1440.\n/cancel.", parse_mode='Markdown')
+    safe_delete(call.message, 1)
+    bot.register_next_step_handler(msg, process_publish_interval, bot)
+
+def process_publish_interval(message, bot):
+    from dialogue.admin_commands import safe_delete, get_admin_menu
+    if message.text == "/cancel":
+        bot.reply_to(message, "❌ Отменено.", reply_markup=get_admin_menu())
+        safe_delete(message, 3)
+        return
+    try:
+        interval = int(message.text.strip())
+        if 10 <= interval <= 1440:
+            config = load_config()
+            if "publisher" not in config:
+                config["publisher"] = {}
+            config["publisher"]["interval_minutes"] = interval
+            config["publisher"]["interval_seconds"] = interval * 60
+            with open(CONFIG_FILE, "w") as f:
+                json.dump(config, f, indent=2)
+            bot.reply_to(message, f"✅ Интервал постов: {interval} мин.", reply_markup=get_admin_menu())
+        else:
+            raise ValueError
+    except:
+        bot.reply_to(message, "❌ Число от 10 до 1440.", reply_markup=get_admin_menu())
+    safe_delete(message, 5)
+
+# ==========================================
+# ОТЛОЖЕННЫЕ ПУБЛИКАЦИИ
+# ==========================================
 
 def handle_pub_menu(bot, chat_id, message_id, user_id):
     pubs = load_post_pool()
@@ -30,9 +143,9 @@ def handle_pub_menu(bot, chat_id, message_id, user_id):
 
 def ask_for_post_text(bot, chat_id, message_id):
     msg = bot.send_message(chat_id, "✍️ Введите текст поста или /skip")
-    bot.register_next_step_handler(msg, process_post_text, bot, chat_id)
+    bot.register_next_step_handler(msg, process_post_text_delayed, bot, chat_id)
 
-def process_post_text(message, bot, chat_id):
+def process_post_text_delayed(message, bot, chat_id):
     text = None if message.text == "/skip" else message.text
     ask_for_post_file(bot, chat_id, text)
 
@@ -62,7 +175,6 @@ def process_post_file(message, bot, chat_id, text):
         downloaded_file = bot.download_file(file_info.file_path)
         with open(file_path, 'wb') as f:
             f.write(downloaded_file)
-    
     ask_for_post_delay(bot, chat_id, text, file_path)
 
 def ask_for_post_delay(bot, chat_id, text, file_path):
@@ -77,12 +189,15 @@ def process_post_delay(message, bot, chat_id, text, file_path):
     except:
         bot.send_message(chat_id, "❌ Введите положительное число минут")
         return
-    from dialogue.admin_commands import load_config
     config = load_config()
     pub_config = config.get("publisher", {})
     default_tags = pub_config.get("default_tags", "#СапёрыАутентичности #МихоельАв #2026плита")
     add_post_to_pool(text or "", default_tags.split(), author=str(message.from_user.id))
     bot.send_message(chat_id, f"✅ Пост запланирован через {delay_minutes} минут")
+
+# ==========================================
+# VK-ПОСТЫ
+# ==========================================
 
 def handle_vk_post(bot, chat_id, message_id, user_id):
     msg = bot.send_message(chat_id, "✍️ Введите текст поста для VK:")
@@ -133,7 +248,3 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
     
     if file_path and os.path.exists(file_path):
         os.remove(file_path)
-
-def return_to_admin_menu(bot, chat_id, message_id=None, user_id=None):
-    from dialogue.admin_commands import return_to_admin_menu as _return
-    _return(bot, chat_id, message_id, user_id)
