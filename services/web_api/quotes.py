@@ -2,7 +2,7 @@
 # Файл: services/web_api/quotes.py
 # Справка: README.md → Веб-морда / API / Цитаты
 # Задача: эндпоинты для работы с цитатами
-# Комментарий: добавлена защита @login_required
+# Комментарий: исправлен импорт login_required из auth_decorator
 # Зависит от: flask, debug_utils, services.sqlite_client
 # Вызывается из: web_api/__init__.py
 # ==========================================
@@ -10,7 +10,7 @@
 from flask import Blueprint, request, jsonify
 from debug_utils import debug_log
 from services.sqlite_client import get_quotes_list, add_quote
-from services.app import login_required
+from services.auth_decorator import login_required
 
 quotes_bp = Blueprint('quotes', __name__)
 
