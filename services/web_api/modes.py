@@ -2,13 +2,14 @@
 # Файл: services/web_api/modes.py
 # Справка: README.md → Веб-морда / API / Режимы
 # Задача: эндпоинты для управления режимами и настроением
-# Комментарий: часть web_api, вынесена в отдельный модуль
+# Комментарий: добавлена защита @login_required
 # Зависит от: flask, debug_utils
 # Вызывается из: web_api/__init__.py
 # ==========================================
 
 from flask import Blueprint, request, jsonify
 from debug_utils import debug_log
+from services.app import login_required
 import os
 
 modes_bp = Blueprint('modes', __name__)
@@ -52,6 +53,7 @@ def set_mood(mood):
         return False
 
 @modes_bp.route('/state', methods=['GET'])
+@login_required
 def state():
     return jsonify({
         "mode": get_mode(),
@@ -59,6 +61,7 @@ def state():
     })
 
 @modes_bp.route('/set_mode', methods=['POST'])
+@login_required
 def set_mode_ep():
     data = request.json
     mode = data.get('mode')
@@ -69,6 +72,7 @@ def set_mode_ep():
     return jsonify({"status": "error", "error": "Неверный режим"}), 400
 
 @modes_bp.route('/set_mood', methods=['POST'])
+@login_required
 def set_mood_ep():
     data = request.json
     mood = data.get('mood')
