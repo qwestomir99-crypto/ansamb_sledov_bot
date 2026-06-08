@@ -2,7 +2,7 @@
 # Файл: services/web_api/posts.py
 # Справка: README.md → Веб-морда / API / Посты
 # Задача: эндпоинты для создания постов в TG и VK
-# Комментарий: VK использует VK_OWNER_ID из переменных окружения
+# Комментарий: добавлена защита @login_required
 # Зависит от: flask, debug_utils, services.tg_api
 # Вызывается из: web_api/__init__.py
 # ==========================================
@@ -11,6 +11,7 @@ import os
 import requests
 from flask import Blueprint, request, jsonify
 from debug_utils import debug_log
+from services.app import login_required
 
 posts_bp = Blueprint('posts', __name__)
 
@@ -18,6 +19,7 @@ def log_posts(level, message):
     debug_log("WEB_API_POSTS", message, level)
 
 @posts_bp.route('/create', methods=['POST'])
+@login_required
 def create_post():
     """Создаёт пост в Telegram или VK (личный профиль)"""
     data = request.json
@@ -71,6 +73,7 @@ def create_post():
         return jsonify({"status": "error", "error": str(e)}), 500
 
 @posts_bp.route('/vk', methods=['POST'])
+@login_required
 def post_to_vk():
     """Пост в VK (текст) — личный профиль."""
     data = request.json
@@ -113,6 +116,7 @@ def post_to_vk():
         return jsonify({"status": "error", "error": str(e)}), 500
 
 @posts_bp.route('/telegram', methods=['POST'])
+@login_required
 def post_to_telegram():
     """Пост в Telegram — отдельный эндпоинт"""
     data = request.json
