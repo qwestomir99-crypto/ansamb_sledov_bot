@@ -2,7 +2,7 @@
 // Файл: static/js/ui.js
 // Справка: README.md → Веб-морда / UI
 // Задача: toast-уведомления, анимации, визуальные эффекты
-// Комментарий: автоматическое создание контейнера, fallback на alert
+// Комментарий: добавлены полезные функции: confirmDialog, showLoading, hideLoading, showModal, closeModal
 // Зависит от: visuals.css
 // Вызывается из: main.js (импорт)
 // ==========================================
@@ -28,6 +28,10 @@ const colors = {
     info: '#007aff',
     debug: '#86868b'
 };
+
+// ==========================================
+// TOAST УВЕДОМЛЕНИЯ
+// ==========================================
 
 /**
  * Показывает всплывающее уведомление (toast)
@@ -94,8 +98,281 @@ export function showToast(message, type = 'info', duration = DEFAULT_DURATION) {
     }, type === 'error' ? ERROR_DURATION : duration);
 }
 
+// ==========================================
+// ДИАЛОГ ПОДТВЕРЖДЕНИЯ
+// ==========================================
+
 /**
- * Простой escape для HTML (чтобы не подключать helpers.js ради одной функции)
+ * Показывает диалог подтверждения с кастомными кнопками
+ * @param {string} message - Текст сообщения
+ * @param {string} confirmText - Текст кнопки подтверждения
+ * @param {string} cancelText - Текст кнопки отмены
+ * @returns {Promise<boolean>} - Promise, который разрешается в true/false
+ */
+export function confirmDialog(message, confirmText = 'Да', cancelText = 'Нет') {
+    return new Promise((resolve) => {
+        // Создаём затемнение
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 10001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: -apple-system, 'SF Pro Text', sans-serif;
+        `;
+        
+        // Создаём диалоговое окно
+        const dialog = document.createElement('div');
+        dialog.style.cssText = `
+            background: var(--card-bg, #ffffff);
+            border-radius: 20px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border, rgba(0, 0, 0, 0.1));
+        `;
+        
+        dialog.innerHTML = `
+            <div style="margin-bottom: 20px; font-size: 16px; line-height: 1.4;">${escapeHtml(message)}</div>
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button id="confirm-cancel" style="
+                    padding: 8px 16px;
+                    border-radius: 10px;
+                    border: 1px solid var(--border, #ccc);
+                    background: transparent;
+                    cursor: pointer;
+                ">${escapeHtml(cancelText)}</button>
+                <button id="confirm-ok" style="
+                    padding: 8px 16px;
+                    border-radius: 10px;
+                    border: none;
+                    background: var(--accent, #007aff);
+                    color: white;
+                    cursor: pointer;
+                ">${escapeHtml(confirmText)}</button>
+            </div>
+        `;
+        
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+        
+        // Обработчики
+        const okBtn = dialog.querySelector('#confirm-ok');
+        const cancelBtn = dialog.querySelector('#confirm-cancel');
+        
+        const cleanup = (result) => {
+            if (overlay.parentNode) overlay.remove();
+            resolve(result);
+        };
+        
+        okBtn.onclick = () => cleanup(true);
+        cancelBtn.onclick = () => cleanup(false);
+        overlay.onclick = (e) => {
+            if (e.target === overlay) cleanup(false);
+        };
+    });
+}
+
+// ==========================================
+// ИНДИКАТОРЫ ЗАГРУЗКИ
+// ==========================================
+
+let loadingOverlay = null;
+
+/**
+ * Показывает индикатор загрузки на весь экран
+ * @param {string} message - Текст загрузки
+ */
+export function showLoading(message = 'Загрузка...') {
+    hideLoading();
+    
+    loadingOverlay = document.createElement('div');
+    loadingOverlay.id = 'loading-overlay';
+    loadingOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(8px);
+        z-index: 10002;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 16px;
+        font-family: -apple-system, 'SF Pro Text', sans-serif;
+        color: white;
+    `;
+    
+    const spinner = document.createElement('div');
+    spinner.style.cssText = `
+        width: 48px;
+        height: 48px;
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    `;
+    
+    const text = document.createElement('div');
+    text.textContent = message;
+    text.style.fontSize = '16px';
+    
+    loadingOverlay.appendChild(spinner);
+    loadingOverlay.appendChild(text);
+    document.body.appendChild(loadingOverlay);
+    
+    // Добавляем анимацию, если её нет
+    if (!document.getElementById('loading-animation')) {
+        const style = document.createElement('style');
+        style.id = 'loading-animation';
+        style.textContent = `@keyframes spin { to { transform: rotate(360deg); } }`;
+        document.head.appendChild(style);
+    }
+}
+
+/**
+ * Скрывает индикатор загрузки
+ */
+export function hideLoading() {
+    if (loadingOverlay && loadingOverlay.parentNode) {
+        loadingOverlay.remove();
+        loadingOverlay = null;
+    }
+}
+
+// ==========================================
+// МОДАЛЬНЫЕ ОКНА
+// ==========================================
+
+let currentModal = null;
+
+/**
+ * Показывает модальное окно с произвольным содержимым
+ * @param {string|HTMLElement} content - Содержимое (HTML строка или DOM элемент)
+ * @param {string} title - Заголовок окна
+ */
+export function showModal(content, title = 'Информация') {
+    closeModal();
+    
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(4px);
+        z-index: 10003;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: -apple-system, 'SF Pro Text', sans-serif;
+    `;
+    
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        background: var(--card-bg, #ffffff);
+        border-radius: 20px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--border, rgba(0, 0, 0, 0.1));
+    `;
+    
+    modal.innerHTML = `
+        <div style="
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border, rgba(0, 0, 0, 0.1));
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        ">
+            <strong style="font-size: 18px;">${escapeHtml(title)}</strong>
+            <button id="modal-close" style="
+                background: transparent;
+                border: none;
+                font-size: 24px;
+                cursor: pointer;
+                color: var(--text-secondary, #666);
+            ">×</button>
+        </div>
+        <div id="modal-body" style="padding: 20px;"></div>
+    `;
+    
+    const bodyDiv = modal.querySelector('#modal-body');
+    if (typeof content === 'string') {
+        bodyDiv.innerHTML = content;
+    } else if (content instanceof HTMLElement) {
+        bodyDiv.appendChild(content);
+    }
+    
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    currentModal = overlay;
+    
+    const closeBtn = modal.querySelector('#modal-close');
+    closeBtn.onclick = closeModal;
+    overlay.onclick = (e) => {
+        if (e.target === overlay) closeModal();
+    };
+}
+
+/**
+ * Закрывает текущее модальное окно
+ */
+export function closeModal() {
+    if (currentModal && currentModal.parentNode) {
+        currentModal.remove();
+        currentModal = null;
+    }
+}
+
+// ==========================================
+// УПРАВЛЕНИЕ КНОПКАМИ
+// ==========================================
+
+/**
+ * Блокирует кнопку на время выполнения операции
+ * @param {HTMLElement} button - Кнопка
+ * @param {string} loadingText - Текст во время загрузки
+ * @param {Function} callback - Функция, которая выполнится после разблокировки
+ */
+export async function withLoading(button, loadingText = '⏳ Загрузка...', callback) {
+    if (!button) return;
+    const originalText = button.textContent;
+    const originalDisabled = button.disabled;
+    
+    button.disabled = true;
+    button.textContent = loadingText;
+    
+    try {
+        await callback();
+    } finally {
+        button.disabled = originalDisabled;
+        button.textContent = originalText;
+    }
+}
+
+// ==========================================
+// ВСПОМОГАТЕЛЬНЫЕ
+// ==========================================
+
+/**
+ * Простой escape для HTML
  * @param {string} str - Строка для экранирования
  * @returns {string} Экранированная строка
  */
@@ -109,7 +386,7 @@ function escapeHtml(str) {
     });
 }
 
-// Добавляем CSS-анимации, если их нет в visuals.css
+// Добавляем CSS-анимации, если их нет
 (function addAnimations() {
     if (document.getElementById('toast-animations')) return;
     
@@ -140,5 +417,10 @@ function escapeHtml(str) {
     document.head.appendChild(style);
 })();
 
-// Экспортируем также функцию для быстрого вызова (для консоли)
+// Экспортируем функции в глобальную область для использования из HTML
 window.showToast = showToast;
+window.confirmDialog = confirmDialog;
+window.showLoading = showLoading;
+window.hideLoading = hideLoading;
+window.showModal = showModal;
+window.closeModal = closeModal;
