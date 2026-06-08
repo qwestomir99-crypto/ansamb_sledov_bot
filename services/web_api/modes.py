@@ -2,14 +2,14 @@
 # Файл: services/web_api/modes.py
 # Справка: README.md → Веб-морда / API / Режимы
 # Задача: эндпоинты для управления режимами и настроением
-# Комментарий: добавлена защита @login_required
+# Комментарий: исправлен импорт login_required из auth_decorator
 # Зависит от: flask, debug_utils
 # Вызывается из: web_api/__init__.py
 # ==========================================
 
 from flask import Blueprint, request, jsonify
 from debug_utils import debug_log
-from services.app import login_required
+from services.auth_decorator import login_required
 import os
 
 modes_bp = Blueprint('modes', __name__)
