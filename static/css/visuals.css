@@ -2,7 +2,7 @@
  * Файл: static/css/visuals.css
  * Справка: README.md → Веб-морда / Визуал
  * Задача: анимации, toast-уведомления, индикаторы загрузки
- * Комментарий: подключается в admin.html после admin.css
+ * Комментарий: добавлена поддержка тёмной темы и мобильных устройств
  * Зависит от: theme.css (переменные)
  * ========================================== */
 
@@ -18,18 +18,31 @@
     max-width: 350px;
 }
 
+@media (max-width: 768px) {
+    #toast-container {
+        bottom: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+}
+
 .toast {
     padding: 12px 16px;
     border-radius: 12px;
     background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     color: var(--text);
-    border: 1px solid var(--border);
+    border: 0.5px solid var(--border);
     box-shadow: var(--shadow);
     animation: slideIn 0.3s ease;
     border-left: 4px solid var(--accent);
     font-size: 0.9rem;
+    font-weight: 500;
 }
 
+/* Типы уведомлений */
 .toast.info { border-left-color: var(--accent); }
 .toast.success { border-left-color: var(--success); }
 .toast.error { border-left-color: var(--error); }
@@ -40,9 +53,21 @@
     from { opacity: 0; transform: translateX(100px); }
     to { opacity: 1; transform: translateX(0); }
 }
+
 @keyframes slideOut {
     from { opacity: 1; transform: translateX(0); }
     to { opacity: 0; transform: translateX(100px); }
+}
+
+@media (max-width: 768px) {
+    @keyframes slideIn {
+        from { opacity: 0; transform: translateY(100px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideOut {
+        from { opacity: 1; transform: translateY(0); }
+        to { opacity: 0; transform: translateY(100px); }
+    }
 }
 
 /* --- Индикатор загрузки --- */
@@ -50,10 +75,17 @@
     display: inline-block;
     width: 20px;
     height: 20px;
-    border: 3px solid var(--border);
+    border: 3px solid rgba(128, 128, 128, 0.2);
     border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
+}
+
+/* Крупный спиннер для модальных окон */
+.spinner-lg {
+    width: 40px;
+    height: 40px;
+    border-width: 4px;
 }
 
 @keyframes spin {
@@ -67,6 +99,88 @@
     height: 10px;
     border-radius: 50%;
     margin-right: 6px;
+    box-shadow: 0 0 4px currentColor;
 }
-.status-dot.on { background: var(--success); }
-.status-dot.off { background: var(--error); }
+
+.status-dot.on { 
+    background: var(--success);
+    box-shadow: 0 0 4px var(--success);
+}
+.status-dot.off { 
+    background: var(--error);
+    box-shadow: 0 0 4px var(--error);
+}
+.status-dot.idle { 
+    background: var(--warning);
+    box-shadow: 0 0 4px var(--warning);
+}
+
+/* --- Эффект пульсации для активных элементов --- */
+@keyframes pulse {
+    0% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.02); }
+    100% { opacity: 0.6; transform: scale(1); }
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+/* --- Скелетон (загрузка контента) --- */
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        rgba(128, 128, 128, 0.1) 25%,
+        rgba(128, 128, 128, 0.2) 50%,
+        rgba(128, 128, 128, 0.1) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 8px;
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* --- Подсветка фокуса для кнопок (безопасность) --- */
+button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* --- Плавное появление элементов --- */
+.fade-in {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* --- Стилизация скроллбара (как в macOS) --- */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(128, 128, 128, 0.4);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(128, 128, 128, 0.6);
+}
+
+/* Для Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(128, 128, 128, 0.4) transparent;
+}
