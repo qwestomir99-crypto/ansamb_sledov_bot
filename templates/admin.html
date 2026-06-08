@@ -9,8 +9,6 @@
     <link rel="stylesheet" href="/static/css/admin.css">
     <link rel="stylesheet" href="/static/css/visuals.css">
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
-    <script src="/static/js/admin.js"></script>
-    <!-- <script type="module" src="/static/js/main.js"></script> -->
 </head>
 <body>
 <div class="container">
@@ -200,5 +198,64 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 </script>
+
+<script type="module">
+    // Импорт всех необходимых модулей
+    import { createPost, sendPost } from '/static/js/posts.js';
+    import { setMode, setMood, togglePing, toggleAlice } from '/static/js/bot.js';
+    import { addQuote } from '/static/js/quotes.js';
+    import { fetchDebugLogs, sendDebugReport, runAudit, showAuditStatus, showDebugIndex } from '/static/js/debug.js';
+    import { uploadToYouTube } from '/static/js/uploads.js';
+    import { saveDraft } from '/static/js/drafts.js';
+    import { sendMail } from '/static/js/mail.js';
+    import { sendToAgent } from '/static/js/dialogue.js';
+    import { escapeHtml } from '/static/js/helpers.js';
+    
+    // Вешаем на window, чтобы кнопки в HTML видели
+    window.createPost = createPost;
+    window.sendPost = sendPost;
+    window.setMode = setMode;
+    window.setMood = setMood;
+    window.togglePing = togglePing;
+    window.toggleAlice = toggleAlice;
+    window.addQuote = addQuote;
+    window.fetchDebugLogs = fetchDebugLogs;
+    window.sendDebugReport = sendDebugReport;
+    window.runAudit = runAudit;
+    window.showAuditStatus = showAuditStatus;
+    window.showDebugIndex = showDebugIndex;
+    window.uploadToYouTube = uploadToYouTube;
+    window.saveDraft = saveDraft;
+    window.sendMail = sendMail;
+    window.sendToAgent = sendToAgent;
+    window.escapeHtml = escapeHtml;
+    
+    // Импорт функций для работы с сообщениями (Socket.io)
+    import { initSocket, sendReply, sendComment, openReply, closeReply, openComment, closeComment } from '/static/js/socket.js';
+    window.sendReply = sendReply;
+    window.sendComment = sendComment;
+    window.openReply = openReply;
+    window.closeReply = closeReply;
+    window.openComment = openComment;
+    window.closeComment = closeComment;
+    
+    // Инициализация Socket соединения
+    initSocket();
+    
+    // Функции для работы с состоянием (режим, цитаты)
+    import { fetchState, fetchMood } from '/static/js/state.js';
+    window.fetchState = fetchState;
+    window.fetchMood = fetchMood;
+    
+    // Загрузка начальных данных
+    fetchState();
+    fetchMood();
+    
+    // Обновление состояния каждые 60 секунд
+    setInterval(() => {
+        fetchState();
+        fetchMood();
+    }, 60000);
+</script>
 </body>
-    </html>
+</html>
