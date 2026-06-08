@@ -2,7 +2,7 @@
 # Файл: services/web_api/youtube_upload.py
 # Справка: README.md → Веб-морда / API / YouTube Upload
 # Задача: загрузка видео на YouTube из веб-морды
-# Комментарий: использует OAuth 2.0, токен хранится в переменных окружения
+# Комментарий: добавлена защита @login_required
 # Зависит от: flask, os, json, google.oauth2.credentials, google_auth_oauthlib.flow, googleapiclient
 # Вызывается из: web_api/__init__.py
 # ==========================================
@@ -16,6 +16,7 @@ from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from debug_utils import debug_log
+from services.app import login_required
 
 youtube_upload_bp = Blueprint('youtube_upload', __name__)
 
@@ -54,6 +55,7 @@ def get_flow():
 # ЭНДПОИНТЫ
 # ==========================================
 @youtube_upload_bp.route('/authorize')
+@login_required
 def authorize():
     """Начинает OAuth 2.0 авторизацию"""
     flow = get_flow()
@@ -65,6 +67,7 @@ def authorize():
     return redirect(authorization_url)
 
 @youtube_upload_bp.route('/oauth2callback')
+@login_required
 def oauth2callback():
     """Обрабатывает callback после авторизации"""
     flow = get_flow()
@@ -75,6 +78,7 @@ def oauth2callback():
     return "✅ Авторизация завершена. Токен сохранён."
 
 @youtube_upload_bp.route('/upload', methods=['POST'])
+@login_required
 def upload_video():
     """Загружает видео на YouTube"""
     creds = get_credentials()
