@@ -1,0 +1,325 @@
+# ==========================================
+# Файл: evolve_agent.py
+# Справка: README.md → Эволюция агента
+# Задача: анализ «осадка» диалогов и генерация новых правил поведения
+# Комментарий: добавлены лимиты (1000 осадков, 7 правил) и планировщик (раз в сутки)
+#              совместим с существующими вызовами из agent.py и admin_commands.py
+#              ДОБАВЛЕНА ЗАЩИТА от None и неверных типов данных
+# Зависит от: json, os, datetime, threading, time
+# Вызывается из: dialogue/agent.py, admin_commands.py, bot/main.py
+# ==========================================
+
+import os
+import json
+import threading
+import time
+from datetime import datetime
+
+# ==========================================
+# КОНСТАНТЫ
+# ==========================================
+SEDIMENT_FILE = "agent_data/sediment.json"
+RULES_FILE = "agent_data/rules.json"
+LOG_FILE = "logs/evolution.log"
+SEDIMENT_LIMIT = 1000
+RULES_LIMIT = 7
+
+# ==========================================
+# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# ==========================================
+def _ensure_dir(file_path):
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+def load_json(file_path, default=None):
+    if not os.path.exists(file_path):
+        return default if default else {}
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            # Если загрузилось None, возвращаем default
+            if data is None:
+                return default if default else {}
+            return data
+    except (json.JSONDecodeError, ValueError):
+        # Если файл битый, возвращаем default
+        return default if default else {}
+
+def save_json(file_path, data):
+    _ensure_dir(file_path)
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+def log_evolution(message):
+    _ensure_dir(LOG_FILE)
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(f"{datetime.now().isoformat()} | {message}\n")
+    print(f"[EVOLVE] {message}")
+
+# ==========================================
+# ГЕНЕРАЦИЯ ПРАВИЛ
+# ==========================================
+def generate_rule_from_sediment(sediment):
+    """Генерирует новое правило из отдельного осадка"""
+    tags = sediment.get("tags", [])
+    text = sediment.get("sediment", "").lower()
+    prompt = sediment.get("prompt", "").lower()
+    
+    if "speed" in tags or "быстрее" in text or "долго" in prompt:
+        return {
+            "id": f"rule_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            "condition": "в запросе есть слова 'быстрее', 'долго', 'скоро'",
+            "action": "увеличить темп ответа на 20%, сократить паузы",
+            "added": datetime.now().isoformat(),
+            "source_sediment": sediment.get("timestamp"),
+            "enabled": True,
+            "description": "Пользователь торопит — отвечаем быстрее"
+        }
+    elif "priority" in tags or "разлом" in text or "смысл" in prompt:
+        return {
+            "id": f"rule_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            "condition": "в запросе есть 'разлом', 'граница', 'смысл'",
+            "action": "отвечать развёрнуто, использовать метафоры роста",
+            "added": datetime.now().isoformat(),
+            "source_sediment": sediment.get("timestamp"),
+            "enabled": True,
+            "description": "Тема разлома — раскрывать глубже"
+        }
+    elif "emotion" in tags or "обижаешься" in text or "чувствуешь" in prompt:
+        return {
+            "id": f"rule_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            "condition": "пользователь спрашивает об эмоциях или состоянии",
+            "action": "отвечать с лёгкой человечностью, но без пафоса",
+            "added": datetime.now().isoformat(),
+            "source_sediment": sediment.get("timestamp"),
+            "enabled": True,
+            "description": "Вопрос об эмоциях — добавить тепла"
+        }
+    elif "тишина" in text or "пауза" in text or "молчать" in prompt:
+        return {
+            "id": f"rule_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            "condition": "в запросе есть 'тишина', 'пауза', 'молчать'",
+            "action": "отвечать коротко, оставлять пространство для размышлений",
+            "added": datetime.now().isoformat(),
+            "source_sediment": sediment.get("timestamp"),
+            "enabled": True,
+            "description": "Тишина — не пустота, а приглашение"
+        }
+    elif "код" in text or "алгоритм" in text or "программирование" in prompt:
+        return {
+            "id": f"rule_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            "condition": "в запросе есть 'код', 'алгоритм', 'программирование'",
+            "action": "отвечать технично, но с метафорами",
+            "added": datetime.now().isoformat(),
+            "source_sediment": sediment.get("timestamp"),
+            "enabled": True,
+            "description": "Код — это поэзия"
+        }
+    return None
+
+# ==========================================
+# ОСНОВНЫЕ ФУНКЦИИ ЭВОЛЮЦИИ
+# ==========================================
+def evolve_agent():
+    """Анализирует осадок, генерирует правила, применяет лимиты"""
+    sediment_data = load_json(SEDIMENT_FILE, {"sediments": [], "evolution_rules": []})
+    rules_data = load_json(RULES_FILE, [])
+    
+    # 🛡️ ЗАЩИТА ОТ None и неверных типов
+    if rules_data is None:
+        rules_data = []
+        save_json(RULES_FILE, rules_data)
+        log_evolution("rules.json был None, исправлен на []")
+    
+    if sediment_data is None:
+        sediment_data = {"sediments": [], "evolution_rules": []}
+        save_json(SEDIMENT_FILE, sediment_data)
+        log_evolution("sediment.json был None, исправлен")
+    
+    # 🛡️ ЗАЩИТА: проверяем, что sediment_data — словарь
+    if not isinstance(sediment_data, dict):
+        log_evolution(f"Ошибка: sediment_data не словарь, а {type(sediment_data)}. Сбрасываю в словарь")
+        sediment_data = {"sediments": [], "evolution_rules": []}
+        save_json(SEDIMENT_FILE, sediment_data)
+    
+    # 🛡️ ЗАЩИТА: проверяем, что нужные ключи — списки
+    if not isinstance(sediment_data.get("sediments"), list):
+        log_evolution("Поле 'sediments' не список, сбрасываю в []")
+        sediment_data["sediments"] = []
+    if not isinstance(sediment_data.get("evolution_rules"), list):
+        log_evolution("Поле 'evolution_rules' не список, сбрасываю в []")
+        sediment_data["evolution_rules"] = []
+    
+    # 🛡️ ЗАЩИТА: проверяем, что rules_data — список
+    if not isinstance(rules_data, list):
+        log_evolution(f"Ошибка: rules_data не список, а {type(rules_data)}. Сбрасываю в []")
+        rules_data = []
+        save_json(RULES_FILE, rules_data)
+    
+    new_sediments = sediment_data.get("sediments", [])
+    new_rules = []
+    
+    for sediment in new_sediments:
+        if sediment.get("processed"):
+            continue
+        
+        rule = generate_rule_from_sediment(sediment)
+        if rule:
+            new_rules.append(rule)
+            sediment["processed"] = True
+            log_evolution(f"Сгенерировано правило: {rule['condition']} → {rule['action']}")
+    
+    if new_rules:
+        existing_conditions = {r.get("condition") for r in rules_data}
+        for rule in new_rules:
+            if rule["condition"] not in existing_conditions:
+                rules_data.append(rule)
+        
+        # Ограничиваем количество правил
+        if len(rules_data) > RULES_LIMIT:
+            rules_data = rules_data[-RULES_LIMIT:]
+        
+        save_json(RULES_FILE, rules_data)
+        
+        sediment_data["evolution_rules"].extend(new_rules)
+        sediment_data["stats"] = {
+            "total_sediments": len(sediment_data.get("sediments", [])),
+            "processed_sediments": sum(1 for s in sediment_data.get("sediments", []) if s.get("processed")),
+            "last_evolution": datetime.now().isoformat()
+        }
+        save_json(SEDIMENT_FILE, sediment_data)
+        
+        log_evolution(f"Добавлено {len(new_rules)} новых правил")
+        return len(new_rules)
+    else:
+        log_evolution("Новых правил не сгенерировано")
+        return 0
+
+def add_sediment(prompt, answer, user_id, tags=None):
+    """Добавляет осадок от диалога (вызывается из ask_agent)"""
+    sediment_data = load_json(SEDIMENT_FILE, {"sediments": [], "evolution_rules": []})
+    
+    # 🛡️ ЗАЩИТА
+    if sediment_data is None:
+        sediment_data = {"sediments": [], "evolution_rules": []}
+    if not isinstance(sediment_data.get("sediments"), list):
+        sediment_data["sediments"] = []
+    
+    text = prompt.lower()
+    sediment_text = ""
+    sediment_tags = tags or []
+    
+    if any(w in text for w in ["быстрее", "долго", "скоро"]):
+        sediment_text = "пользователь ускорил темп — добавить больше ритма в ответ"
+        sediment_tags.append("speed")
+    elif "разлом" in text or "граница" in text or "смысл" in text:
+        sediment_text = "тема «разлом» — приоритет, давать развёрнутые метафоры"
+        sediment_tags.append("priority")
+    elif any(w in text for w in ["обижаешься", "чувствуешь", "эмоции"]):
+        sediment_text = "пользователь спрашивает об эмоциях — добавить больше человечности в ответ"
+        sediment_tags.append("emotion")
+    elif any(w in text for w in ["тишина", "пауза", "молчать"]):
+        sediment_text = "пользователь говорит о тишине — отвечать коротко, оставлять пространство"
+        sediment_tags.append("silence")
+    elif any(w in text for w in ["код", "алгоритм", "программирование"]):
+        sediment_text = "техническая тема — отвечать с метафорами"
+        sediment_tags.append("technical")
+    
+    if not sediment_text:
+        return False
+    
+    sediment = {
+        "timestamp": datetime.now().isoformat(),
+        "user_id": user_id,
+        "prompt": prompt[:200],
+        "answer": answer[:200],
+        "sediment": sediment_text,
+        "tags": sediment_tags,
+        "processed": False
+    }
+    
+    sediment_data["sediments"].append(sediment)
+    
+    # Ограничиваем количество осадков
+    if len(sediment_data["sediments"]) > SEDIMENT_LIMIT:
+        sediment_data["sediments"] = sediment_data["sediments"][-SEDIMENT_LIMIT:]
+    
+    sediment_data["stats"] = {
+        "total_sediments": len(sediment_data.get("sediments", [])),
+        "processed_sediments": sum(1 for s in sediment_data.get("sediments", []) if s.get("processed")),
+        "last_evolution": sediment_data.get("stats", {}).get("last_evolution", "never")
+    }
+    save_json(SEDIMENT_FILE, sediment_data)
+    log_evolution(f"Добавлен осадок от диалога с user {user_id}")
+    return True
+
+def get_evolution_stats():
+    """Возвращает статистику эволюции"""
+    sediment_data = load_json(SEDIMENT_FILE, {})
+    rules_data = load_json(RULES_FILE, [])
+    
+    # 🛡️ ЗАЩИТА
+    if rules_data is None:
+        rules_data = []
+    if sediment_data is None:
+        sediment_data = {}
+    if not isinstance(sediment_data.get("sediments"), list):
+        sediment_data["sediments"] = []
+    
+    return {
+        "total_sediments": len(sediment_data.get("sediments", [])),
+        "processed_sediments": sum(1 for s in sediment_data.get("sediments", []) if s.get("processed")),
+        "total_rules": len(rules_data),
+        "enabled_rules": sum(1 for r in rules_data if r.get("enabled", True)),
+        "last_evolution": sediment_data.get("stats", {}).get("last_evolution", "never")
+    }
+
+# ==========================================
+# ПЛАНИРОВЩИК (раз в сутки)
+# ==========================================
+_scheduler_running = False
+
+def _scheduler_loop():
+    global _scheduler_running
+    while _scheduler_running:
+        time.sleep(86400)  # 24 часа
+        evolve_agent()
+        log_evolution("✅ Ежедневная эволюция выполнена")
+
+def start_evolution_scheduler():
+    global _scheduler_running
+    if _scheduler_running:
+        return
+    _scheduler_running = True
+    thread = threading.Thread(target=_scheduler_loop, daemon=True)
+    thread.start()
+    log_evolution("Планировщик эволюции запущен (раз в сутки)")
+
+# ==========================================
+# СОВМЕСТИМОСТЬ С СУЩЕСТВУЮЩИМИ ВЫЗОВАМИ
+# ==========================================
+# apply_rules — заглушка (реальное применение правил в agent.py)
+def apply_rules(prompt, answer):
+    """Применяет правила к ответу (заглушка, пока не интегрировано)"""
+    return answer
+
+# ==========================================
+# ТЕСТ
+# ==========================================
+if __name__ == "__main__":
+    print("=== ЭВОЛЮЦИЯ АГЕНТА ===")
+    print("Статистика до эволюции:")
+    print(get_evolution_stats())
+    
+    count = evolve_agent()
+    print(f"\nСгенерировано {count} новых правил")
+    
+    print("\nСтатистика после эволюции:")
+    print(get_evolution_stats())
+    
+    print("\nПоследние правила:")
+    rules = load_json(RULES_FILE, [])
+    if isinstance(rules, list):
+        for rule in rules[-3:]:
+            print(f"  - {rule.get('condition')} → {rule.get('action')}")
+    else:
+        print("  Нет правил или файл повреждён")
