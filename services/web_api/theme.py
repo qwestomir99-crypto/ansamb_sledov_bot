@@ -2,7 +2,7 @@
 # Файл: services/web_api/theme.py
 # Справка: README.md → Веб-морда / API / Темы
 # Задача: эндпоинты для управления темами
-# Комментарий: добавлена защита @login_required
+# Комментарий: исправлен импорт login_required из auth_decorator
 # Зависит от: flask, debug_utils, services.theme
 # Вызывается из: web_api/__init__.py
 # ==========================================
@@ -10,7 +10,7 @@
 from flask import Blueprint, request, jsonify
 from debug_utils import debug_log
 from services.theme import save_theme
-from services.app import login_required
+from services.auth_decorator import login_required
 
 theme_bp = Blueprint('theme', __name__)
 
