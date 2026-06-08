@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes">
     <title>Ансамбль Следов 6 — веб-морда</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='10' y='65' font-family='monospace' font-size='50' fill='%2300ffcc'%3E0.8%3C/text%3E%3C/svg%3E">
     <link rel="stylesheet" href="/static/css/{{ theme }}">
@@ -12,9 +12,9 @@
 </head>
 <body>
 <div class="container">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <h1>🔥 Ансамбль Следов 6</h1>
-        <div>
+        <div style="display: flex; gap: 10px;">
             <button onclick="toggleThemeManually()" style="margin-right: 10px;">🌓 Сменить тему</button>
             <form method="post" action="/logout" style="display: inline;">
                 <button type="submit" style="background: transparent; border: 1px solid var(--border);">🚪 Выйти</button>
@@ -23,136 +23,205 @@
     </div>
     <p>Ритм 0,8 Гц. Управление ботом из браузера. Время: {{ time }}</p>
 
-    <!-- Создать пост -->
+    <!-- Создать пост (выпадающее меню) -->
     <div class="card">
-        <h2>✍️ Создать</h2>
-        <div class="button-group">
-            <button onclick="createPost('telegram')">📱 Пост в Telegram</button>
-            <button onclick="createPost('vk')">📘 Пост в VK</button>
+        <div class="card-header">
+            <h2>✍️ Создать</h2>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="card-content">
+            <div class="dropdown" id="create-dropdown">
+                <button class="dropdown-trigger" onclick="toggleDropdown('create-dropdown')">📝 Создать пост ▼</button>
+                <div class="dropdown-menu">
+                    <button onclick="createPost('telegram')">📱 Пост в Telegram</button>
+                    <button onclick="createPost('vk')">📘 Пост в VK</button>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- Входящие сообщения -->
     <div class="card">
-        <h2>📨 Входящие сообщения (VK + Telegram)</h2>
-        <div id="messages" class="messages"><div style="color: var(--text-secondary);">Загрузка...</div></div>
-        <div id="reply-area" class="hidden" style="margin-top: 1rem;">
-            <textarea id="reply-text" rows="2" cols="50" placeholder="Ваш ответ..." style="width: 100%; margin-bottom: 0.5rem;"></textarea>
-            <button onclick="sendReply()">📤 Отправить ответ</button>
-            <button onclick="closeReply()" style="background: transparent; border: 1px solid var(--border);">❌ Отмена</button>
+        <div class="card-header">
+            <h2>📨 Входящие сообщения (VK + Telegram)</h2>
+            <span class="toggle-icon">▼</span>
         </div>
-        <div id="comment-area" class="hidden" style="margin-top: 1rem;">
-            <textarea id="comment-text" rows="2" cols="50" placeholder="Ваш комментарий..." style="width: 100%; margin-bottom: 0.5rem;"></textarea>
-            <button onclick="sendComment()">✏️ Отправить комментарий</button>
-            <button onclick="closeComment()" style="background: transparent; border: 1px solid var(--border);">❌ Отмена</button>
+        <div class="card-content">
+            <div id="messages" class="messages"><div style="color: var(--text-secondary);">Загрузка...</div></div>
+            <div id="reply-area" class="hidden" style="margin-top: 1rem;">
+                <textarea id="reply-text" rows="2" cols="50" placeholder="Ваш ответ..." style="width: 100%; margin-bottom: 0.5rem;"></textarea>
+                <button onclick="sendReply()">📤 Отправить ответ</button>
+                <button onclick="closeReply()" style="background: transparent; border: 1px solid var(--border);">❌ Отмена</button>
+            </div>
+            <div id="comment-area" class="hidden" style="margin-top: 1rem;">
+                <textarea id="comment-text" rows="2" cols="50" placeholder="Ваш комментарий..." style="width: 100%; margin-bottom: 0.5rem;"></textarea>
+                <button onclick="sendComment()">✏️ Отправить комментарий</button>
+                <button onclick="closeComment()" style="background: transparent; border: 1px solid var(--border);">❌ Отмена</button>
+            </div>
         </div>
     </div>
 
-    <!-- Управление ботом -->
+    <!-- Управление ботом (выпадающее меню) -->
     <div class="card">
-        <h2>⚙️ Управление ботом</h2>
-        <div class="button-group">
-            <button onclick="setMode('утро')">🌅 Утро</button>
-            <button onclick="setMode('день')">☀️ День</button>
-            <button onclick="setMode('вечер')">🌙 Вечер</button>
-            <button onclick="setMode('ночь')">🌌 Ночь</button>
-            <button onclick="togglePing()">🔄 Пинг</button>
-            <button onclick="toggleAlice()">Старший брат</button>
+        <div class="card-header">
+            <h2>⚙️ Управление ботом</h2>
+            <span class="toggle-icon">▼</span>
         </div>
-        <div style="margin-top: 0.5rem;">Текущий режим: <span id="current-mode" class="status-badge">день</span></div>
+        <div class="card-content">
+            <div class="dropdown" id="mode-dropdown">
+                <button class="dropdown-trigger" onclick="toggleDropdown('mode-dropdown')">🎮 Режимы ▼</button>
+                <div class="dropdown-menu">
+                    <button onclick="setMode('утро')">🌅 Утро</button>
+                    <button onclick="setMode('день')">☀️ День</button>
+                    <button onclick="setMode('вечер')">🌙 Вечер</button>
+                    <button onclick="setMode('ночь')">🌌 Ночь</button>
+                </div>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
+                <button onclick="togglePing()">🔄 Пинг</button>
+                <button onclick="toggleAlice()">Старший брат</button>
+            </div>
+            <div style="margin-top: 0.5rem;">Текущий режим: <span id="current-mode" class="status-badge">день</span></div>
+        </div>
     </div>
 
-    <!-- Настроение агента -->
+    <!-- Настроение агента (выпадающее меню) -->
     <div class="card">
-        <h2>🎭 Настроение агента</h2>
-        <div class="button-group">
-            <button onclick="setMood('artist')">🎨 Художник</button>
-            <button onclick="setMood('admin')">📋 Администратор</button>
-            <button onclick="setMood('poet')">🎭 Поэт</button>
-            <button onclick="setMood('engineer')">🔧 Инженер</button>
+        <div class="card-header">
+            <h2>🎭 Настроение агента</h2>
+            <span class="toggle-icon">▼</span>
         </div>
-        <div style="margin-top: 0.5rem;">Текущее настроение: <span id="current-mood" class="status-badge">художник</span></div>
+        <div class="card-content">
+            <div class="dropdown" id="mood-dropdown">
+                <button class="dropdown-trigger" onclick="toggleDropdown('mood-dropdown')">🎨 Выбрать настроение ▼</button>
+                <div class="dropdown-menu">
+                    <button onclick="setMood('artist')">🎨 Художник</button>
+                    <button onclick="setMood('admin')">📋 Администратор</button>
+                    <button onclick="setMood('poet')">🎭 Поэт</button>
+                    <button onclick="setMood('engineer')">🔧 Инженер</button>
+                </div>
+            </div>
+            <div style="margin-top: 0.5rem;">Текущее настроение: <span id="current-mood" class="status-badge">художник</span></div>
+        </div>
     </div>
 
     <!-- Цитаты -->
     <div class="card">
-        <h2>📜 Управление цитатами</h2>
-        <textarea id="new-quote" rows="2" cols="50" placeholder="Текст новой цитаты..." style="width: 100%;"></textarea>
-        <button onclick="addQuote()">➕ Добавить цитату</button>
-        <details style="margin-top: 1rem;">
-            <summary>📖 Последние 10 цитат</summary>
-            <ul id="quotes-list">
-                {% for q in quotes %}
-                    <li>{{ q[:100] }}{% if q|length > 100 %}...{% endif %}</li>
-                {% else %}
-                    <li>Нет цитат</li>
-                {% endfor %}
-            </ul>
-        </details>
+        <div class="card-header">
+            <h2>📜 Управление цитатами</h2>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="card-content">
+            <textarea id="new-quote" rows="2" cols="50" placeholder="Текст новой цитаты..." style="width: 100%;"></textarea>
+            <button onclick="addQuote()">➕ Добавить цитату</button>
+            <details style="margin-top: 1rem;">
+                <summary>📖 Последние 10 цитат</summary>
+                <ul id="quotes-list">
+                    {% for q in quotes %}
+                        <li>{{ q[:100] }}{% if q|length > 100 %}...{% endif %}</li>
+                    {% else %}
+                        <li>Нет цитат</li>
+                    {% endfor %}
+                </ul>
+            </details>
+        </div>
     </div>
 
     <!-- Пост в VK -->
     <div class="card">
-        <h2>🎬 Пост в VK (текст)</h2>
-        <textarea id="post-text" rows="3" cols="50" placeholder="Текст поста..."></textarea><br>
-        <button onclick="sendPost()">Отправить</button>
-        <span id="post-status" style="margin-left: 10px;"></span>
+        <div class="card-header">
+            <h2>🎬 Пост в VK (текст)</h2>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="card-content">
+            <textarea id="post-text" rows="3" cols="50" placeholder="Текст поста..."></textarea><br>
+            <button onclick="sendPost()">Отправить</button>
+            <span id="post-status" style="margin-left: 10px;"></span>
+        </div>
     </div>
 
     <!-- Дебаггер -->
     <div class="card">
-        <h2>🐛 Дебаггер</h2>
-        <div class="button-group">
-            <button onclick="fetchDebugLogs()">📋 Показать логи</button>
-            <button onclick="sendDebugReport()">📨 Отправить отчёт в Telegram</button>
-            <button onclick="runAudit()">🔍 Запустить аудит</button>
-            <button onclick="showAuditStatus()">📊 Статус аудита</button>
-            <button onclick="showDebugIndex()">🗂️ Показать индекс</button>
+        <div class="card-header">
+            <h2>🐛 Дебаггер</h2>
+            <span class="toggle-icon">▼</span>
         </div>
-        <div id="debug-report" style="margin-top: 1rem;"></div>
-        <div id="audit-result" style="margin-top: 1rem;"></div>
-        <div id="index-result" style="margin-top: 1rem;"></div>
+        <div class="card-content">
+            <div class="dropdown" id="debug-dropdown">
+                <button class="dropdown-trigger" onclick="toggleDropdown('debug-dropdown')">🐛 Действия ▼</button>
+                <div class="dropdown-menu">
+                    <button onclick="fetchDebugLogs()">📋 Показать логи</button>
+                    <button onclick="sendDebugReport()">📨 Отправить отчёт в Telegram</button>
+                    <button onclick="runAudit()">🔍 Запустить аудит</button>
+                    <button onclick="showAuditStatus()">📊 Статус аудита</button>
+                    <button onclick="showDebugIndex()">🗂️ Показать индекс</button>
+                </div>
+            </div>
+            <div id="debug-report" style="margin-top: 1rem;"></div>
+            <div id="audit-result" style="margin-top: 1rem;"></div>
+            <div id="index-result" style="margin-top: 1rem;"></div>
+        </div>
     </div>
 
     <!-- YouTube Upload -->
     <div class="card">
-        <h2>🎬 Загрузить на YouTube</h2>
-        <button onclick="uploadToYouTube()">📤 Загрузить видео</button>
-        <div id="youtube-upload-status"></div>
+        <div class="card-header">
+            <h2>🎬 Загрузить на YouTube</h2>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="card-content">
+            <button onclick="uploadToYouTube()">📤 Загрузить видео</button>
+            <div id="youtube-upload-status"></div>
+        </div>
     </div>
 
     <!-- Черновики -->
     <div class="card">
-        <h2>📝 Черновики</h2>
-        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-            <input type="text" id="draft-title" placeholder="Заголовок черновика" style="flex: 1;">
-            <textarea id="draft-content" rows="3" placeholder="Содержание черновика" style="flex: 2;"></textarea>
-            <input type="hidden" id="draft-id" value="">
-            <button onclick="saveDraft()">💾 Сохранить</button>
+        <div class="card-header">
+            <h2>📝 Черновики</h2>
+            <span class="toggle-icon">▼</span>
         </div>
-        <div id="drafts-list"></div>
+        <div class="card-content">
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+                <input type="text" id="draft-title" placeholder="Заголовок черновика" style="flex: 1;">
+                <textarea id="draft-content" rows="3" placeholder="Содержание черновика" style="flex: 2;"></textarea>
+                <input type="hidden" id="draft-id" value="">
+                <button onclick="saveDraft()">💾 Сохранить</button>
+            </div>
+            <div id="drafts-list"></div>
+        </div>
     </div>
 
     <!-- Почта -->
     <div class="card" id="mail-panel">
-        <h2>📧 Почта</h2>
-        <div id="mail-inbox"></div>
-        <hr>
-        <div>
-            <input type="email" id="mail-to" placeholder="Кому" style="width: 100%; margin-bottom: 5px;">
-            <input type="text" id="mail-subject" placeholder="Тема" style="width: 100%; margin-bottom: 5px;">
-            <textarea id="mail-body" rows="3" placeholder="Сообщение" style="width: 100%; margin-bottom: 5px;"></textarea>
-            <button onclick="sendMail()">📤 Отправить</button>
+        <div class="card-header">
+            <h2>📧 Почта</h2>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="card-content">
+            <div id="mail-inbox"></div>
+            <hr>
+            <div>
+                <input type="email" id="mail-to" placeholder="Кому" style="width: 100%; margin-bottom: 5px;">
+                <input type="text" id="mail-subject" placeholder="Тема" style="width: 100%; margin-bottom: 5px;">
+                <textarea id="mail-body" rows="3" placeholder="Сообщение" style="width: 100%; margin-bottom: 5px;"></textarea>
+                <button onclick="sendMail()">📤 Отправить</button>
+            </div>
         </div>
     </div>
 
     <!-- Диалог с агентом -->
     <div class="card">
-        <h2>🗣 Диалог с агентом</h2>
-        <div id="chat-history" style="max-height: 300px; overflow-y: auto; margin-bottom: 10px;"></div>
-        <div style="display: flex; gap: 10px;">
-            <textarea id="chat-input" rows="2" placeholder="Напишите агенту..." style="flex: 1;"></textarea>
-            <button onclick="sendToAgent()">Отправить</button>
+        <div class="card-header">
+            <h2>🗣 Диалог с агентом</h2>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="card-content">
+            <div id="chat-history" style="max-height: 300px; overflow-y: auto; margin-bottom: 10px;"></div>
+            <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                <textarea id="chat-input" rows="2" placeholder="Напишите агенту..." style="flex: 1;"></textarea>
+                <button onclick="sendToAgent()">Отправить</button>
+            </div>
         </div>
     </div>
 
@@ -196,13 +265,57 @@ document.addEventListener('DOMContentLoaded', () => {
             currentLink.href = `/static/css/${savedTheme}`;
         }
     }
+    
+    // Инициализация аккордеонов
+    initAccordions();
+});
+
+// ==========================================
+// АККОРДЕОНЫ (сворачивание карточек)
+// ==========================================
+function initAccordions() {
+    document.querySelectorAll('.card').forEach(card => {
+        const header = card.querySelector('.card-header');
+        if (!header) return;
+        
+        header.addEventListener('click', (e) => {
+            // Не сворачиваем, если клик по кнопке внутри заголовка
+            if (e.target.tagName === 'BUTTON') return;
+            card.classList.toggle('collapsed');
+        });
+    });
+}
+
+// ==========================================
+// ВЫПАДАЮЩИЕ МЕНЮ (DROPDOWN)
+// ==========================================
+function toggleDropdown(dropdownId) {
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) return;
+    dropdown.classList.toggle('open');
+    
+    // Закрываем другие открытые меню
+    document.querySelectorAll('.dropdown.open').forEach(other => {
+        if (other.id !== dropdownId) {
+            other.classList.remove('open');
+        }
+    });
+}
+
+// Закрываем dropdown при клике вне меню
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.dropdown')) {
+        document.querySelectorAll('.dropdown.open').forEach(dropdown => {
+            dropdown.classList.remove('open');
+        });
+    }
 });
 </script>
 
 <script type="module">
     // Импорт всех необходимых модулей
     import { createPost, sendPost } from '/static/js/posts.js';
-    import { setMode, setMood, togglePing, toggleAlice } from '/static/js/bot.js';
+    import { setMode, setMood, togglePing, toggleAlice, fetchMode, fetchMood } from '/static/js/bot.js';
     import { addQuote } from '/static/js/quotes.js';
     import { fetchDebugLogs, sendDebugReport, runAudit, showAuditStatus, showDebugIndex } from '/static/js/debug.js';
     import { uploadToYouTube } from '/static/js/uploads.js';
@@ -231,7 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.escapeHtml = escapeHtml;
     
     // Импорт функций для работы с сообщениями (Socket.io)
-    import { initSocket, sendReply, sendComment, openReply, closeReply, openComment, closeComment } from '/static/js/socket.js';
+    import { initSocket, sendReply, sendComment, openReply, closeReply, openComment, closeComment } from '/static/js/replies.js';
     window.sendReply = sendReply;
     window.sendComment = sendComment;
     window.openReply = openReply;
@@ -242,19 +355,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Инициализация Socket соединения
     initSocket();
     
-    // Функции для работы с состоянием (режим, цитаты)
-    import { fetchState, fetchMood } from '/static/js/state.js';
-    window.fetchState = fetchState;
-    window.fetchMood = fetchMood;
-    
     // Загрузка начальных данных
-    fetchState();
-    fetchMood();
+    if (typeof fetchMode === 'function') fetchMode();
+    if (typeof fetchMood === 'function') fetchMood();
     
     // Обновление состояния каждые 60 секунд
     setInterval(() => {
-        fetchState();
-        fetchMood();
+        if (typeof fetchMode === 'function') fetchMode();
+        if (typeof fetchMood === 'function') fetchMood();
     }, 60000);
 </script>
 </body>
