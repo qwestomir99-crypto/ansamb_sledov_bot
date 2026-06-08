@@ -2,7 +2,7 @@
 # Файл: services/web_api/audit.py
 # Справка: README.md → Веб-морда / API / Аудит
 # Задача: эндпоинты для аудита
-# Комментарий: добавлена защита @login_required
+# Комментарий: исправлен импорт login_required из auth_decorator
 # Зависит от: flask, debug_utils, debug_audit
 # Вызывается из: web_api/__init__.py
 # ==========================================
@@ -11,7 +11,7 @@ from flask import Blueprint, jsonify
 from debug_utils import debug_log
 from debug_audit import run_audit
 from debug_utils import get_audit_status
-from services.app import login_required
+from services.auth_decorator import login_required
 
 audit_bp = Blueprint('audit', __name__)
 
