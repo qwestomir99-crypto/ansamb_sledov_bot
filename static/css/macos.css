@@ -2,6 +2,7 @@
    Файл: static/css/macos.css
    Справка: README.md → Веб-морда / Светлая тема
    Задача: светлая тема оформления в стиле macOS
+   Комментарий: переработана под мобильные устройства, добавлены dropdown и аккордеоны
    Зависит от: переменные CSS
    Вызывается из: templates/*.html
    ========================================== */
@@ -18,6 +19,13 @@
     --success: #34c759;
     --error: #ff3b30;
     --warning: #ff9500;
+    
+    /* Адаптивные отступы */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
 }
 
 * {
@@ -30,7 +38,7 @@ body {
     background: var(--bg);
     font-family: -apple-system, 'Inter', 'SF Pro Text', 'Segoe UI', sans-serif;
     color: var(--text);
-    padding: 2rem;
+    padding: var(--space-md);
     line-height: 1.4;
 }
 
@@ -40,39 +48,158 @@ body {
 }
 
 /* ==========================================
-   КАРТОЧКИ
+   КАРТОЧКИ (аккордеоны)
    ========================================== */
 .card {
     background: var(--card-bg);
     backdrop-filter: blur(10px);
     border-radius: 20px;
-    padding: 1.5rem;
-    margin: 1rem 0;
+    margin: var(--space-md) 0;
     box-shadow: var(--shadow);
     border: 1px solid var(--border);
-    transition: transform 0.2s, box-shadow 0.2s;
+    overflow: hidden;
+    transition: all 0.2s;
 }
 
-.card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+.card-header {
+    padding: var(--space-md) var(--space-lg);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    transition: background 0.2s;
 }
 
-/* ==========================================
-   ЗАГОЛОВКИ
-   ========================================== */
-h1 {
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    font-size: 1.8rem;
-    margin-bottom: 0.25rem;
+.card-header:hover {
+    background: rgba(0, 0, 0, 0.02);
 }
 
-h2 {
+.card-header h2 {
     font-weight: 600;
     letter-spacing: -0.02em;
     font-size: 1.3rem;
-    margin-bottom: 0.75rem;
+    margin: 0;
+}
+
+.card-header .toggle-icon {
+    font-size: 1.2rem;
+    transition: transform 0.2s;
+    color: var(--text-secondary);
+}
+
+.card.collapsed .card-header .toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.card-content {
+    padding: 0 var(--space-lg) var(--space-lg) var(--space-lg);
+    transition: all 0.3s ease;
+}
+
+.card.collapsed .card-content {
+    display: none;
+}
+
+/* ==========================================
+   ВЫПАДАЮЩИЕ МЕНЮ (DROPDOWN)
+   ========================================== */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-trigger {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.dropdown-trigger:hover {
+    background: var(--accent-hover);
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    min-width: 150px;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.2s;
+}
+
+.dropdown.open .dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(5px);
+}
+
+.dropdown-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 16px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    color: var(--text);
+    font-size: 0.85rem;
+}
+
+.dropdown-menu button:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.dropdown-menu button:first-child {
+    border-radius: 12px 12px 0 0;
+}
+
+.dropdown-menu button:last-child {
+    border-radius: 0 0 12px 12px;
+}
+
+/* ==========================================
+   ГРУППЫ КНОПОК
+   ========================================== */
+.button-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+}
+
+.button-group button {
+    flex: 1 1 auto;
+    min-width: 80px;
+}
+
+/* Специальная группа для мобильных — вертикальное расположение */
+@media (max-width: 768px) {
+    .button-group {
+        flex-direction: column;
+    }
+    
+    .button-group button {
+        width: 100%;
+    }
 }
 
 /* ==========================================
@@ -82,7 +209,7 @@ button, input, textarea, select {
     background: #ffffff;
     color: var(--text);
     border: 1px solid var(--border);
-    padding: 8px 16px;
+    padding: 10px 16px;
     border-radius: 12px;
     font-family: inherit;
     font-size: 0.9rem;
@@ -102,6 +229,34 @@ button:hover {
     transform: scale(0.98);
 }
 
+button:active {
+    transform: scale(0.96);
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Вторичные кнопки */
+button.secondary,
+.button-group button:not([onclick*="createPost"]):not([onclick*="setMode"]):not([onclick*="setMood"]) {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+}
+
+button.secondary:hover,
+.button-group button:not([onclick*="createPost"]):not([onclick*="setMode"]):not([onclick*="setMood"]):hover {
+    background: rgba(0, 122, 255, 0.1);
+}
+
+input, textarea, select {
+    width: 100%;
+    max-width: 100%;
+}
+
 input:focus, textarea:focus, select:focus {
     outline: none;
     border-color: var(--accent);
@@ -109,17 +264,17 @@ input:focus, textarea:focus, select:focus {
 }
 
 textarea {
-    width: 100%;
     resize: vertical;
+    min-height: 80px;
 }
 
 /* ==========================================
-   СООБЩЕНИЯ (VK / TELEGRAM / АДМИН)
+   СООБЩЕНИЯ (VK / TELEGRAM)
    ========================================== */
 .messages {
     max-height: 400px;
     overflow-y: auto;
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-md);
 }
 
 .message {
@@ -151,10 +306,16 @@ textarea {
     opacity: 0.7;
 }
 
+.message-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
 .message-actions button {
     font-size: 0.7rem;
     padding: 4px 10px;
-    margin-right: 8px;
     background: #e5e5e7;
     color: var(--text);
 }
@@ -163,6 +324,16 @@ textarea {
     background: var(--accent);
     color: white;
     transform: none;
+}
+
+/* ==========================================
+   ЗАГОЛОВКИ
+   ========================================== */
+h1 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-size: 1.8rem;
+    margin-bottom: 0.25rem;
 }
 
 /* ==========================================
@@ -175,21 +346,6 @@ a {
 
 a:hover {
     text-decoration: underline;
-}
-
-/* ==========================================
-   ГРУППЫ КНОПОК
-   ========================================== */
-.button-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-}
-
-.button-group button {
-    flex: 1;
-    min-width: 80px;
 }
 
 /* ==========================================
@@ -216,7 +372,7 @@ a:hover {
    ========================================== */
 pre {
     background: #f0f0f2;
-    padding: 0.5rem;
+    padding: var(--space-sm);
     border-radius: 12px;
     overflow-x: auto;
     font-size: 0.8rem;
@@ -227,80 +383,77 @@ pre {
 /* ==========================================
    ДЕБАГГЕР
    ========================================== */
-#debug-report {
-    margin-top: 1rem;
+#debug-report, #audit-result, #index-result {
+    margin-top: var(--space-md);
     font-size: 0.8rem;
     max-height: 300px;
     overflow-y: auto;
-}
-
-#debug-report details {
-    background: #f0f0f2;
-    border-radius: 12px;
-    padding: 0.5rem;
-}
-
-/* ==========================================
-   АУДИТ И ИНДЕКС
-   ========================================== */
-#audit-result details,
-#index-result details {
-    background: var(--card-bg);
-    border-radius: 12px;
-    padding: 0.5rem;
-    margin-top: 0.5rem;
-}
-
-#audit-result pre,
-#index-result pre {
-    background: #f0f0f2;
-    padding: 0.5rem;
-    border-radius: 8px;
-    overflow-x: auto;
-    font-size: 0.7rem;
-    font-family: monospace;
 }
 
 /* ==========================================
    ФУТЕР (ССЫЛКИ)
    ========================================== */
 .footer-links {
-    margin-top: 2rem;
+    margin-top: var(--space-xl);
     text-align: center;
     font-size: 0.8rem;
     border-top: 1px solid var(--border);
-    padding-top: 1rem;
+    padding-top: var(--space-md);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-md);
 }
 
 .footer-links a {
-    margin: 0 10px;
+    margin: 0;
 }
 
 /* ==========================================
-   АДАПТИВНОСТЬ
+   АДАПТИВНОСТЬ (МОБИЛЬНЫЕ УСТРОЙСТВА)
    ========================================== */
 @media (max-width: 768px) {
     body {
-        padding: 1rem;
+        padding: var(--space-sm);
     }
     
     .container {
         max-width: 100%;
     }
     
-    .button-group button {
-        min-width: 60px;
-        padding: 6px 12px;
+    .card-header {
+        padding: var(--space-sm) var(--space-md);
+    }
+    
+    .card-header h2 {
+        font-size: 1.1rem;
+    }
+    
+    .card-content {
+        padding: 0 var(--space-md) var(--space-md) var(--space-md);
+    }
+    
+    h1 {
+        font-size: 1.4rem;
+    }
+    
+    /* Горизонтальная прокрутка для таблиц и длинного текста */
+    pre, .messages {
+        max-width: 100%;
+        overflow-x: auto;
+    }
+    
+    /* Уменьшаем отступы в сообщениях */
+    .message {
+        padding: 8px;
+    }
+    
+    .message-actions {
+        flex-direction: column;
     }
     
     .message-actions button {
-        padding: 2px 6px;
-        font-size: 0.65rem;
-    }
-    
-    .footer-links a {
-        margin: 0 5px;
-        font-size: 0.7rem;
+        width: 100%;
     }
 }
 
@@ -312,6 +465,60 @@ pre {
     to { opacity: 1; transform: translateY(0); }
 }
 
-.card, .message, .video-card {
+.card, .message {
     animation: fadeIn 0.3s ease;
 }
+
+/* ==========================================
+   МОБИЛЬНОЕ МЕНЮ (ГАМБУРГЕР)
+   ========================================== */
+.hamburger {
+    display: none;
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 8px;
+}
+
+@media (max-width: 768px) {
+    .hamburger {
+        display: block;
+    }
+    
+    .mobile-menu {
+        position: fixed;
+        top: 0;
+        left: -100%;
+        width: 80%;
+        max-width: 300px;
+        height: 100%;
+        background: var(--card-bg);
+        backdrop-filter: blur(20px);
+        box-shadow: var(--shadow);
+        z-index: 1000;
+        padding: var(--space-lg);
+        transition: left 0.3s ease;
+        overflow-y: auto;
+    }
+    
+    .mobile-menu.open {
+        left: 0;
+    }
+    
+    .mobile-menu .close-btn {
+        position: absolute;
+        top: var(--space-md);
+        right: var(--space-md);
+        background: transparent;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+    }
+    
+    .mobile-menu .menu-item {
+        display: block;
+        width: 100%;
+        margin: var(--space-sm) 0;
+    }
+       }
