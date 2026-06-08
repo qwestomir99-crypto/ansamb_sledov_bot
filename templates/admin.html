@@ -11,6 +11,24 @@
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
 </head>
 <body>
+
+<!-- ========================================== -->
+<!-- ЗАЩИТА: проверка авторизации перед загрузкой -->
+<!-- ========================================== -->
+<script>
+    (async function() {
+        try {
+            const resp = await fetch('/api/check_auth');
+            const data = await resp.json();
+            if (!data.authenticated) {
+                window.location.href = '/auth/login';
+            }
+        } catch (e) {
+            window.location.href = '/auth/login';
+        }
+    })();
+</script>
+
 <div class="container">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <h1>🔥 Ансамбль Следов 6</h1>
