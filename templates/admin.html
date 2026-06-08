@@ -305,19 +305,25 @@ function initAccordions() {
 }
 
 // ==========================================
-// ВЫПАДАЮЩИЕ МЕНЮ (DROPDOWN)
+// ВЫПАДАЮЩИЕ МЕНЮ (DROPDOWN) — исправлено: клик по кнопке закрывает меню
 // ==========================================
 function toggleDropdown(dropdownId) {
     const dropdown = document.getElementById(dropdownId);
     if (!dropdown) return;
-    dropdown.classList.toggle('open');
     
-    // Закрываем другие открытые меню
+    // Если этот dropdown уже открыт — закрываем его
+    if (dropdown.classList.contains('open')) {
+        dropdown.classList.remove('open');
+        return;
+    }
+    
+    // Закрываем все открытые меню
     document.querySelectorAll('.dropdown.open').forEach(other => {
-        if (other.id !== dropdownId) {
-            other.classList.remove('open');
-        }
+        other.classList.remove('open');
     });
+    
+    // Открываем текущий
+    dropdown.classList.add('open');
 }
 
 // Закрываем dropdown при клике вне меню
