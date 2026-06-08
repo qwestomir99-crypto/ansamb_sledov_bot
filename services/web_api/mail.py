@@ -2,7 +2,7 @@
 # Файл: services/web_api/mail.py
 # Справка: README.md → Веб-морда / API / Почта
 # Задача: эндпоинты для работы с почтой
-# Комментарий: добавлена защита @login_required
+# Комментарий: исправлен импорт login_required из auth_decorator
 # Зависит от: flask, services.gmail_client, debug_utils
 # Вызывается из: web_api/__init__.py
 # ==========================================
@@ -10,7 +10,7 @@
 from flask import Blueprint, request, jsonify
 from services.gmail_client import fetch_emails, send_email
 from debug_utils import debug_log
-from services.app import login_required
+from services.auth_decorator import login_required
 
 mail_bp = Blueprint('mail', __name__)
 
