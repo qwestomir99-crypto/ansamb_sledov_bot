@@ -2,8 +2,8 @@
 # Файл: services/vk_api.py
 # Справка: README.md → Веб-морда / VK API
 # Задача: API для комментариев, ответов и постинга в VK
-# Комментарий: добавлена функция get_vk_messages() для фонового потока
-# Зависит от: flask, requests, debug_utils
+# Комментарий: токен теперь берётся через get_vk_token() (автообновление)
+# Зависит от: flask, requests, debug_utils, services.app
 # Вызывается из: services/app.py (blueprint)
 # ==========================================
 
@@ -11,10 +11,10 @@ import os
 import requests
 from flask import Blueprint, request, jsonify
 from debug_utils import debug_log
+from services.app import get_vk_token
 
 vk_api_bp = Blueprint('vk_api', __name__)
 
-VK_TOKEN = os.environ.get("VK_TOKEN")
 try:
     VK_GROUP_ID = int(os.environ.get("VK_GROUP_ID", 0))
 except (ValueError, TypeError):
@@ -23,17 +23,21 @@ except (ValueError, TypeError):
 def log_vk(level, message):
     debug_log("VK_API", message, level)
 
+def get_current_token():
+    """Возвращает актуальный токен через механизм обновления"""
+    token = get_vk_token()
+    if not token:
+        log_vk("ERROR", "Не удалось получить токен VK")
+    return token
+
 @vk_api_bp.route('/comment', methods=['POST'])
 def api_vk_comment():
-    """
-    Добавляет комментарий к посту в VK.
-    Ожидает JSON: {"post_id": 123, "text": "текст комментария"}
-    """
     data = request.json
     post_id = data.get('post_id')
     text = data.get('text', '').strip()
     
-    if not VK_TOKEN or not VK_GROUP_ID:
+    token = get_current_token()
+    if not token or not VK_GROUP_ID:
         log_vk("ERROR", "VK_TOKEN или VK_GROUP_ID не заданы")
         return jsonify({"status": "error", "error": "VK не настроен"}), 500
     
@@ -41,7 +45,7 @@ def api_vk_comment():
         return jsonify({"status": "error", "error": "post_id и text обязательны"}), 400
     
     params = {
-        "access_token": VK_TOKEN,
+        "access_token": token,
         "v": "5.199",
         "owner_id": -VK_GROUP_ID,
         "post_id": post_id,
@@ -66,15 +70,12 @@ def api_vk_comment():
 
 @vk_api_bp.route('/send_message', methods=['POST'])
 def api_vk_send_message():
-    """
-    Отправляет личное сообщение в VK.
-    Ожидает JSON: {"peer_id": 123456789, "text": "текст сообщения"}
-    """
     data = request.json
     peer_id = data.get('peer_id')
     text = data.get('text', '').strip()
     
-    if not VK_TOKEN:
+    token = get_current_token()
+    if not token:
         log_vk("ERROR", "VK_TOKEN не задан")
         return jsonify({"status": "error", "error": "VK не настроен"}), 500
     
@@ -82,7 +83,7 @@ def api_vk_send_message():
         return jsonify({"status": "error", "error": "peer_id и text обязательны"}), 400
     
     params = {
-        "access_token": VK_TOKEN,
+        "access_token": token,
         "v": "5.199",
         "peer_id": peer_id,
         "message": text,
@@ -107,15 +108,12 @@ def api_vk_send_message():
 
 @vk_api_bp.route('/like', methods=['POST'])
 def api_vk_like():
-    """
-    Ставит лайк посту в VK.
-    Ожидает JSON: {"post_id": 123, "owner_id": -123456789}
-    """
     data = request.json
     post_id = data.get('post_id')
     owner_id = data.get('owner_id', -VK_GROUP_ID)
     
-    if not VK_TOKEN:
+    token = get_current_token()
+    if not token:
         log_vk("ERROR", "VK_TOKEN не задан")
         return jsonify({"status": "error", "error": "VK не настроен"}), 500
     
@@ -123,7 +121,7 @@ def api_vk_like():
         return jsonify({"status": "error", "error": "post_id обязателен"}), 400
     
     params = {
-        "access_token": VK_TOKEN,
+        "access_token": token,
         "v": "5.199",
         "type": "post",
         "owner_id": owner_id,
@@ -146,16 +144,13 @@ def api_vk_like():
 
 @vk_api_bp.route('/repost', methods=['POST'])
 def api_vk_repost():
-    """
-    Делает репост поста в VK.
-    Ожидает JSON: {"post_id": 123, "owner_id": -123456789, "text": "мой комментарий"}
-    """
     data = request.json
     post_id = data.get('post_id')
     owner_id = data.get('owner_id', -VK_GROUP_ID)
     text = data.get('text', '').strip()
     
-    if not VK_TOKEN:
+    token = get_current_token()
+    if not token:
         log_vk("ERROR", "VK_TOKEN не задан")
         return jsonify({"status": "error", "error": "VK не настроен"}), 500
     
@@ -163,7 +158,7 @@ def api_vk_repost():
         return jsonify({"status": "error", "error": "post_id обязателен"}), 400
     
     params = {
-        "access_token": VK_TOKEN,
+        "access_token": token,
         "v": "5.199",
         "object": f"wall{owner_id}_{post_id}"
     }
@@ -185,23 +180,62 @@ def api_vk_repost():
         return jsonify({"status": "error", "error": str(e)}), 500
 
 # ==========================================
+# ФУНКЦИЯ ДЛЯ ОТПРАВКИ ПОСТА (используется публикатором)
+# ==========================================
+
+def send_vk_post(text):
+    """
+    Отправляет пост на стену VK (личную или групповую).
+    Возвращает True/False.
+    """
+    token = get_current_token()
+    vk_owner_id = os.environ.get("VK_OWNER_ID")
+    
+    if not token or not vk_owner_id:
+        log_vk("ERROR", "Не удалось получить токен или VK_OWNER_ID не задан")
+        return False
+    
+    params = {
+        "access_token": token,
+        "v": "5.199",
+        "owner_id": int(vk_owner_id),
+        "message": text,
+        "from_group": 1 if int(vk_owner_id) < 0 else 0
+    }
+    
+    try:
+        log_vk("INFO", "Отправка поста в VK")
+        r = requests.get("https://api.vk.com/method/wall.post", params=params, timeout=30)
+        data = r.json()
+        
+        if 'response' in data:
+            log_vk("INFO", f"Пост отправлен, ID: {data['response']['post_id']}")
+            return True
+        else:
+            error_msg = data.get('error', {}).get('error_msg', 'неизвестная ошибка')
+            log_vk("ERROR", f"Ошибка VK: {error_msg}")
+            return False
+    except Exception as e:
+        log_vk("ERROR", f"Исключение: {e}")
+        return False
+
+# ==========================================
 # ФУНКЦИЯ ДЛЯ ФОНОВОГО ПОТОКА
 # ==========================================
 
 def get_vk_messages(limit=10):
     """
     Получение последних сообщений из VK.
-    Возвращает список сообщений в формате:
-    [{'chat_id': 123, 'text': 'текст', 'timestamp': '2026-06-01T12:00:00', 'source': 'vk'}]
+    Возвращает список сообщений.
     """
-    if not VK_TOKEN or not VK_GROUP_ID:
+    token = get_current_token()
+    if not token or not VK_GROUP_ID:
         log_vk("ERROR", "VK_TOKEN или VK_GROUP_ID не заданы")
         return []
     
     try:
-        # Получаем последние сообщения из чатов
         params = {
-            "access_token": VK_TOKEN,
+            "access_token": token,
             "v": "5.199",
             "count": limit,
             "filter": "all"
@@ -227,9 +261,4 @@ def get_vk_messages(limit=10):
 # ДЛЯ ТЕСТА
 # ==========================================
 if __name__ == "__main__":
-    print("VK API модуль загружен")
-    print("Доступные эндпоинты:")
-    print("  POST /api/vk/comment  - комментарий к посту")
-    print("  POST /api/vk/send_message - личное сообщение")
-    print("  POST /api/vk/like - лайк")
-    print("  POST /api/vk/repost - репост")
+    print("VK API модуль загружен (с автообновлением токена)")
