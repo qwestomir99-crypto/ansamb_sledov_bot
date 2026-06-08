@@ -1,21 +1,22 @@
 /* ==========================================
    Файл: static/css/macos.css
    Справка: README.md → Веб-морда / Светлая тема
-   Задача: светлая тема оформления в стиле macOS
-   Комментарий: переработана под мобильные устройства, добавлены dropdown и аккордеоны
-   Зависит от: переменные CSS
-   Вызывается из: templates/*.html
+   Задача: светлая тема оформления в стиле современной macOS
+   Комментарий: мягкие серые тона, размытие, минимальный акцент
    ========================================== */
 
 :root {
-    --bg: #f5f5f7;
-    --card-bg: rgba(255, 255, 255, 0.92);
+    /* Основные цвета — мягкий серый, как в macOS */
+    --bg: #e8e8ec;
+    --card-bg: rgba(255, 255, 255, 0.75);
     --text: #1d1d1f;
-    --text-secondary: #86868b;
-    --border: rgba(0, 0, 0, 0.06);
+    --text-secondary: #6e6e73;
+    --border: rgba(0, 0, 0, 0.08);
     --accent: #007aff;
     --accent-hover: #005fc5;
-    --shadow: 0 8px 20px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.04);
+    --accent-soft: rgba(0, 122, 255, 0.15);
+    --shadow: 0 8px 20px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
     --success: #34c759;
     --error: #ff3b30;
     --warning: #ff9500;
@@ -36,10 +37,11 @@
 
 body {
     background: var(--bg);
-    font-family: -apple-system, 'Inter', 'SF Pro Text', 'Segoe UI', sans-serif;
+    font-family: -apple-system, 'SF Pro Text', 'Inter', 'Segoe UI', sans-serif;
     color: var(--text);
     padding: var(--space-md);
     line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
 }
 
 .container {
@@ -48,17 +50,18 @@ body {
 }
 
 /* ==========================================
-   КАРТОЧКИ (аккордеоны)
+   КАРТОЧКИ (аккордеоны) — стиль macOS
    ========================================== */
 .card {
     background: var(--card-bg);
-    backdrop-filter: blur(10px);
-    border-radius: 20px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
     margin: var(--space-md) 0;
     box-shadow: var(--shadow);
-    border: 1px solid var(--border);
+    border: 0.5px solid rgba(255, 255, 255, 0.5);
     overflow: hidden;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
 }
 
 .card-header {
@@ -76,14 +79,15 @@ body {
 }
 
 .card-header h2 {
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    font-size: 1.3rem;
+    font-weight: 590;
+    letter-spacing: -0.01em;
+    font-size: 1.2rem;
     margin: 0;
+    color: var(--text);
 }
 
 .card-header .toggle-icon {
-    font-size: 1.2rem;
+    font-size: 0.9rem;
     transition: transform 0.2s;
     color: var(--text-secondary);
 }
@@ -107,49 +111,54 @@ body {
 .dropdown {
     position: relative;
     display: inline-block;
+    width: 100%;
 }
 
 .dropdown-trigger {
-    background: var(--accent);
-    color: white;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text);
     border: none;
     padding: 10px 16px;
-    border-radius: 12px;
+    border-radius: 10px;
     font-family: inherit;
     font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
-    display: inline-flex;
+    display: flex;
+    justify-content: space-between;
     align-items: center;
     gap: 8px;
     transition: all 0.2s;
+    width: 100%;
 }
 
 .dropdown-trigger:hover {
-    background: var(--accent-hover);
+    background: rgba(0, 0, 0, 0.08);
 }
 
 .dropdown-menu {
     position: absolute;
     top: 100%;
     left: 0;
-    background: var(--card-bg);
-    backdrop-filter: blur(10px);
+    right: 0;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border-radius: 12px;
     box-shadow: var(--shadow);
-    border: 1px solid var(--border);
-    min-width: 150px;
+    border: 0.5px solid rgba(255, 255, 255, 0.5);
     z-index: 100;
     opacity: 0;
     visibility: hidden;
-    transform: translateY(-10px);
+    transform: translateY(-8px);
     transition: all 0.2s;
+    min-width: 100%;
 }
 
 .dropdown.open .dropdown-menu {
     opacity: 1;
     visibility: visible;
-    transform: translateY(5px);
+    transform: translateY(4px);
 }
 
 .dropdown-menu button {
@@ -162,10 +171,11 @@ body {
     border-radius: 0;
     color: var(--text);
     font-size: 0.85rem;
+    font-weight: 400;
 }
 
 .dropdown-menu button:hover {
-    background: rgba(0, 0, 0, 0.05);
+    background: var(--accent-soft);
 }
 
 .dropdown-menu button:first-child {
@@ -191,26 +201,24 @@ body {
     min-width: 80px;
 }
 
-/* Специальная группа для мобильных — вертикальное расположение */
 @media (max-width: 768px) {
     .button-group {
         flex-direction: column;
     }
-    
     .button-group button {
         width: 100%;
     }
 }
 
 /* ==========================================
-   КНОПКИ, ИНПУТЫ, СЕЛЕКТЫ
+   КНОПКИ — минималистичные
    ========================================== */
 button, input, textarea, select {
-    background: #ffffff;
+    background: rgba(0, 0, 0, 0.04);
     color: var(--text);
-    border: 1px solid var(--border);
+    border: none;
     padding: 10px 16px;
-    border-radius: 12px;
+    border-radius: 10px;
     font-family: inherit;
     font-size: 0.9rem;
     transition: all 0.2s ease;
@@ -219,18 +227,16 @@ button, input, textarea, select {
 button {
     background: var(--accent);
     color: white;
-    border: none;
     font-weight: 500;
     cursor: pointer;
 }
 
 button:hover {
     background: var(--accent-hover);
-    transform: scale(0.98);
 }
 
 button:active {
-    transform: scale(0.96);
+    transform: scale(0.98);
 }
 
 button:disabled {
@@ -239,28 +245,26 @@ button:disabled {
     transform: none;
 }
 
-/* Вторичные кнопки */
-button.secondary,
-.button-group button:not([onclick*="createPost"]):not([onclick*="setMode"]):not([onclick*="setMood"]) {
-    background: transparent;
+/* Вторичные кнопки (неосновные действия) */
+button.secondary {
+    background: rgba(0, 0, 0, 0.05);
     color: var(--accent);
-    border: 1px solid var(--accent);
+    border: none;
 }
 
-button.secondary:hover,
-.button-group button:not([onclick*="createPost"]):not([onclick*="setMode"]):not([onclick*="setMood"]):hover {
-    background: rgba(0, 122, 255, 0.1);
+button.secondary:hover {
+    background: var(--accent-soft);
 }
 
 input, textarea, select {
+    background: rgba(0, 0, 0, 0.04);
     width: 100%;
-    max-width: 100%;
 }
 
 input:focus, textarea:focus, select:focus {
     outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+    background: rgba(0, 0, 0, 0.06);
+    box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 textarea {
@@ -269,7 +273,7 @@ textarea {
 }
 
 /* ==========================================
-   СООБЩЕНИЯ (VK / TELEGRAM)
+   СООБЩЕНИЯ
    ========================================== */
 .messages {
     max-height: 400px;
@@ -278,27 +282,25 @@ textarea {
 }
 
 .message {
-    background: #f8f8fa;
-    border-radius: 16px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 14px;
     padding: 12px;
     margin: 8px 0;
-    border: 1px solid var(--border);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    border: 0.5px solid rgba(0, 0, 0, 0.04);
     transition: 0.1s;
 }
 
 .message.own {
-    background: var(--accent);
-    color: white;
-    border: none;
+    background: var(--accent-soft);
+    color: var(--text);
 }
 
 .message-telegram {
-    border-left: 4px solid #26a5e4;
+    border-left: 3px solid #26a5e4;
 }
 
 .message-vk {
-    border-left: 4px solid #4c75a3;
+    border-left: 3px solid #4c75a3;
 }
 
 .message small {
@@ -316,23 +318,22 @@ textarea {
 .message-actions button {
     font-size: 0.7rem;
     padding: 4px 10px;
-    background: #e5e5e7;
+    background: rgba(0, 0, 0, 0.05);
     color: var(--text);
 }
 
 .message-actions button:hover {
     background: var(--accent);
     color: white;
-    transform: none;
 }
 
 /* ==========================================
    ЗАГОЛОВКИ
    ========================================== */
 h1 {
-    font-weight: 600;
+    font-weight: 650;
     letter-spacing: -0.02em;
-    font-size: 1.8rem;
+    font-size: 1.6rem;
     margin-bottom: 0.25rem;
 }
 
@@ -354,50 +355,21 @@ a:hover {
 .status-badge {
     display: inline-block;
     padding: 2px 8px;
-    border-radius: 12px;
+    border-radius: 10px;
     font-size: 0.7rem;
-    background: var(--accent);
-    color: white;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 500;
 }
 
 /* ==========================================
-   СКРЫТЫЕ БЛОКИ
-   ========================================== */
-.hidden {
-    display: none;
-}
-
-/* ==========================================
-   ЛОГИ (PRE)
-   ========================================== */
-pre {
-    background: #f0f0f2;
-    padding: var(--space-sm);
-    border-radius: 12px;
-    overflow-x: auto;
-    font-size: 0.8rem;
-    border: 1px solid var(--border);
-    color: var(--text);
-}
-
-/* ==========================================
-   ДЕБАГГЕР
-   ========================================== */
-#debug-report, #audit-result, #index-result {
-    margin-top: var(--space-md);
-    font-size: 0.8rem;
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-/* ==========================================
-   ФУТЕР (ССЫЛКИ)
+   ФУТЕР
    ========================================== */
 .footer-links {
     margin-top: var(--space-xl);
     text-align: center;
-    font-size: 0.8rem;
-    border-top: 1px solid var(--border);
+    font-size: 0.75rem;
+    border-top: 0.5px solid rgba(0, 0, 0, 0.08);
     padding-top: var(--space-md);
     display: flex;
     flex-wrap: wrap;
@@ -406,11 +378,15 @@ pre {
 }
 
 .footer-links a {
-    margin: 0;
+    color: var(--text-secondary);
+}
+
+.footer-links a:hover {
+    color: var(--accent);
 }
 
 /* ==========================================
-   АДАПТИВНОСТЬ (МОБИЛЬНЫЕ УСТРОЙСТВА)
+   АДАПТИВНОСТЬ
    ========================================== */
 @media (max-width: 768px) {
     body {
@@ -426,7 +402,7 @@ pre {
     }
     
     .card-header h2 {
-        font-size: 1.1rem;
+        font-size: 1rem;
     }
     
     .card-content {
@@ -437,13 +413,11 @@ pre {
         font-size: 1.4rem;
     }
     
-    /* Горизонтальная прокрутка для таблиц и длинного текста */
     pre, .messages {
         max-width: 100%;
         overflow-x: auto;
     }
     
-    /* Уменьшаем отступы в сообщениях */
     .message {
         padding: 8px;
     }
@@ -468,57 +442,3 @@ pre {
 .card, .message {
     animation: fadeIn 0.3s ease;
 }
-
-/* ==========================================
-   МОБИЛЬНОЕ МЕНЮ (ГАМБУРГЕР)
-   ========================================== */
-.hamburger {
-    display: none;
-    background: transparent;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    padding: 8px;
-}
-
-@media (max-width: 768px) {
-    .hamburger {
-        display: block;
-    }
-    
-    .mobile-menu {
-        position: fixed;
-        top: 0;
-        left: -100%;
-        width: 80%;
-        max-width: 300px;
-        height: 100%;
-        background: var(--card-bg);
-        backdrop-filter: blur(20px);
-        box-shadow: var(--shadow);
-        z-index: 1000;
-        padding: var(--space-lg);
-        transition: left 0.3s ease;
-        overflow-y: auto;
-    }
-    
-    .mobile-menu.open {
-        left: 0;
-    }
-    
-    .mobile-menu .close-btn {
-        position: absolute;
-        top: var(--space-md);
-        right: var(--space-md);
-        background: transparent;
-        border: none;
-        font-size: 1.5rem;
-        cursor: pointer;
-    }
-    
-    .mobile-menu .menu-item {
-        display: block;
-        width: 100%;
-        margin: var(--space-sm) 0;
-    }
-       }
