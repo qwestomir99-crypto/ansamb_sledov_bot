@@ -2,8 +2,8 @@
    Файл: static/css/admin.css
    Справка: README.md → Веб-морда / Стили
    Задача: стили для главной страницы веб-морды
-   Комментарий: использует переменные из темы (macos.css)
-   Зависит от: macos.css (тема)
+   Комментарий: обновлён под современный macOS стиль
+   Зависит от: macos.css / dark.css (тема)
    Вызывается из: templates/admin.html
    ========================================== */
 
@@ -13,10 +13,11 @@
 
 .admin-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 1rem;
 }
 
+/* Кнопочные группы — уже есть в теме, но добавим специфику */
 .button-group {
     display: flex;
     flex-wrap: wrap;
@@ -29,13 +30,21 @@
     min-width: 80px;
 }
 
+/* Статус-бейджи — адаптируем под тему */
 .status-badge {
     display: inline-block;
-    padding: 2px 8px;
-    border-radius: 12px;
+    padding: 4px 12px;
+    border-radius: 20px;
     font-size: 0.7rem;
-    background: var(--accent);
-    color: white;
+    font-weight: 500;
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+/* Для тёмной темы */
+.status-badge-dark {
+    background: rgba(10, 132, 255, 0.2);
+    color: #0a84ff;
 }
 
 /* ==========================================
@@ -46,41 +55,51 @@
     max-height: 400px;
     overflow-y: auto;
     margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .message {
-    border-bottom: 1px solid var(--border);
-    padding: 8px;
-    margin: 5px 0;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 14px;
+    padding: 12px;
+    margin: 0;
+    transition: all 0.2s;
 }
 
+/* Свои сообщения (от админа) */
 .message.own {
-    background: var(--accent);
-    color: white;
-    border: none;
+    background: var(--accent-soft);
+    color: var(--text);
 }
 
+/* Telegram vs VK — цветовая маркировка */
 .message-telegram {
-    border-left: 4px solid #26a5e4;
+    border-left: 3px solid #26a5e4;
 }
 
 .message-vk {
-    border-left: 4px solid #4c75a3;
+    border-left: 3px solid #4c75a3;
 }
 
+/* Действия над сообщением */
 .message-actions {
-    margin-top: 8px;
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
 }
 
 .message-actions button {
     font-size: 0.7rem;
-    padding: 2px 6px;
-    margin-right: 5px;
-    background: var(--border);
+    padding: 4px 10px;
+    background: rgba(0, 0, 0, 0.05);
     color: var(--text);
     border: none;
     border-radius: 8px;
     cursor: pointer;
+    transition: all 0.2s;
 }
 
 .message-actions button:hover {
@@ -94,20 +113,30 @@
 
 #audit-result details,
 #index-result details {
-    background: var(--card-bg);
+    background: rgba(0, 0, 0, 0.03);
     border-radius: 12px;
-    padding: 0.5rem;
-    margin-top: 0.5rem;
+    padding: 0.75rem;
+    margin-top: 0.75rem;
+    border: 0.5px solid var(--border);
 }
 
 #audit-result pre,
 #index-result pre {
-    background: #f0f0f0;
-    padding: 0.5rem;
-    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.04);
+    padding: 0.75rem;
+    border-radius: 10px;
     overflow-x: auto;
-    font-size: 0.7rem;
-    font-family: monospace;
+    font-size: 0.75rem;
+    font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+    color: var(--text);
+}
+
+/* Тёмная тема для превью */
+@media (prefers-color-scheme: dark) {
+    #audit-result pre,
+    #index-result pre {
+        background: rgba(255, 255, 255, 0.05);
+    }
 }
 
 /* ==========================================
@@ -126,38 +155,114 @@
     margin-top: 2rem;
     text-align: center;
     font-size: 0.8rem;
-    border-top: 1px solid var(--border);
-    padding-top: 1rem;
+    border-top: 0.5px solid var(--border);
+    padding-top: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
 }
 
 .footer-links a {
-    margin: 0 10px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.footer-links a:hover {
     color: var(--accent);
     text-decoration: none;
 }
 
-.footer-links a:hover {
-    text-decoration: underline;
+/* ==========================================
+   6. ЧЕРНОВИКИ И ПОЧТА
+   ========================================== */
+
+#drafts-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 0.75rem;
+}
+
+.draft-item {
+    background: rgba(0, 0, 0, 0.02);
+    border-radius: 12px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    transition: background 0.2s;
+}
+
+.draft-item:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+#mail-inbox {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+}
+
+.mail-item {
+    background: rgba(0, 0, 0, 0.02);
+    border-radius: 12px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
 }
 
 /* ==========================================
-   6. АДАПТИВНОСТЬ
+   7. АДАПТИВНОСТЬ (МОБИЛЬНЫЕ УСТРОЙСТВА)
    ========================================== */
 
 @media (max-width: 768px) {
+    .admin-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+    
     .button-group button {
         min-width: 60px;
-        padding: 6px 12px;
-        font-size: 0.8rem;
+        padding: 8px 12px;
+        font-size: 0.85rem;
+    }
+    
+    .message-actions {
+        flex-wrap: wrap;
     }
     
     .message-actions button {
-        padding: 2px 6px;
-        font-size: 0.6rem;
+        flex: 1;
+        text-align: center;
+        padding: 6px 10px;
+        font-size: 0.7rem;
+    }
+    
+    .footer-links {
+        gap: 0.75rem;
     }
     
     .footer-links a {
-        margin: 0 5px;
         font-size: 0.7rem;
     }
 }
+
+/* ==========================================
+   8. ВСПОМОГАТЕЛЬНЫЕ УТИЛИТЫ
+   ========================================== */
+
+.text-center {
+    text-align: center;
+}
+
+.text-secondary {
+    color: var(--text-secondary);
+}
+
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mt-3 { margin-top: 1.5rem; }
+
+.mb-1 { margin-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+.mb-3 { margin-bottom: 1.5rem; }
+
+.w-100 { width: 100%; }
