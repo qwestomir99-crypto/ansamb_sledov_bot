@@ -2,11 +2,11 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, VK OAuth + авто-рефреш
-# Комментарий: device_id из переменной VK_DEVICE_ID
+# Комментарий: добавлена защита API через before_request
 # ==========================================
 
 import os, sys, hashlib, base64, secrets, json as json_module, time as time_module
-from flask import Flask, request as flask_request
+from flask import Flask, request as flask_request, session, redirect, url_for, jsonify
 from flask_socketio import SocketIO
 from debug_utils import debug_log
 import requests as req
@@ -25,9 +25,39 @@ from services.analytics_api import analytics_api
 from services.agent import agent_bp
 
 app = Flask(__name__, template_folder=os.path.join(PROJECT_ROOT, 'templates'), static_folder=os.path.join(PROJECT_ROOT, 'static'))
-app.config['SECRET_KEY'] = os.environ.get("FLASK_SECRET_KEY")
+app.config['SECRET_KEY'] = os.environ.get("FLASK_SECRET_KEY", os.urandom(24))
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SECURE'] = True  # только HTTPS
 socketio.init_app(app, cors_allowed_origins="*")
 
+# ==========================================
+# ЗАЩИТА API И СТРАНИЦ
+# ==========================================
+@app.before_request
+def require_auth():
+    """Защищает все маршруты, кроме логина, статики и API проверки"""
+    # Разрешаем доступ к публичным маршрутам
+    public_paths = ['/auth/login', '/auth/check', '/static', '/api/check_auth']
+    for path in public_paths:
+        if flask_request.path.startswith(path):
+            return None
+    
+    # Если пользователь не авторизован
+    if not session.get('authenticated'):
+        # Для API-запросов возвращаем 401
+        if flask_request.path.startswith('/api/') or flask_request.path.startswith('/bg/'):
+            return jsonify({'error': 'Unauthorized', 'status': 'error'}), 401
+        # Для обычных страниц — редирект на логин
+        return redirect(url_for('auth.login'))
+
+@app.route('/api/check_auth')
+def check_auth():
+    """Эндпоинт для проверки авторизации с фронтенда"""
+    return jsonify({'authenticated': session.get('authenticated', False)})
+
+# ==========================================
+# РЕГИСТРАЦИЯ BLUEPRINT'ОВ
+# ==========================================
 app.register_blueprint(auth_bp, url_prefix='/auth')
 app.register_blueprint(static_bp, url_prefix='/static')
 app.register_blueprint(youtube_bp, url_prefix='/youtube')
