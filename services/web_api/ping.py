@@ -2,7 +2,7 @@
 # Файл: services/web_api/ping.py
 # Справка: README.md → Веб-морда / API / Пинг
 # Задача: эндпоинты для пинга бота
-# Комментарий: добавлена защита @login_required
+# Комментарий: исправлен импорт login_required из auth_decorator
 # Зависит от: flask, debug_utils, ping_utils
 # Вызывается из: web_api/__init__.py
 # ==========================================
@@ -10,7 +10,7 @@
 from flask import Blueprint, jsonify
 from debug_utils import debug_log
 from ping_utils import toggle_ping
-from services.app import login_required
+from services.auth_decorator import login_required
 
 ping_bp = Blueprint('ping', __name__)
 
