@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 08.06.2026 12:47:33*
+*Обновлено: 08.06.2026 12:50:56*
 
 | Файл | Статус |
 |------|--------|
@@ -288,6 +288,7 @@
 | `services/dialogue/exception_handler.py` | ✅ Redmi-шапка |
 | `services/draft_bulder.py` | ✅ Redmi-шапка |
 | `services/draft_publisher.py` | ✅ Redmi-шапка |
+| `services/error_handlers.py` | ✅ Redmi-шапка |
 | `services/exception_handler.py` | ✅ Redmi-шапка |
 | `services/gmail_client.py` | ✅ Redmi-шапка |
 | `services/iternal_line.py` | ✅ Redmi-шапка |
