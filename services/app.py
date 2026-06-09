@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, VK OAuth + авто-рефреш
-# Комментарий: автоматическое определение корня проекта (не привязано к Render)
+# Комментарий: ПУТИ К ШАБЛОНАМ ОПРЕДЕЛЯЮТСЯ АВТОМАТИЧЕСКИ (не привязано к Render)
 # ==========================================
 
 import os
@@ -17,9 +17,11 @@ from flask_socketio import SocketIO
 from debug_utils import debug_log
 import requests as req
 
-# Автоматическое определение корня проекта
+# --- АВТОМАТИЧЕСКОЕ ОПРЕДЕЛЕНИЕ КОРНЯ ПРОЕКТА (РАБОТАЕТ ВЕЗДЕ) ---
+# Эта строка сама найдет корневую папку твоего проекта, где лежат папки services, templates, static.
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
+# -----------------------------------------------------------------
 
 from services.app_modules.auth import auth_bp
 from services.app_modules.static import static_bp
@@ -32,9 +34,13 @@ from services.analytics_api import analytics_api
 from services.agent import agent_bp
 from services.error_handlers import register_error_handlers
 
+# --- СОЗДАНИЕ ПРИЛОЖЕНИЯ С ЯВНЫМИ ПУТЯМИ ---
+# Мы напрямую указываем Flask'у, где искать папки templates и static.
 app = Flask(__name__, 
-            template_folder=os.path.join(PROJECT_ROOT, 'templates'), 
+            template_folder=os.path.join(PROJECT_ROOT, 'templates'),
             static_folder=os.path.join(PROJECT_ROOT, 'static'))
+# -------------------------------------------
+
 app.config['SECRET_KEY'] = os.environ.get("FLASK_SECRET_KEY", os.urandom(24))
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SECURE'] = True
