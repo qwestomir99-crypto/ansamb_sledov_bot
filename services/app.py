@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, VK OAuth + авто-рефреш
-# Комментарий: ПУТИ К ШАБЛОНАМ ОПРЕДЕЛЯЮТСЯ АВТОМАТИЧЕСКИ (не привязано к Render)
+# Комментарий: жёсткие пути (как было на Render)
 # ==========================================
 
 import os
@@ -17,11 +17,8 @@ from flask_socketio import SocketIO
 from debug_utils import debug_log
 import requests as req
 
-# --- АВТОМАТИЧЕСКОЕ ОПРЕДЕЛЕНИЕ КОРНЯ ПРОЕКТА (РАБОТАЕТ ВЕЗДЕ) ---
-# Эта строка сама найдет корневую папку твоего проекта, где лежат папки services, templates, static.
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = '/opt/render/project/src'
 sys.path.insert(0, PROJECT_ROOT)
-# -----------------------------------------------------------------
 
 from services.app_modules.auth import auth_bp
 from services.app_modules.static import static_bp
@@ -34,13 +31,7 @@ from services.analytics_api import analytics_api
 from services.agent import agent_bp
 from services.error_handlers import register_error_handlers
 
-# --- СОЗДАНИЕ ПРИЛОЖЕНИЯ С ЯВНЫМИ ПУТЯМИ ---
-# Мы напрямую указываем Flask'у, где искать папки templates и static.
-app = Flask(__name__, 
-            template_folder=os.path.join(PROJECT_ROOT, 'templates'),
-            static_folder=os.path.join(PROJECT_ROOT, 'static'))
-# -------------------------------------------
-
+app = Flask(__name__, template_folder=os.path.join(PROJECT_ROOT, 'templates'), static_folder=os.path.join(PROJECT_ROOT, 'static'))
 app.config['SECRET_KEY'] = os.environ.get("FLASK_SECRET_KEY", os.urandom(24))
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SECURE'] = True
@@ -80,7 +71,7 @@ app.register_blueprint(agent_bp, url_prefix='/agent')
 register_error_handlers(app)
 
 # ==========================================
-# VK OAUTH + АВТО-РЕФРЕШ
+# VK OAUTH + АВТО-РЕФРЕШ (device_id из переменной)
 # ==========================================
 
 _vk_token_cache = {"token": None, "expires_at": 0}
@@ -156,14 +147,14 @@ def vk_callback():
     device_id = flask_request.args.get('device_id', '')
     
     if device_id:
-        debug_log("VK_OAUTH", f"device_id получен: {device_id[:20]}...")
+        debug_log("VK_OAUTH", f"device_id получен: {device_id[:20]}... Сохрани в VK_DEVICE_ID в Render!")
     
     if not code:
         return "❌ Нет кода авторизации", 400
     
     client_id = os.environ.get("VK_APP_ID")
     client_secret = os.environ.get("VK_APP_SECRET")
-    redirect_uri = "https://ansamb-sledov-6.bothost.tech/api/vk/callback"
+    redirect_uri = "https://ansamb-sledov-bot-94wz.onrender.com/api/vk/callback"
     
     try:
         with open("/tmp/vk_code_verifier.txt", "r") as f:
@@ -206,7 +197,7 @@ def vk_auth_link():
     code_challenge = base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest()).rstrip(b'=').decode()
     state = secrets.token_urlsafe(16)
     client_id = os.environ.get("VK_APP_ID")
-    redirect_uri = "https://ansamb-sledov-6.bothost.tech/api/vk/callback"
+    redirect_uri = "https://ansamb-sledov-bot-94wz.onrender.com/api/vk/callback"
     
     os.makedirs("/tmp", exist_ok=True)
     with open("/tmp/vk_code_verifier.txt", "w") as f:
