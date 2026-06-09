@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, VK OAuth + авто-рефреш
-# Комментарий: добавлена защита API через before_request
+# Комментарий: автоматическое определение корня проекта (не привязано к Render)
 # ==========================================
 
 import os
@@ -17,7 +17,8 @@ from flask_socketio import SocketIO
 from debug_utils import debug_log
 import requests as req
 
-PROJECT_ROOT = '/opt/render/project/src'
+# Автоматическое определение корня проекта
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
 from services.app_modules.auth import auth_bp
@@ -31,10 +32,12 @@ from services.analytics_api import analytics_api
 from services.agent import agent_bp
 from services.error_handlers import register_error_handlers
 
-app = Flask(__name__, template_folder=os.path.join(PROJECT_ROOT, 'templates'), static_folder=os.path.join(PROJECT_ROOT, 'static'))
+app = Flask(__name__, 
+            template_folder=os.path.join(PROJECT_ROOT, 'templates'), 
+            static_folder=os.path.join(PROJECT_ROOT, 'static'))
 app.config['SECRET_KEY'] = os.environ.get("FLASK_SECRET_KEY", os.urandom(24))
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SECURE'] = True  # только HTTPS
+app.config['SESSION_COOKIE_SECURE'] = True
 socketio.init_app(app, cors_allowed_origins="*")
 
 # ==========================================
@@ -42,24 +45,18 @@ socketio.init_app(app, cors_allowed_origins="*")
 # ==========================================
 @app.before_request
 def require_auth():
-    """Защищает все маршруты, кроме логина, статики и API проверки"""
-    # Разрешаем доступ к публичным маршрутам
     public_paths = ['/auth/login', '/auth/check', '/static', '/api/check_auth']
     for path in public_paths:
         if flask_request.path.startswith(path):
             return None
     
-    # Если пользователь не авторизован
     if not session.get('authenticated'):
-        # Для API-запросов возвращаем 401
         if flask_request.path.startswith('/api/') or flask_request.path.startswith('/bg/'):
             return jsonify({'error': 'Unauthorized', 'status': 'error'}), 401
-        # Для обычных страниц — редирект на логин
         return redirect(url_for('auth.login'))
 
 @app.route('/api/check_auth')
 def check_auth():
-    """Эндпоинт для проверки авторизации с фронтенда"""
     return jsonify({'authenticated': session.get('authenticated', False)})
 
 # ==========================================
@@ -74,13 +71,10 @@ app.register_blueprint(web_api, url_prefix='/api')
 app.register_blueprint(analytics_api, url_prefix='/api/analytics')
 app.register_blueprint(agent_bp, url_prefix='/agent')
 
-# ==========================================
-# ОБРАБОТЧИКИ ОШИБОК (вынесены в отдельный модуль)
-# ==========================================
 register_error_handlers(app)
 
 # ==========================================
-# VK OAUTH + АВТО-РЕФРЕШ (device_id из переменной)
+# VK OAUTH + АВТО-РЕФРЕШ
 # ==========================================
 
 _vk_token_cache = {"token": None, "expires_at": 0}
@@ -156,14 +150,14 @@ def vk_callback():
     device_id = flask_request.args.get('device_id', '')
     
     if device_id:
-        debug_log("VK_OAUTH", f"device_id получен: {device_id[:20]}... Сохрани в VK_DEVICE_ID в Render!")
+        debug_log("VK_OAUTH", f"device_id получен: {device_id[:20]}...")
     
     if not code:
         return "❌ Нет кода авторизации", 400
     
     client_id = os.environ.get("VK_APP_ID")
     client_secret = os.environ.get("VK_APP_SECRET")
-    redirect_uri = "https://ansamb-sledov-bot-94wz.onrender.com/api/vk/callback"
+    redirect_uri = "https://ansamb-sledov-6.bothost.tech/api/vk/callback"
     
     try:
         with open("/tmp/vk_code_verifier.txt", "r") as f:
@@ -206,7 +200,7 @@ def vk_auth_link():
     code_challenge = base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest()).rstrip(b'=').decode()
     state = secrets.token_urlsafe(16)
     client_id = os.environ.get("VK_APP_ID")
-    redirect_uri = "https://ansamb-sledov-bot-94wz.onrender.com/api/vk/callback"
+    redirect_uri = "https://ansamb-sledov-6.bothost.tech/api/vk/callback"
     
     os.makedirs("/tmp", exist_ok=True)
     with open("/tmp/vk_code_verifier.txt", "w") as f:
