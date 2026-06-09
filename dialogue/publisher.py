@@ -5,16 +5,22 @@
 # Комментарий: VK — группа через VK_TOKEN + VK_GROUP_ID
 # ==========================================
 
-import os, json, time, random, threading
+import os
+import json
+import time
+import random
+import threading
 from debug_utils import debug_log
 from dialogue.publisher_utils import get_random_quote, get_auto_tags
 from dialogue.post_manager import load_post_pool, save_post_pool, build_tags, remove_post_from_pool, add_post_to_pool
 
-CONFIG_FILE = "config.json"
+# Путь к файлу конфигурации
+CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
 MAX_POOL_SIZE = 100
 
 def load_config():
-    with open(CONFIG_FILE, "r") as f: return json.load(f)
+    with open(CONFIG_FILE, "r") as f:
+        return json.load(f)
 
 def clean_pool():
     pool = load_post_pool()
