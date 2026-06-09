@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, VK OAuth + авто-рефреш
-# Комментарий: абсолютные пути для Bothost
+# Комментарий: исправленные пути для Bothost
 # ==========================================
 
 import os
@@ -17,8 +17,19 @@ from flask_socketio import SocketIO
 from debug_utils import debug_log
 import requests as req
 
-PROJECT_ROOT = '/opt/render/project/src'
+# === ИСПРАВЛЕНИЕ: корень проекта для Bothost ===
+PROJECT_ROOT = '/app'
 sys.path.insert(0, PROJECT_ROOT)
+
+# Диагностика путей
+print("=== DIAGNOSTIC ===")
+print("PROJECT_ROOT =", PROJECT_ROOT)
+print("Templates path:", os.path.join(PROJECT_ROOT, 'templates'))
+print("Static path:", os.path.join(PROJECT_ROOT, 'static'))
+print("Templates exists:", os.path.exists(os.path.join(PROJECT_ROOT, 'templates')))
+print("Static exists:", os.path.exists(os.path.join(PROJECT_ROOT, 'static')))
+print("==================")
+# =============================================
 
 from services.app_modules.auth import auth_bp
 from services.app_modules.static import static_bp
@@ -31,12 +42,9 @@ from services.analytics_api import analytics_api
 from services.agent import agent_bp
 from services.error_handlers import register_error_handlers
 
-# === ИСПРАВЛЕНИЕ: абсолютные пути для Bothost ===
 app = Flask(__name__, 
-            template_folder='/app/templates', 
-            static_folder='/app/static')
-# =============================================
-
+            template_folder=os.path.join(PROJECT_ROOT, 'templates'), 
+            static_folder=os.path.join(PROJECT_ROOT, 'static'))
 app.config['SECRET_KEY'] = os.environ.get("FLASK_SECRET_KEY", os.urandom(24))
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SECURE'] = True
@@ -159,7 +167,7 @@ def vk_callback():
     
     client_id = os.environ.get("VK_APP_ID")
     client_secret = os.environ.get("VK_APP_SECRET")
-    redirect_uri = "https://ansamb-sledov-bot-94wz.onrender.com/api/vk/callback"
+    redirect_uri = "https://ansamb-sledov-6.bothost.tech/api/vk/callback"
     
     try:
         with open("/tmp/vk_code_verifier.txt", "r") as f:
@@ -202,7 +210,7 @@ def vk_auth_link():
     code_challenge = base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest()).rstrip(b'=').decode()
     state = secrets.token_urlsafe(16)
     client_id = os.environ.get("VK_APP_ID")
-    redirect_uri = "https://ansamb-sledov-bot-94wz.onrender.com/api/vk/callback"
+    redirect_uri = "https://ansamb-sledov-6.bothost.tech/api/vk/callback"
     
     os.makedirs("/tmp", exist_ok=True)
     with open("/tmp/vk_code_verifier.txt", "w") as f:
