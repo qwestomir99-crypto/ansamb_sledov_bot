@@ -29,8 +29,11 @@ def thread_exception_handler(args):
 sys.excepthook = global_exception_handler
 threading.excepthook = thread_exception_handler
 
+# Путь к файлу конфигурации
+CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
+
 def load_config():
-    with open("config.json", "r") as f:
+    with open(CONFIG_FILE, "r") as f:
         return json.load(f)
 
 def get_bot():
