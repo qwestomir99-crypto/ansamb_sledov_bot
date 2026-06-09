@@ -10,7 +10,8 @@
 import os
 import json
 
-CONFIG_FILE = "config.json"
+# Путь к файлу конфигурации
+CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
 
 def is_alice_disabled():
     """Возвращает True, если Алиса выключена (по умолчанию)"""
