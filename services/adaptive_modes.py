@@ -13,7 +13,8 @@ import time
 from datetime import datetime
 from collections import deque
 
-CONFIG_FILE = "config.json"
+# Путь к файлу конфигурации
+CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
 ADAPTIVE_STATE_FILE = "dialogue/data/adaptive_state.json"
 ADAPTIVE_CONFIG_FILE = "dialogue/data/adaptive_config.json"
 
