@@ -2,6 +2,7 @@
 # Файл: bot/core.py
 # Справка: README.md → Бот / Ядро
 # Задача: глобальные обработчики, конфиг, токены
+# Комментарий: config.json ищется автоматически относительно bot.py
 # ==========================================
 
 import sys
@@ -29,12 +30,26 @@ def thread_exception_handler(args):
 sys.excepthook = global_exception_handler
 threading.excepthook = thread_exception_handler
 
-# Путь к файлу конфигурации
-CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
-
 def load_config():
-    with open(CONFIG_FILE, "r") as f:
-        return json.load(f)
+    """
+    Загружает config.json из папки dialogue/data.
+    Ищет файл относительно расположения этого скрипта (bot/core.py),
+    а не относительно текущей рабочей директории.
+    """
+    # Получаем абсолютный путь к каталогу, где находится этот файл (bot/core.py)
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # Поднимаемся на один уровень вверх, чтобы попасть в корень проекта (папку с bot.py)
+    project_root = os.path.dirname(current_dir)
+    # Формируем полный путь к config.json
+    config_path = os.path.join(project_root, 'dialogue', 'data', 'config.json')
+    
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"❌ Не найден config.json по пути: {config_path}")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"❌ Ошибка в формате config.json: {e}")
 
 def get_bot():
     TOKEN = os.environ.get("BOT_TOKEN")
