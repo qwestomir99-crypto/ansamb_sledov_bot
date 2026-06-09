@@ -13,7 +13,8 @@ import os
 from datetime import datetime
 from collections import Counter
 
-CONFIG_FILE = "config.json"
+# Путь к файлу конфигурации
+CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
 VK_POSTS_FILE = "dialogue/data/vk_posts.json"
 POST_POOL_FILE = "dialogue/data/post_pool.json"
 JOURNALIST_FEED = "dialogue/data/journalist_feed.json"
