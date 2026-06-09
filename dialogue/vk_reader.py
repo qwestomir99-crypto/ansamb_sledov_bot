@@ -12,7 +12,8 @@ import requests
 from datetime import datetime
 from debug_utils import debug_log
 
-CONFIG_FILE = "config.json"
+# Путь к файлу конфигурации
+CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
 VK_POSTS_FILE = "dialogue/data/vk_posts.json"
 
 def load_config():
