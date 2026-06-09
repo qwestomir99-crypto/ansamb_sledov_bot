@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, VK OAuth + авто-рефреш
-# Комментарий: жёсткие пути (как было на Render)
+# Комментарий: абсолютные пути для Bothost
 # ==========================================
 
 import os
@@ -31,7 +31,12 @@ from services.analytics_api import analytics_api
 from services.agent import agent_bp
 from services.error_handlers import register_error_handlers
 
-app = Flask(__name__, template_folder=os.path.join(PROJECT_ROOT, 'templates'), static_folder=os.path.join(PROJECT_ROOT, 'static'))
+# === ИСПРАВЛЕНИЕ: абсолютные пути для Bothost ===
+app = Flask(__name__, 
+            template_folder='/app/templates', 
+            static_folder='/app/static')
+# =============================================
+
 app.config['SECRET_KEY'] = os.environ.get("FLASK_SECRET_KEY", os.urandom(24))
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SECURE'] = True
