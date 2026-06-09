@@ -2,7 +2,7 @@
 # Файл: bot/core.py
 # Справка: README.md → Бот / Ядро
 # Задача: глобальные обработчики, конфиг, токены
-# Комментарий: config.json ищется автоматически относительно bot.py
+# Комментарий: исправлен умный поиск config.json с диагностикой
 # ==========================================
 
 import sys
@@ -31,25 +31,48 @@ sys.excepthook = global_exception_handler
 threading.excepthook = thread_exception_handler
 
 def load_config():
-    """
-    Загружает config.json из папки dialogue/data.
-    Ищет файл относительно расположения этого скрипта (bot/core.py),
-    а не относительно текущей рабочей директории.
-    """
-    # Получаем абсолютный путь к каталогу, где находится этот файл (bot/core.py)
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    # Поднимаемся на один уровень вверх, чтобы попасть в корень проекта (папку с bot.py)
-    project_root = os.path.dirname(current_dir)
-    # Формируем полный путь к config.json
-    config_path = os.path.join(project_root, 'dialogue', 'data', 'config.json')
+    """Умная загрузка config.json с диагностикой путей"""
+    import os
+    import json
     
-    try:
-        with open(config_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"❌ Не найден config.json по пути: {config_path}")
-    except json.JSONDecodeError as e:
-        raise ValueError(f"❌ Ошибка в формате config.json: {e}")
+    # Вариант 1: прямой абсолютный путь (Bothost)
+    path1 = '/app/dialogue/data/config.json'
+    # Вариант 2: относительный через __file__
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(current_dir)
+    path2 = os.path.join(project_root, 'dialogue', 'data', 'config.json')
+    # Вариант 3: без начального слеша (для экспериментов)
+    path3 = 'dialogue/data/config.json'
+    
+    print("=== ДИАГНОСТИКА load_config ===")
+    print(f"Вариант 1 (абсолютный): {path1}")
+    print(f"  существует? {os.path.exists(path1)}")
+    print(f"Вариант 2 (через __file__): {path2}")
+    print(f"  существует? {os.path.exists(path2)}")
+    print(f"Вариант 3 (относительный): {path3}")
+    print(f"  существует? {os.path.exists(path3)}")
+    print("================================")
+    
+    # Пробуем открыть первый существующий
+    for path in [path1, path2, path3]:
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    print(f"✅ config.json загружен из: {path}")
+                    return config
+            except json.JSONDecodeError as e:
+                print(f"❌ Ошибка в JSON: {e}")
+                raise ValueError(f"Ошибка в формате config.json ({path}): {e}")
+    
+    # Если ни один не подошёл
+    raise FileNotFoundError(
+        f"❌ Не найден config.json!\n"
+        f"Проверенные пути:\n"
+        f"  - {path1}\n"
+        f"  - {path2}\n"
+        f"  - {path3}"
+    )
 
 def get_bot():
     TOKEN = os.environ.get("BOT_TOKEN")
