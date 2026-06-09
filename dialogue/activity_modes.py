@@ -8,11 +8,13 @@
 # ==========================================
 
 import json
+import os
 from datetime import datetime
 from debug_utils import debug_log
 from dialogue.shabbat_manager import is_shabbat
 
-CONFIG_FILE = "config.json"
+# Путь к файлу конфигурации
+CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
 
 # Импорт адаптивных режимов (если модуль есть)
 try:
