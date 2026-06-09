@@ -1,0 +1,9 @@
+{
+  "name": "ansambl-sledov-6",
+  "version": "1.0.0",
+  "description": "Node.js wrapper for Python bot",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  }
+}
