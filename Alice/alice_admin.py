@@ -13,7 +13,8 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from debug_utils import debug_log
 
-CONFIG_FILE = "config.json"
+# Путь к файлу конфигурации
+CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
 
 def load_config():
     try:
