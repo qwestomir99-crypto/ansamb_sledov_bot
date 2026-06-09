@@ -1,0 +1,13 @@
+{
+  "name": "ansambl-sledov-6",
+  "version": "1.0.0",
+  "description": "Node.js wrapper for Python bot (обход автоопределения языка на Bothost)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
