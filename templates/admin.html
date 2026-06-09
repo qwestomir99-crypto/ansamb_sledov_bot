@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes">
     <title>Ансамбль Следов 6 — веб-морда</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='10' y='65' font-family='monospace' font-size='50' fill='%2300ffcc'%3E0.8%3C/text%3E%3C/svg%3E">
-    <link rel="stylesheet" href="/static/css/{{ theme }}">
-    <link rel="stylesheet" href="/static/css/admin.css">
-    <link rel="stylesheet" href="/static/css/visuals.css">
+    <link rel="stylesheet" href="{{ cdn_for('static', filename='css/' + theme) }}">
+    <link rel="stylesheet" href="{{ cdn_for('static', filename='css/admin.css') }}">
+    <link rel="stylesheet" href="{{ cdn_for('static', filename='css/visuals.css') }}">
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
 </head>
 <body>
@@ -297,7 +297,6 @@ function initAccordions() {
         if (!header) return;
         
         header.addEventListener('click', (e) => {
-            // Не сворачиваем, если клик по кнопке внутри заголовка
             if (e.target.tagName === 'BUTTON') return;
             card.classList.toggle('collapsed');
         });
@@ -305,28 +304,24 @@ function initAccordions() {
 }
 
 // ==========================================
-// ВЫПАДАЮЩИЕ МЕНЮ (DROPDOWN) — исправлено: клик по кнопке закрывает меню
+// ВЫПАДАЮЩИЕ МЕНЮ (DROPDOWN)
 // ==========================================
 function toggleDropdown(dropdownId) {
     const dropdown = document.getElementById(dropdownId);
     if (!dropdown) return;
     
-    // Если этот dropdown уже открыт — закрываем его
     if (dropdown.classList.contains('open')) {
         dropdown.classList.remove('open');
         return;
     }
     
-    // Закрываем все открытые меню
     document.querySelectorAll('.dropdown.open').forEach(other => {
         other.classList.remove('open');
     });
     
-    // Открываем текущий
     dropdown.classList.add('open');
 }
 
-// Закрываем dropdown при клике вне меню
 document.addEventListener('click', (e) => {
     if (!e.target.closest('.dropdown')) {
         document.querySelectorAll('.dropdown.open').forEach(dropdown => {
@@ -337,7 +332,6 @@ document.addEventListener('click', (e) => {
 </script>
 
 <script type="module">
-    // Импорт всех необходимых модулей
     import { createPost, sendPost } from '/static/js/posts.js';
     import { setMode, setMood, togglePing, toggleAlice, fetchMode, fetchMood } from '/static/js/bot.js';
     import { addQuote } from '/static/js/quotes.js';
@@ -348,7 +342,6 @@ document.addEventListener('click', (e) => {
     import { sendToAgent } from '/static/js/dialogue.js';
     import { escapeHtml } from '/static/js/helpers.js';
     
-    // Вешаем на window, чтобы кнопки в HTML видели
     window.createPost = createPost;
     window.sendPost = sendPost;
     window.setMode = setMode;
@@ -367,7 +360,6 @@ document.addEventListener('click', (e) => {
     window.sendToAgent = sendToAgent;
     window.escapeHtml = escapeHtml;
     
-    // Импорт функций для работы с сообщениями (Socket.io)
     import { initSocket, sendReply, sendComment, openReply, closeReply, openComment, closeComment } from '/static/js/replies.js';
     window.sendReply = sendReply;
     window.sendComment = sendComment;
@@ -376,14 +368,11 @@ document.addEventListener('click', (e) => {
     window.openComment = openComment;
     window.closeComment = closeComment;
     
-    // Инициализация Socket соединения
     initSocket();
     
-    // Загрузка начальных данных
     if (typeof fetchMode === 'function') fetchMode();
     if (typeof fetchMood === 'function') fetchMood();
     
-    // Обновление состояния каждые 60 секунд
     setInterval(() => {
         if (typeof fetchMode === 'function') fetchMode();
         if (typeof fetchMood === 'function') fetchMood();
