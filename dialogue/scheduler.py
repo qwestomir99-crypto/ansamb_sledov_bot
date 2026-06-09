@@ -16,7 +16,8 @@ import pytz
 from debug_utils import debug_log
 from evolve_agent import evolve_agent, get_evolution_stats
 
-CONFIG_FILE = "config.json"
+# Путь к файлу конфигурации
+CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
 RITUAL_TIMEZONE = pytz.timezone('Europe/Moscow')
 
 def load_config():
