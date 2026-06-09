@@ -1,15 +1,15 @@
-# Берём за основу официальный образ Python
-FROM python:3.11-slim
+# Используем официальный образ Node.js
+FROM node:20-slim
 
-# Указываем рабочую папку внутри контейнера
+# Устанавливаем рабочую директорию внутри контейнера
 WORKDIR /app
 
-# Копируем список с зависимостями и устанавливаем их
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Копируем package.json и устанавливаем зависимости (если появятся)
+COPY package*.json ./
+RUN npm install
 
-# Копируем весь остальной код в папку /app
+# Копируем всё остальное
 COPY . .
 
-# Запускаем бота
-CMD ["python", "bot.py"]
+# Запускаем бота через Node.js
+CMD ["node", "bot.js"]
