@@ -1,0 +1,5 @@
+{
+  "_comment": "Это не сам конфиг, а указатель. Настоящий config.json лежит в dialogue/data/config.json",
+  "_source": "dialogue/data/config.json",
+  "_message": "Если ты это читаешь, значит код ищет config.json не там. Скопируй реальный конфиг из dialogue/data/config.json в этот файл."
+}
