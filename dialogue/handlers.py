@@ -6,6 +6,7 @@
 # Вызывается из: bot.py
 # ==========================================
 
+import os
 import random
 import json
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -18,7 +19,8 @@ from dialogue.agent import ask_agent
 from debug_utils import debug_log
 from ping_utils import ping_self
 
-CONFIG_FILE = "config.json"
+# Путь к файлу конфигурации
+CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
 
 def load_config():
     with open(CONFIG_FILE, "r") as f:
