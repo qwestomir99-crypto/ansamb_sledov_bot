@@ -7,10 +7,12 @@
 # Вызывается из: admin_commands.py (при изменении интервала)
 # ==========================================
 
+import os
 import json
 from ping_utils import start_background_pinger
 
-CONFIG_FILE = "config.json"
+# Путь к файлу конфигурации
+CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
 
 def load_config():
     with open(CONFIG_FILE, "r") as f:
