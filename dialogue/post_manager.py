@@ -13,7 +13,7 @@ import random
 from datetime import datetime
 
 POST_POOL_FILE = "dialogue/data/post_pool.json"
-CONFIG_FILE = "config.json"
+CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
 
 def load_config():
     with open(CONFIG_FILE, "r") as f:
