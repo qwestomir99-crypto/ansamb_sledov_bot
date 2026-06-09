@@ -1,20 +1,29 @@
-const { spawn } = require('child_process');
-const path = require('path');
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-console.log('[Node.js] Обёртка запущена');
-console.log('[Node.js] Запуск Python-бота...');
+import os
+import sys
+import threading
 
-const pythonProcess = spawn('python3', [path.join(__dirname, 'real_bot.py')], {
-    stdio: 'inherit',
-    env: process.env
-});
+# Добавляем путь к модулям
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-pythonProcess.on('close', (code) => {
-    console.log(`[Node.js] Python-бот завершил работу с кодом ${code}`);
-    process.exit(code);
-});
+from services.app import app
+from ping_utils import start_background_pinger, start_agent_pinger
 
-pythonProcess.on('error', (err) => {
-    console.error(`[Node.js] Ошибка запуска Python: ${err.message}`);
-    process.exit(1);
-});
+if __name__ == "__main__":
+    # Запускаем пингеры
+    try:
+        start_background_pinger(interval=60)
+        start_agent_pinger()
+        print("[BOT] Пингеры запущены")
+    except Exception as e:
+        print(f"[BOT] Ошибка запуска пингеров: {e}")
+    
+    # Веб-морда в фоне
+    port = int(os.environ.get("PORT", 10000))
+    threading.Thread(target=app.run, args=('0.0.0.0', port), daemon=True).start()
+    
+    # Бот в основном потоке
+    from bot.main import main
+    main()
