@@ -6,18 +6,24 @@
 #              VK_GROUP_ID уже содержит минус — не дублируем.
 # ==========================================
 
-import os, random, json, requests
+import os
+import random
+import json
+import requests
 from utils import escape_markdown
 from debug_utils import debug_log
 
-CONFIG_FILE = "config.json"
+# Путь к файлу конфигурации
+CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
 QUOTES_FILE = "dialogue/data/quotes.txt"
 
 def load_config():
-    with open(CONFIG_FILE, "r") as f: return json.load(f)
+    with open(CONFIG_FILE, "r") as f:
+        return json.load(f)
 
 def load_quotes():
-    if not os.path.exists(QUOTES_FILE): return []
+    if not os.path.exists(QUOTES_FILE):
+        return []
     with open(QUOTES_FILE, "r", encoding="utf-8") as f:
         return [line.strip() for line in f if line.strip()]
 
@@ -33,13 +39,15 @@ def get_auto_tags(text, platform="vk"):
     else:
         tags.update(config.get("publisher", {}).get("default_tags", "#СапёрыАутентичности #МихоельАв #2026плита").split())
     for w in text.split():
-        if w.startswith('#'): tags.add(w)
+        if w.startswith('#'):
+            tags.add(w)
     return " ".join(tags)
 
 def post_to_telegram(bot, chat_id, message, file_id=None, tags=None, auto_quote=True, auto_tags=True):
     if auto_quote and message and len(message) < 500:
         message = f"{message}\n\n📜 {get_random_quote()}"
-    if auto_tags: tags = get_auto_tags(message, "tg")
+    if auto_tags:
+        tags = get_auto_tags(message, "tg")
     full_message = f"{message}\n\n{tags}" if tags and message else (tags or message)
     try:
         if file_id:
@@ -69,7 +77,8 @@ def post_to_vk(message, tags, access_token, owner_id, file_id=None, auto_quote=T
     
     if auto_quote and message and len(message) < 500:
         message = f"{message}\n\n📜 {get_random_quote()}"
-    if auto_tags: tags = get_auto_tags(message, "vk")
+    if auto_tags:
+        tags = get_auto_tags(message, "vk")
     full_message = f"{message}\n\n{tags}" if message else tags
     
     # VK_GROUP_ID уже приходит с минусом — не добавляем лишний
