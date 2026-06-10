@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, VK OAuth + авто-рефреш
-# Комментарий: flask-cdn убран, статика через url_for, добавлен /health
+# Комментарий: порт берётся строго из переменной PORT (без хардкода)
 # ==========================================
 
 import os
@@ -55,9 +55,6 @@ def require_auth():
 def check_auth():
     return jsonify({'authenticated': session.get('authenticated', False)})
 
-# ==========================================
-# HEALTH CHECK ДЛЯ BOTHOST
-# ==========================================
 @app.route('/health')
 def health():
     return jsonify({"status": "ok", "ritm": "0.8 Hz"})
@@ -146,5 +143,5 @@ def vk_auth_link():
 start_background_thread()
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT"))
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
