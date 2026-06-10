@@ -20,8 +20,8 @@ RUN echo "=== СОДЕРЖИМОЕ /app/dialogue/data ===" && ls -la /app/dialog
 # ПРИНУДИТЕЛЬНО копируем config.json (если есть в репозитории)
 COPY dialogue/data/config.json /app/dialogue/data/config.json
 
-# Создаём символическую ссылку в корне для старых обращений
-RUN ln -s /app/dialogue/data/config.json /app/config.json
+# Создаём символическую ссылку (принудительно, даже если существует)
+RUN ln -sf /app/dialogue/data/config.json /app/config.json
 
 # Запускаем бота
 CMD ["python", "bot.py"]
