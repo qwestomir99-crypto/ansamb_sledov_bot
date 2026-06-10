@@ -1,0 +1,251 @@
+/* ==========================================
+   Файл: static/css/macos-new.css
+   Справка: README.md → Веб-морда / Современная тёмная тема
+   Задача: тема в стиле macOS Ventura/Sonoma
+   Комментарий: серый фон, фиолетовые акценты, карточки свёрнуты, анимация
+   ========================================== */
+
+:root {
+    --bg: #1c1c1e;
+    --card-bg: rgba(44, 44, 46, 0.8);
+    --text: #f5f5f7;
+    --text-secondary: #98989d;
+    --border: rgba(255, 255, 255, 0.08);
+    --accent: #9b59b6;
+    --accent-hover: #b37bcd;
+    --accent-soft: rgba(155, 89, 182, 0.2);
+    --shadow: 0 8px 20px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.2);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+    --success: #30d158;
+    --error: #ff453a;
+    --warning: #ff9f0a;
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: var(--bg);
+    font-family: -apple-system, 'SF Pro Text', 'Inter', 'Segoe UI', sans-serif;
+    color: var(--text);
+    padding: var(--space-md);
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+}
+
+.container { max-width: 1200px; margin: 0 auto; }
+
+/* Карточки */
+.card {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
+    margin: var(--space-md) 0;
+    box-shadow: var(--shadow);
+    border: 0.5px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.card-header {
+    padding: var(--space-md) var(--space-lg);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    transition: background 0.2s;
+}
+
+.card-header:hover { background: rgba(255, 255, 255, 0.03); }
+
+.card-header h2 {
+    font-weight: 590;
+    letter-spacing: -0.01em;
+    font-size: 1.2rem;
+    margin: 0;
+    color: var(--text);
+}
+
+.card-header .toggle-icon {
+    font-size: 0.9rem;
+    transition: transform 0.3s ease;
+    color: var(--text-secondary);
+}
+
+/* Свёрнуто по умолчанию */
+.card.collapsed .card-header .toggle-icon { transform: rotate(-90deg); }
+
+.card-content {
+    padding: 0 var(--space-lg) var(--space-lg) var(--space-lg);
+    max-height: 2000px;
+    opacity: 1;
+    overflow: hidden;
+    transition: max-height 0.4s ease, opacity 0.3s ease, padding 0.3s ease;
+}
+
+.card.collapsed .card-content {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+/* По умолчанию все карточки свёрнуты, кроме первой */
+.card:first-of-type { }
+.card:not(:first-of-type) { }
+/* Управляется JS: initAccordions() добавляет класс collapsed */
+
+/* Выпадающие меню */
+.dropdown { position: relative; display: inline-block; width: 100%; }
+
+.dropdown-trigger {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+    border: none;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+    width: 100%;
+}
+
+.dropdown-trigger:hover { background: rgba(255, 255, 255, 0.1); }
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: rgba(44, 44, 46, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    border: 0.5px solid rgba(255, 255, 255, 0.1);
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition: all 0.25s ease;
+    min-width: 100%;
+}
+
+.dropdown.open .dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(4px);
+}
+
+.dropdown-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 16px;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 0.85rem;
+    transition: background 0.2s;
+}
+
+.dropdown-menu button:hover { background: var(--accent-soft); }
+.dropdown-menu button:first-child { border-radius: 12px 12px 0 0; }
+.dropdown-menu button:last-child { border-radius: 0 0 12px 12px; }
+
+/* Кнопки */
+button, input, textarea, select {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+    border: none;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+button {
+    background: var(--accent);
+    color: white;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+button:hover { background: var(--accent-hover); }
+button:active { transform: scale(0.98); }
+button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+button.secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--accent);
+    border: 1px solid var(--accent-soft);
+}
+
+button.secondary:hover { background: var(--accent-soft); }
+
+input, textarea, select { background: rgba(255, 255, 255, 0.06); width: 100%; }
+input:focus, textarea:focus, select:focus { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+textarea { resize: vertical; min-height: 80px; }
+
+/* Кнопочные группы */
+.button-group { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-sm); }
+.button-group button { flex: 1 1 auto; min-width: 80px; }
+
+/* Сообщения */
+.messages { max-height: 400px; overflow-y: auto; margin-bottom: var(--space-md); }
+.message { background: rgba(255, 255, 255, 0.03); border-radius: 14px; padding: 12px; margin: 8px 0; transition: 0.1s; }
+.message.own { background: var(--accent-soft); }
+.message-telegram { border-left: 3px solid #26a5e4; }
+.message-vk { border-left: 3px solid #4c75a3; }
+.message small { font-size: 0.7rem; opacity: 0.7; }
+.message-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.message-actions button { font-size: 0.7rem; padding: 4px 10px; background: rgba(255, 255, 255, 0.06); color: var(--text); }
+.message-actions button:hover { background: var(--accent); color: white; }
+
+/* Заголовки */
+h1 { font-weight: 650; letter-spacing: -0.02em; font-size: 1.6rem; margin-bottom: 0.25rem; }
+
+/* Ссылки */
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Статусы */
+.status-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+
+/* Футер */
+.footer-links { margin-top: var(--space-xl); text-align: center; font-size: 0.75rem; border-top: 0.5px solid rgba(255, 255, 255, 0.08); padding-top: var(--space-md); display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-md); }
+.footer-links a { color: var(--text-secondary); }
+.footer-links a:hover { color: var(--accent); }
+
+/* Анимации */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.card, .message { animation: fadeIn 0.3s ease; }
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    body { padding: var(--space-sm); }
+    .container { max-width: 100%; }
+    .card-header { padding: var(--space-sm) var(--space-md); }
+    .card-header h2 { font-size: 1rem; }
+    .card-content { padding: 0 var(--space-md) var(--space-md) var(--space-md); }
+    h1 { font-size: 1.4rem; }
+    pre, .messages { max-width: 100%; overflow-x: auto; }
+    .message { padding: 8px; }
+    .message-actions { flex-direction: column; }
+    .message-actions button { width: 100%; }
+    .button-group { flex-direction: column; }
+    .button-group button { width: 100%; }
+}
