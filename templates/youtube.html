@@ -12,17 +12,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes">
     <title>YouTube через Ансамбль — прокси и поиск</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='10' y='65' font-family='monospace' font-size='50' fill='%2300ffcc'%3E0.8%3C/text%3E%3C/svg%3E">
-    <link rel="stylesheet" href="{{ cdn_for('static', filename='css/' + theme) }}">
-    <link rel="stylesheet" href="{{ cdn_for('static', filename='css/visuals.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/' + theme) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/visuals.css') }}">
 </head>
 <body>
 <script>
     (async function() {
-        try {
-            const resp = await fetch('/api/check_auth');
-            const data = await resp.json();
-            if (!data.authenticated) window.location.href = '/auth/login';
-        } catch (e) { window.location.href = '/auth/login'; }
+        try { const resp = await fetch('/api/check_auth'); const data = await resp.json(); if (!data.authenticated) window.location.href = '/auth/login'; }
+        catch (e) { window.location.href = '/auth/login'; }
     })();
 </script>
 <div class="container">
@@ -40,10 +37,9 @@
 </div>
 <script>
 async function toggleThemeManually() {
-    const currentLink = document.querySelector('link[rel="stylesheet"][href*="/static/css/"]');
-    const isDark = currentLink.href.includes('dark.css');
-    const newTheme = isDark ? 'macos.css' : 'dark.css';
-    try { await fetch('/api/set_theme', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: newTheme }) }); currentLink.href = `/static/css/${newTheme}`; localStorage.setItem('web_theme', newTheme); } catch (e) { console.error('Ошибка сохранения темы:', e); }
+    const currentLink = document.querySelector('link[rel="stylesheet"][href*="/static/css/"]'); const isDark = currentLink.href.includes('dark.css'); const newTheme = isDark ? 'macos.css' : 'dark.css';
+    try { await fetch('/api/set_theme', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: newTheme }) }); currentLink.href = `/static/css/${newTheme}`; localStorage.setItem('web_theme', newTheme); }
+    catch (e) { console.error('Ошибка сохранения темы:', e); }
 }
 document.addEventListener('DOMContentLoaded', () => {
     const savedTheme = localStorage.getItem('web_theme');
@@ -53,11 +49,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 async function logToDebug(level, message) { try { await fetch('/api/debug/log', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({level: level, module: 'YOUTUBE_PAGE', message: message}) }); } catch(e) { console.log('Лог не отправлен:', e); } }
 async function searchVideos() {
-    const query = document.getElementById('search-query').value.trim();
-    if (!query) { logToDebug('WARNING', 'Пустой поисковый запрос'); return; }
-    const catalogDiv = document.getElementById('catalog');
-    catalogDiv.innerHTML = '<div class="status-loading" style="color: var(--accent); text-align: center; padding: 2rem;">⏳ Поиск...</div>';
-    logToDebug('INFO', `Поиск: ${query}`);
+    const query = document.getElementById('search-query').value.trim(); if (!query) { logToDebug('WARNING', 'Пустой поисковый запрос'); return; }
+    const catalogDiv = document.getElementById('catalog'); catalogDiv.innerHTML = '<div class="status-loading" style="color: var(--accent); text-align: center; padding: 2rem;">⏳ Поиск...</div>'; logToDebug('INFO', `Поиск: ${query}`);
     try {
         const resp = await fetch(`/youtube_search?q=${encodeURIComponent(query)}`); const data = await resp.json();
         if (data.error) { catalogDiv.innerHTML = `<div class="status-error" style="color: var(--error); text-align: center; padding: 2rem;">❌ ${escapeHtml(data.error)}</div>`; logToDebug('ERROR', `Ошибка поиска: ${data.error}`); return; }
@@ -67,9 +60,7 @@ async function searchVideos() {
     } catch(e) { catalogDiv.innerHTML = '<div class="status-error" style="color: var(--error); text-align: center; padding: 2rem;">❌ Ошибка поиска</div>'; logToDebug('ERROR', `Исключение при поиске: ${e.message}`); }
 }
 async function loadVideo(videoUrl, videoTitle) {
-    const container = document.getElementById('player-container');
-    container.innerHTML = '<div class="status-loading" style="color: var(--accent); text-align: center; padding: 2rem;">⏳ Загрузка видео...</div>';
-    logToDebug('INFO', `Загрузка видео: ${videoTitle || videoUrl}`);
+    const container = document.getElementById('player-container'); container.innerHTML = '<div class="status-loading" style="color: var(--accent); text-align: center; padding: 2rem;">⏳ Загрузка видео...</div>'; logToDebug('INFO', `Загрузка видео: ${videoTitle || videoUrl}`);
     try {
         const resp = await fetch('/youtube_info', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url: videoUrl}) }); const data = await resp.json();
         if (data.error) { container.innerHTML = `<div class="status-error" style="color: var(--error); text-align: center; padding: 2rem;">❌ ${escapeHtml(data.error)}</div>`; logToDebug('ERROR', `Ошибка загрузки видео: ${data.error}`); return; }
