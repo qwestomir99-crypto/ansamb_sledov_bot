@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, VK OAuth + авто-рефреш
-# Комментарий: порт берётся строго из переменной PORT (без хардкода), добавлен /health
+# Комментарий: порт 10000 по умолчанию (Bothost)
 # ==========================================
 
 import os
@@ -143,5 +143,5 @@ def vk_auth_link():
 start_background_thread()
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT"))
+    port = int(os.environ.get("PORT", 10000))
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
