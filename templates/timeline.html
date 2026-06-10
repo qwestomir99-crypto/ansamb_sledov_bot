@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes">
     <title>Таймлайн — Ансамбль Следов 6</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='10' y='65' font-family='monospace' font-size='50' fill='%2300ffcc'%3E0.8%3C/text%3E%3C/svg%3E">
-    <link rel="stylesheet" href="{{ cdn_for('static', filename='css/' + theme) }}">
-    <link rel="stylesheet" href="{{ cdn_for('static', filename='css/visuals.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/' + theme) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/visuals.css') }}">
 </head>
 <body>
 
@@ -78,7 +78,7 @@ async function toggleThemeManually() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ theme: newTheme })
         });
-        currentLink.href = `{{ cdn_for('static', filename='css/' + newTheme) }}`;
+        currentLink.href = `/static/css/${newTheme}`;
         localStorage.setItem('web_theme', newTheme);
     } catch (e) {
         console.error('Ошибка сохранения темы:', e);
@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (savedTheme) {
         const currentLink = document.querySelector('link[rel="stylesheet"][href*="/static/css/"]');
         if (currentLink && !currentLink.href.includes(savedTheme)) {
-            currentLink.href = `{{ cdn_for('static', filename='css/' + savedTheme) }}`;
+            currentLink.href = `/static/css/${savedTheme}`;
         }
     }
 });
