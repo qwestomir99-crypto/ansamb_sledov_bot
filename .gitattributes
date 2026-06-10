@@ -1,0 +1,12 @@
+# Явно указываем кодировку UTF-8 для всех файлов
+* text=auto
+
+# Для JSON и TXT — строго UTF-8
+*.json text working-tree-encoding=UTF-8
+*.txt text working-tree-encoding=UTF-8
+
+# Для Python — строго UTF-8
+*.py text working-tree-encoding=UTF-8
+
+# Для Markdown — UTF-8
+*.md text working-tree-encoding=UTF-8
