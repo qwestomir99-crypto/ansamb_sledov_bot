@@ -2,7 +2,7 @@
 # Файл: bot/core.py
 # Справка: README.md → Бот / Ядро
 # Задача: глобальные обработчики, конфиг, токены
-# Комментарий: конфиг теперь загружается из PostgreSQL, с fallback на файл
+# Комментарий: ищет config.json в /app/shared/, PostgreSQL и файлах
 # ==========================================
 
 import sys
@@ -31,9 +31,22 @@ sys.excepthook = global_exception_handler
 threading.excepthook = thread_exception_handler
 
 def load_config():
-    """Загружает конфиг: сначала из PostgreSQL, потом из файла"""
+    """Загружает config.json: сначала /app/shared/, потом PostgreSQL, потом файлы"""
     
-    # === Попытка 1: PostgreSQL ===
+    # Путь к общим файлам
+    shared_path = '/app/shared/config.json'
+    
+    # === Попытка 1: Общие файлы Bothost ===
+    if os.path.exists(shared_path):
+        try:
+            with open(shared_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                print(f"✅ config.json загружен из {shared_path}")
+                return config
+        except json.JSONDecodeError as e:
+            print(f"❌ Ошибка JSON в {shared_path}: {e}")
+    
+    # === Попытка 2: PostgreSQL ===
     try:
         from services.sqlite_client import load_config_from_db
         config = load_config_from_db()
@@ -43,7 +56,7 @@ def load_config():
     except Exception as e:
         print(f"[CONFIG] PostgreSQL недоступен: {e}")
     
-    # === Попытка 2: файлы (старый способ) ===
+    # === Попытка 3: Файлы ===
     path1 = '/app/dialogue/data/config.json'
     path2 = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'dialogue', 'data', 'config.json')
     path3 = 'dialogue/data/config.json'
@@ -53,15 +66,16 @@ def load_config():
             try:
                 with open(path, 'r', encoding='utf-8') as f:
                     config = json.load(f)
-                    print(f"✅ config.json загружен из файла: {path}")
+                    print(f"✅ config.json загружен из {path}")
                     return config
             except json.JSONDecodeError as e:
-                print(f"❌ Ошибка в JSON ({path}): {e}")
+                print(f"❌ Ошибка JSON ({path}): {e}")
                 raise ValueError(f"Ошибка в формате config.json ({path}): {e}")
     
     raise FileNotFoundError(
         f"❌ Не найден config.json!\n"
         f"Проверенные пути:\n"
+        f"  - {shared_path}\n"
         f"  - PostgreSQL\n"
         f"  - {path1}\n"
         f"  - {path2}\n"
