@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, VK OAuth + авто-рефреш
-# Комментарий: порт берётся из переменной PORT для совместимости с Bothost
+# Комментарий: добавлен Flask-CDN для правильной раздачи статики
 # ==========================================
 
 import os
@@ -14,11 +14,12 @@ import json as json_module
 import time as time_module
 from flask import Flask, request as flask_request, session, redirect, url_for, jsonify, render_template
 from flask_socketio import SocketIO
+from flask_cdn import CDN
 from debug_utils import debug_log
 import requests as req
 
 # === ИСПРАВЛЕНИЕ: корень проекта для Bothost ===
-PROJECT_ROOT = '/usr/src/app'
+PROJECT_ROOT = '/app'
 sys.path.insert(0, PROJECT_ROOT)
 
 # Диагностика путей
@@ -45,6 +46,13 @@ from services.error_handlers import register_error_handlers
 app = Flask(__name__, 
             template_folder=os.path.join(PROJECT_ROOT, 'templates'), 
             static_folder=os.path.join(PROJECT_ROOT, 'static'))
+
+# === НАСТРОЙКА CDN ДЛЯ СТАТИКИ ===
+app.config['CDN_DOMAIN'] = 'https://ansambl-sledov-8.bothost.tech'
+app.config['CDN_HTTPS'] = True
+app.config['CDN_STATIC_FOLDER'] = 'static'
+CDN(app)
+# =================================
 
 app.config['SECRET_KEY'] = os.environ.get("FLASK_SECRET_KEY", os.urandom(24))
 app.config['SESSION_COOKIE_HTTPONLY'] = True
