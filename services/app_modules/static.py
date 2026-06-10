@@ -2,7 +2,7 @@
 # Файл: services/app_modules/static.py
 # Справка: README.md → Веб-морда / Статика
 # Задача: раздача статических файлов
-# Комментарий: ИСПРАВЛЕН путь к папке static (АБСОЛЮТНЫЙ ПУТЬ на Render) + ДИАГНОСТИКА
+# Комментарий: путь к статике теперь /usr/src/app/static (Bothost) или из переменной STATIC_DIR
 # Зависит от: flask
 # Вызывается из: app_modules/__init__.py
 # ==========================================
@@ -12,8 +12,8 @@ import os
 
 static_bp = Blueprint('static', __name__)
 
-# Абсолютный путь к папке static на Render
-STATIC_DIR = '/opt/render/project/src/static'
+# Путь к папке static (для Bothost /usr/src/app/static, можно переопределить через STATIC_DIR)
+STATIC_DIR = os.environ.get("STATIC_DIR", "/usr/src/app/static")
 
 # Диагностика: печатаем путь в логи
 print(f"=== ДИАГНОСТИКА STATIC ===")
@@ -32,7 +32,7 @@ print(f"==========================")
 @static_bp.route('/<path:filename>')
 def serve_static(filename):
     """
-    Раздача статических файлов из папки services/static/
+    Раздача статических файлов из папки static/
     Используется абсолютный путь для надёжности.
     """
     print(f"Запрос статики: {filename}")
