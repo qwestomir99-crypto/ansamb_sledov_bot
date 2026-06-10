@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, VK OAuth + авто-рефреш
-# Комментарий: добавлен Flask-CDN для правильной раздачи статики
+# Комментарий: flask-cdn убран, статика через url_for
 # ==========================================
 
 import os
@@ -14,7 +14,6 @@ import json as json_module
 import time as time_module
 from flask import Flask, request as flask_request, session, redirect, url_for, jsonify, render_template
 from flask_socketio import SocketIO
-from flask_cdn import CDN
 from debug_utils import debug_log
 import requests as req
 
@@ -46,13 +45,6 @@ from services.error_handlers import register_error_handlers
 app = Flask(__name__, 
             template_folder=os.path.join(PROJECT_ROOT, 'templates'), 
             static_folder=os.path.join(PROJECT_ROOT, 'static'))
-
-# === НАСТРОЙКА CDN ДЛЯ СТАТИКИ ===
-app.config['CDN_DOMAIN'] = 'https://ansambl-sledov-6.bothost.tech'
-app.config['CDN_HTTPS'] = True
-app.config['CDN_STATIC_FOLDER'] = 'static'
-CDN(app)
-# =================================
 
 app.config['SECRET_KEY'] = os.environ.get("FLASK_SECRET_KEY", os.urandom(24))
 app.config['SESSION_COOKIE_HTTPONLY'] = True
