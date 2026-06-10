@@ -1,7 +1,7 @@
 # ==========================================
 # Файл: services/agent.py
 # Задача: агент для обработки #говори через Yandex GPT
-# Комментарий: теперь blueprint
+# Комментарий: исправлен keep_alive (URL из переменной окружения)
 # ==========================================
 
 import os
@@ -13,10 +13,6 @@ from flask import Blueprint, request, jsonify
 from datetime import datetime
 
 agent_bp = Blueprint('agent', __name__)
-
-# ==========================================
-# НАСТРОЙКА ЛОГИРОВАНИЯ
-# ==========================================
 
 LOG_DIR = "logs"
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -31,10 +27,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("yandex_gpt_agent")
 
-# ==========================================
-# КОНФИГУРАЦИЯ YANDEX GPT
-# ==========================================
-
 API_KEY = os.environ.get("YC_API_KEY")
 FOLDER_ID = os.environ.get("YC_FOLDER_ID")
 YANDEX_GPT_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
@@ -44,10 +36,8 @@ def log_request_details(prompt, headers, payload):
     logger.info("📤 НОВЫЙ ЗАПРОС К YANDEX GPT")
     logger.info(f"🕐 Время: {datetime.now().isoformat()}")
     logger.info(f"📝 Промпт: {prompt[:200]}{'...' if len(prompt) > 200 else ''}")
-    logger.info(f"🔑 API Key: {API_KEY[:10] if API_KEY else 'None'}... (первые 10 символов)")
     logger.info(f"📁 Folder ID: {FOLDER_ID}")
     logger.info(f"🌐 URL: {YANDEX_GPT_URL}")
-    logger.info(f"📦 Payload: {payload}")
     logger.info("=" * 60)
 
 def log_response_details(response):
@@ -68,10 +58,6 @@ def log_error_details(error, response=None):
         logger.error(f"📊 Статус код: {response.status_code}")
         logger.error(f"📄 Тело ответа: {response.text[:500]}")
     logger.error("=" * 60)
-
-# ==========================================
-# ОСНОВНАЯ ЛОГИКА АГЕНТА
-# ==========================================
 
 @agent_bp.route('/ask', methods=['POST'])
 def ask():
@@ -105,29 +91,20 @@ def ask():
         }
         
         log_request_details(prompt, headers, payload)
-        
         response = requests.post(YANDEX_GPT_URL, headers=headers, json=payload, timeout=30)
         log_response_details(response)
-        
         response.raise_for_status()
-        
         result = response.json()
         answer = result['result']['alternatives'][0]['message']['text']
-        
         logger.info(f"✅ Успешный ответ: {answer[:100]}...")
-        
         return jsonify({"answer": answer})
     
     except requests.exceptions.RequestException as e:
         log_error_details(e, e.response if hasattr(e, 'response') else None)
         return jsonify({"error": f"Request failed: {str(e)}"}), 500
-    
     except KeyError as e:
         logger.error(f"❌ Ошибка парсинга JSON: отсутствует ключ {e}")
-        if 'response' in locals():
-            logger.error(f"📄 Содержимое ответа: {response.text}")
         return jsonify({"error": f"Parse error: {str(e)}"}), 500
-    
     except Exception as e:
         log_error_details(e)
         return jsonify({"error": f"Internal error: {str(e)}"}), 500
@@ -148,7 +125,6 @@ def get_logs():
     secret = request.args.get('secret')
     if secret != os.environ.get("LOGS_SECRET", "tleem2026"):
         return jsonify({"error": "Forbidden"}), 403
-    
     try:
         with open(os.path.join(LOG_DIR, "agent.log"), "r", encoding='utf-8') as f:
             logs = f.read()
@@ -161,14 +137,15 @@ def get_logs():
 # ==========================================
 
 def keep_alive():
-    """Пинг самого себя каждую минуту, чтобы не засыпать на Render"""
+    """Пинг самого себя каждую минуту, чтобы не засыпать"""
+    port = os.environ.get("PORT", "10000")
+    url = f"http://127.0.0.1:{port}/agent/health"
     while True:
         time.sleep(60)
         try:
-            requests.get('http://127.0.0.1:10000/agent/health', timeout=5)
+            requests.get(url, timeout=5)
             logger.debug("AGENT: Внутренний пинг успешен")
         except Exception as e:
             logger.debug(f"AGENT: Ошибка пинга: {e}")
 
-# Запускаем поток с пингом
 threading.Thread(target=keep_alive, daemon=True).start()
