@@ -3,67 +3,87 @@
 Файл: templates/admin.html
 Справка: README.md → Веб-морда / Админ-панель
 Задача: главная страница веб-морды Ансамбля
+Комментарий: обновлён на Pico CSS (современный адаптивный дизайн)
 ==========================================
 -->
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes">
     <title>Ансамбль Следов 6 — веб-морда</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='10' y='65' font-family='monospace' font-size='50' fill='%2300ffcc'%3E0.8%3C/text%3E%3C/svg%3E">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/' + theme) }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/visuals.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <style>
+        /* Ансамбль — кастомные штрихи поверх Pico */
+        :root { --pico-primary: #9b59b6; --pico-primary-hover: #b37bcd; }
+        .card { margin: 1rem 0; padding: 0; }
+        .card-header { cursor: pointer; user-select: none; padding: 0.5rem 0; display: flex; justify-content: space-between; align-items: center; }
+        .card-header h2 { margin: 0; font-size: 1.2rem; }
+        .toggle-icon { font-size: 0.9rem; transition: transform 0.3s ease; opacity: 0.6; }
+        .card.collapsed .card-content { display: none; }
+        .card.collapsed .toggle-icon { transform: rotate(-90deg); }
+        .dropdown { position: relative; }
+        .dropdown-menu { position: absolute; top: 100%; left: 0; z-index: 100; background: var(--pico-card-background); border: 1px solid var(--pico-card-border); border-radius: 8px; padding: 0.25rem; min-width: 200px; opacity: 0; visibility: hidden; transform: translateY(-5px); transition: all 0.2s; }
+        .dropdown.open .dropdown-menu { opacity: 1; visibility: visible; transform: translateY(0); }
+        .dropdown-menu button { display: block; width: 100%; text-align: left; margin: 0.1rem 0; }
+        .footer-links { margin-top: 2rem; text-align: center; font-size: 0.8rem; opacity: 0.7; display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; }
+        .footer-links a { color: var(--pico-muted-color); }
+        @media (max-width: 768px) { .dropdown-menu { position: static; } }
+    </style>
 </head>
 <body>
-<script>
-    (async function() {
-        try {
-            const resp = await fetch('/api/check_auth');
-            const data = await resp.json();
-            if (!data.authenticated) window.location.href = '/auth/login';
-        } catch (e) { window.location.href = '/auth/login'; }
-    })();
-</script>
-<div class="container">
+<main class="container">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <h1>🔥 Ансамбль Следов 6</h1>
         <div style="display: flex; gap: 10px;">
-            <button onclick="toggleThemeManually()" style="margin-right: 10px;">🌓 Сменить тему</button>
-            <form method="post" action="/logout" style="display: inline;"><button type="submit" style="background: transparent; border: 1px solid var(--border);">🚪 Выйти</button></form>
+            <button onclick="toggleThemeManually()">🌓 Тема</button>
+            <form method="post" action="/logout" style="display: inline;"><button type="submit" class="secondary">🚪 Выйти</button></form>
         </div>
     </div>
     <p>Ритм 0,8 Гц. Управление ботом из браузера. Время: {{ time }}</p>
-    <div class="card"><div class="card-header"><h2>✍️ Создать</h2><span class="toggle-icon">▼</span></div><div class="card-content"><div class="dropdown" id="create-dropdown"><button class="dropdown-trigger" onclick="toggleDropdown('create-dropdown')">📝 Создать пост ▼</button><div class="dropdown-menu"><button onclick="createPost('telegram')">📱 Пост в Telegram</button><button onclick="createPost('vk')">📘 Пост в VK</button></div></div></div></div>
-    <div class="card"><div class="card-header"><h2>📨 Входящие сообщения (VK + Telegram)</h2><span class="toggle-icon">▼</span></div><div class="card-content"><div id="messages" class="messages"><div style="color: var(--text-secondary);">Загрузка...</div></div><div id="reply-area" class="hidden" style="margin-top: 1rem;"><textarea id="reply-text" rows="2" cols="50" placeholder="Ваш ответ..." style="width: 100%; margin-bottom: 0.5rem;"></textarea><button onclick="sendReply()">📤 Отправить ответ</button><button onclick="closeReply()" style="background: transparent; border: 1px solid var(--border);">❌ Отмена</button></div><div id="comment-area" class="hidden" style="margin-top: 1rem;"><textarea id="comment-text" rows="2" cols="50" placeholder="Ваш комментарий..." style="width: 100%; margin-bottom: 0.5rem;"></textarea><button onclick="sendComment()">✏️ Отправить комментарий</button><button onclick="closeComment()" style="background: transparent; border: 1px solid var(--border);">❌ Отмена</button></div></div></div>
-    <div class="card"><div class="card-header"><h2>⚙️ Управление ботом</h2><span class="toggle-icon">▼</span></div><div class="card-content"><div class="dropdown" id="mode-dropdown"><button class="dropdown-trigger" onclick="toggleDropdown('mode-dropdown')">🎮 Режимы ▼</button><div class="dropdown-menu"><button onclick="setMode('утро')">🌅 Утро</button><button onclick="setMode('день')">☀️ День</button><button onclick="setMode('вечер')">🌙 Вечер</button><button onclick="setMode('ночь')">🌌 Ночь</button></div></div><div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;"><button onclick="togglePing()">🔄 Пинг</button><button onclick="toggleAlice()">Старший брат</button></div><div style="margin-top: 0.5rem;">Текущий режим: <span id="current-mode" class="status-badge">день</span></div></div></div>
-    <div class="card"><div class="card-header"><h2>🎭 Настроение агента</h2><span class="toggle-icon">▼</span></div><div class="card-content"><div class="dropdown" id="mood-dropdown"><button class="dropdown-trigger" onclick="toggleDropdown('mood-dropdown')">🎨 Выбрать настроение ▼</button><div class="dropdown-menu"><button onclick="setMood('artist')">🎨 Художник</button><button onclick="setMood('admin')">📋 Администратор</button><button onclick="setMood('poet')">🎭 Поэт</button><button onclick="setMood('engineer')">🔧 Инженер</button></div></div><div style="margin-top: 0.5rem;">Текущее настроение: <span id="current-mood" class="status-badge">художник</span></div></div></div>
-    <div class="card"><div class="card-header"><h2>📜 Управление цитатами</h2><span class="toggle-icon">▼</span></div><div class="card-content"><textarea id="new-quote" rows="2" cols="50" placeholder="Текст новой цитаты..." style="width: 100%;"></textarea><button onclick="addQuote()">➕ Добавить цитату</button><details style="margin-top: 1rem;"><summary>📖 Последние 10 цитат</summary><ul id="quotes-list">{% for q in quotes %}<li>{{ q[:100] }}{% if q|length > 100 %}...{% endif %}</li>{% else %}<li>Нет цитат</li>{% endfor %}</ul></details></div></div>
-    <div class="card"><div class="card-header"><h2>🎬 Пост в VK (текст)</h2><span class="toggle-icon">▼</span></div><div class="card-content"><textarea id="post-text" rows="3" cols="50" placeholder="Текст поста..."></textarea><br><button onclick="sendPost()">Отправить</button><span id="post-status" style="margin-left: 10px;"></span></div></div>
-    <div class="card"><div class="card-header"><h2>🐛 Дебаггер</h2><span class="toggle-icon">▼</span></div><div class="card-content"><div class="dropdown" id="debug-dropdown"><button class="dropdown-trigger" onclick="toggleDropdown('debug-dropdown')">🐛 Действия ▼</button><div class="dropdown-menu"><button onclick="fetchDebugLogs()">📋 Показать логи</button><button onclick="sendDebugReport()">📨 Отправить отчёт в Telegram</button><button onclick="runAudit()">🔍 Запустить аудит</button><button onclick="showAuditStatus()">📊 Статус аудита</button><button onclick="showDebugIndex()">🗂️ Показать индекс</button></div></div><div id="debug-report" style="margin-top: 1rem;"></div><div id="audit-result" style="margin-top: 1rem;"></div><div id="index-result" style="margin-top: 1rem;"></div></div></div>
-    <div class="card"><div class="card-header"><h2>🎬 Загрузить на YouTube</h2><span class="toggle-icon">▼</span></div><div class="card-content"><button onclick="uploadToYouTube()">📤 Загрузить видео</button><div id="youtube-upload-status"></div></div></div>
-    <div class="card"><div class="card-header"><h2>📝 Черновики</h2><span class="toggle-icon">▼</span></div><div class="card-content"><div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;"><input type="text" id="draft-title" placeholder="Заголовок черновика" style="flex: 1;"><textarea id="draft-content" rows="3" placeholder="Содержание черновика" style="flex: 2;"></textarea><input type="hidden" id="draft-id" value=""><button onclick="saveDraft()">💾 Сохранить</button></div><div id="drafts-list"></div></div></div>
-    <div class="card" id="mail-panel"><div class="card-header"><h2>📧 Почта</h2><span class="toggle-icon">▼</span></div><div class="card-content"><div id="mail-inbox"></div><hr><div><input type="email" id="mail-to" placeholder="Кому" style="width: 100%; margin-bottom: 5px;"><input type="text" id="mail-subject" placeholder="Тема" style="width: 100%; margin-bottom: 5px;"><textarea id="mail-body" rows="3" placeholder="Сообщение" style="width: 100%; margin-bottom: 5px;"></textarea><button onclick="sendMail()">📤 Отправить</button></div></div></div>
-    <div class="card"><div class="card-header"><h2>🗣 Диалог с агентом</h2><span class="toggle-icon">▼</span></div><div class="card-content"><div id="chat-history" style="max-height: 300px; overflow-y: auto; margin-bottom: 10px;"></div><div style="display: flex; flex-wrap: wrap; gap: 10px;"><textarea id="chat-input" rows="2" placeholder="Напишите агенту..." style="flex: 1;"></textarea><button onclick="sendToAgent()">Отправить</button></div></div></div>
-    <div class="footer-links"><a href="/timeline">📅 Таймлайн Ансамбля</a><a href="/youtube">🎬 YouTube без VPN</a><a href="/logs/admin">📋 admin.log</a><a href="/logs/error">❌ error.log</a></div>
-</div>
+
+    <div class="card"><div class="card-header"><h2>✍️ Создать</h2><span class="toggle-icon">▼</span></div><div class="card-content"><div class="dropdown" id="create-dropdown"><button onclick="toggleDropdown('create-dropdown')">📝 Создать пост ▼</button><div class="dropdown-menu"><button onclick="createPost('telegram')">📱 Пост в Telegram</button><button onclick="createPost('vk')">📘 Пост в VK</button></div></div></div></div>
+
+    <div class="card"><div class="card-header"><h2>📨 Входящие сообщения</h2><span class="toggle-icon">▼</span></div><div class="card-content"><div id="messages">Загрузка...</div><div id="reply-area" class="hidden" style="margin-top: 1rem;"><textarea id="reply-text" placeholder="Ваш ответ..."></textarea><button onclick="sendReply()">📤 Отправить</button><button onclick="closeReply()" class="secondary">❌ Отмена</button></div></div></div>
+
+    <div class="card"><div class="card-header"><h2>⚙️ Управление ботом</h2><span class="toggle-icon">▼</span></div><div class="card-content"><div class="dropdown" id="mode-dropdown"><button onclick="toggleDropdown('mode-dropdown')">🎮 Режимы ▼</button><div class="dropdown-menu"><button onclick="setMode('утро')">🌅 Утро</button><button onclick="setMode('день')">☀️ День</button><button onclick="setMode('вечер')">🌙 Вечер</button><button onclick="setMode('ночь')">🌌 Ночь</button></div></div><div style="display: flex; gap: 10px; margin-top: 10px;"><button onclick="togglePing()">🔄 Пинг</button><button onclick="toggleAlice()">Старший брат</button></div></div></div>
+
+    <div class="card"><div class="card-header"><h2>🎭 Настроение агента</h2><span class="toggle-icon">▼</span></div><div class="card-content"><div class="dropdown" id="mood-dropdown"><button onclick="toggleDropdown('mood-dropdown')">🎨 Настроение ▼</button><div class="dropdown-menu"><button onclick="setMood('artist')">🎨 Художник</button><button onclick="setMood('admin')">📋 Администратор</button><button onclick="setMood('poet')">🎭 Поэт</button><button onclick="setMood('engineer')">🔧 Инженер</button></div></div></div></div>
+
+    <div class="card"><div class="card-header"><h2>📜 Цитаты</h2><span class="toggle-icon">▼</span></div><div class="card-content"><textarea id="new-quote" placeholder="Текст новой цитаты..."></textarea><button onclick="addQuote()">➕ Добавить</button><details style="margin-top: 1rem;"><summary>📖 Последние 10</summary><ul>{% for q in quotes %}<li>{{ q[:100] }}{% if q|length > 100 %}...{% endif %}</li>{% else %}<li>Нет цитат</li>{% endfor %}</ul></details></div></div>
+
+    <div class="card"><div class="card-header"><h2>🎬 Пост в VK</h2><span class="toggle-icon">▼</span></div><div class="card-content"><textarea id="post-text" placeholder="Текст поста..."></textarea><button onclick="sendPost()">Отправить</button></div></div>
+
+    <div class="card"><div class="card-header"><h2>🐛 Дебаггер</h2><span class="toggle-icon">▼</span></div><div class="card-content"><div class="dropdown" id="debug-dropdown"><button onclick="toggleDropdown('debug-dropdown')">🐛 Действия ▼</button><div class="dropdown-menu"><button onclick="fetchDebugLogs()">📋 Логи</button><button onclick="sendDebugReport()">📨 Отчёт в TG</button><button onclick="runAudit()">🔍 Аудит</button><button onclick="showAuditStatus()">📊 Статус</button><button onclick="showDebugIndex()">🗂️ Индекс</button></div></div></div></div>
+
+    <div class="card"><div class="card-header"><h2>📝 Черновики</h2><span class="toggle-icon">▼</span></div><div class="card-content"><input type="text" id="draft-title" placeholder="Заголовок"><textarea id="draft-content" placeholder="Содержание"></textarea><button onclick="saveDraft()">💾 Сохранить</button><div id="drafts-list"></div></div></div>
+
+    <div class="card" id="mail-panel"><div class="card-header"><h2>📧 Почта</h2><span class="toggle-icon">▼</span></div><div class="card-content"><input type="email" id="mail-to" placeholder="Кому"><input type="text" id="mail-subject" placeholder="Тема"><textarea id="mail-body" placeholder="Сообщение"></textarea><button onclick="sendMail()">📤 Отправить</button></div></div>
+
+    <div class="card"><div class="card-header"><h2>🗣 Диалог с агентом</h2><span class="toggle-icon">▼</span></div><div class="card-content"><div id="chat-history" style="max-height: 300px; overflow-y: auto;"></div><textarea id="chat-input" placeholder="Напишите агенту..."></textarea><button onclick="sendToAgent()">Отправить</button></div></div>
+
+    <div class="footer-links"><a href="/timeline">📅 Таймлайн</a><a href="/youtube">🎬 YouTube</a><a href="/logs/admin">📋 admin.log</a><a href="/logs/error">❌ error.log</a></div>
+</main>
+
 <script>
 async function toggleThemeManually() {
-    const currentLink = document.querySelector('link[rel="stylesheet"][href*="/static/css/"]');
-    const isDark = currentLink.href.includes('dark.css');
-    const newTheme = isDark ? 'macos.css' : 'dark.css';
-    try { await fetch('/api/set_theme', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: newTheme }) }); currentLink.href = `/static/css/${newTheme}`; localStorage.setItem('web_theme', newTheme); } catch (e) { console.error('Ошибка сохранения темы:', e); }
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('web_theme', next);
+    try { await fetch('/api/set_theme', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: next === 'dark' ? 'dark.css' : 'macos.css' }) }); } catch(e) {}
 }
 document.addEventListener('DOMContentLoaded', () => {
-    const savedTheme = localStorage.getItem('web_theme');
-    if (savedTheme) { const currentLink = document.querySelector('link[rel="stylesheet"][href*="/static/css/"]'); if (currentLink && !currentLink.href.includes(savedTheme)) currentLink.href = `/static/css/${savedTheme}`; }
+    const saved = localStorage.getItem('web_theme');
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
     initAccordions();
 });
 function initAccordions() { document.querySelectorAll('.card').forEach(card => { const header = card.querySelector('.card-header'); if (!header) return; header.addEventListener('click', (e) => { if (e.target.tagName === 'BUTTON') return; card.classList.toggle('collapsed'); }); }); }
-function toggleDropdown(dropdownId) { const dropdown = document.getElementById(dropdownId); if (!dropdown) return; if (dropdown.classList.contains('open')) { dropdown.classList.remove('open'); return; } document.querySelectorAll('.dropdown.open').forEach(other => other.classList.remove('open')); dropdown.classList.add('open'); }
-document.addEventListener('click', (e) => { if (!e.target.closest('.dropdown')) document.querySelectorAll('.dropdown.open').forEach(dropdown => dropdown.classList.remove('open')); });
+function toggleDropdown(id) { const dd = document.getElementById(id); if (!dd) return; dd.classList.toggle('open'); }
+document.addEventListener('click', (e) => { if (!e.target.closest('.dropdown')) document.querySelectorAll('.dropdown.open').forEach(d => d.classList.remove('open')); });
 </script>
 <script type="module">
     import { createPost, sendPost } from '/static/js/posts.js';
