@@ -9,18 +9,11 @@ import os
 import sys
 import threading
 
-# ==========================================
-# ДИАГНОСТИКА: поиск старого config.json
-# ==========================================
 print("=== ПОИСК ФАЙЛОВ С config.json ===")
 for root, dirs, files in os.walk('.'):
-    if '.venv' in dirs:
-        dirs.remove('.venv')
-    if 'env' in dirs:
-        dirs.remove('env')
-    if '__pycache__' in dirs:
-        dirs.remove('__pycache__')
-    
+    if '.venv' in dirs: dirs.remove('.venv')
+    if 'env' in dirs: dirs.remove('env')
+    if '__pycache__' in dirs: dirs.remove('__pycache__')
     for file in files:
         if file.endswith('.py'):
             path = os.path.join(root, file)
@@ -32,7 +25,6 @@ for root, dirs, files in os.walk('.'):
             except Exception as e:
                 print(f"  Ошибка чтения {path}: {e}")
 print("=== КОНЕЦ ПОИСКА ===")
-# ==========================================
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
