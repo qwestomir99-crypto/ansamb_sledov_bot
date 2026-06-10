@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, VK OAuth + авто-рефреш
-# Комментарий: flask-cdn убран, статика через url_for
+# Комментарий: порт берётся из переменной PORT для совместимости с Bothost
 # ==========================================
 
 import os
@@ -18,7 +18,7 @@ from debug_utils import debug_log
 import requests as req
 
 # === ИСПРАВЛЕНИЕ: корень проекта для Bothost ===
-PROJECT_ROOT = '/app'
+PROJECT_ROOT = '/usr/src/app'
 sys.path.insert(0, PROJECT_ROOT)
 
 # Диагностика путей
@@ -168,7 +168,7 @@ def vk_callback():
     
     client_id = os.environ.get("VK_APP_ID")
     client_secret = os.environ.get("VK_APP_SECRET")
-    redirect_uri = "https://ansamb-sledov-6.bothost.tech/api/vk/callback"
+    redirect_uri = "https://ansambl-sledov-8.bothost.tech/api/vk/callback"
     
     try:
         with open("/tmp/vk_code_verifier.txt", "r") as f:
@@ -211,7 +211,7 @@ def vk_auth_link():
     code_challenge = base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest()).rstrip(b'=').decode()
     state = secrets.token_urlsafe(16)
     client_id = os.environ.get("VK_APP_ID")
-    redirect_uri = "https://ansamb-sledov-6.bothost.tech/api/vk/callback"
+    redirect_uri = "https://ansambl-sledov-8.bothost.tech/api/vk/callback"
     
     os.makedirs("/tmp", exist_ok=True)
     with open("/tmp/vk_code_verifier.txt", "w") as f:
