@@ -2,7 +2,7 @@
 # Файл: bot.py
 # Справка: README.md → Бот / Точка входа
 # Задача: запуск бота, веб-морды и пингеров
-# Комментарий: порт 10000, веб-морда в фоне, бот в основном потоке
+# Комментарий: порт строго из переменной PORT (без хардкода)
 # ==========================================
 
 import os
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"[BOT] Ошибка запуска пингеров: {e}")
     
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT"))
     threading.Thread(target=app.run, args=('0.0.0.0', port), daemon=True).start()
     
     from bot.main import main
