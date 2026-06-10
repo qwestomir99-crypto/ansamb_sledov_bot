@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, VK OAuth + авто-рефреш
-# Комментарий: порт 10000 по умолчанию (Bothost)
+# Комментарий: порт 10000 по умолчанию, добавлен web_server Blueprint
 # ==========================================
 
 import os
@@ -30,6 +30,7 @@ from services.web_api import web_api
 from services.analytics_api import analytics_api
 from services.agent import agent_bp
 from services.error_handlers import register_error_handlers
+from services.web_server import web_server_bp
 
 app = Flask(__name__, 
             template_folder=os.path.join(PROJECT_ROOT, 'templates'), 
@@ -67,6 +68,7 @@ app.register_blueprint(background_bp, url_prefix='/bg')
 app.register_blueprint(web_api, url_prefix='/api')
 app.register_blueprint(analytics_api, url_prefix='/api/analytics')
 app.register_blueprint(agent_bp, url_prefix='/agent')
+app.register_blueprint(web_server_bp)
 
 register_error_handlers(app)
 
