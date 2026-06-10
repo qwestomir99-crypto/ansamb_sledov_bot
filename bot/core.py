@@ -2,7 +2,7 @@
 # Файл: bot/core.py
 # Справка: README.md → Бот / Ядро
 # Задача: глобальные обработчики, конфиг, токены
-# Комментарий: исправлен умный поиск config.json с диагностикой
+# Комментарий: конфиг теперь загружается из PostgreSQL, с fallback на файл
 # ==========================================
 
 import sys
@@ -31,44 +31,38 @@ sys.excepthook = global_exception_handler
 threading.excepthook = thread_exception_handler
 
 def load_config():
-    """Умная загрузка config.json с диагностикой путей"""
-    import os
-    import json
+    """Загружает конфиг: сначала из PostgreSQL, потом из файла"""
     
-    # Вариант 1: прямой абсолютный путь (Bothost)
+    # === Попытка 1: PostgreSQL ===
+    try:
+        from services.sqlite_client import load_config_from_db
+        config = load_config_from_db()
+        if config:
+            print("✅ config.json загружен из PostgreSQL")
+            return config
+    except Exception as e:
+        print(f"[CONFIG] PostgreSQL недоступен: {e}")
+    
+    # === Попытка 2: файлы (старый способ) ===
     path1 = '/app/dialogue/data/config.json'
-    # Вариант 2: относительный через __file__
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(current_dir)
-    path2 = os.path.join(project_root, 'dialogue', 'data', 'config.json')
-    # Вариант 3: без начального слеша (для экспериментов)
+    path2 = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'dialogue', 'data', 'config.json')
     path3 = 'dialogue/data/config.json'
     
-    print("=== ДИАГНОСТИКА load_config ===")
-    print(f"Вариант 1 (абсолютный): {path1}")
-    print(f"  существует? {os.path.exists(path1)}")
-    print(f"Вариант 2 (через __file__): {path2}")
-    print(f"  существует? {os.path.exists(path2)}")
-    print(f"Вариант 3 (относительный): {path3}")
-    print(f"  существует? {os.path.exists(path3)}")
-    print("================================")
-    
-    # Пробуем открыть первый существующий
     for path in [path1, path2, path3]:
         if os.path.exists(path):
             try:
                 with open(path, 'r', encoding='utf-8') as f:
                     config = json.load(f)
-                    print(f"✅ config.json загружен из: {path}")
+                    print(f"✅ config.json загружен из файла: {path}")
                     return config
             except json.JSONDecodeError as e:
-                print(f"❌ Ошибка в JSON: {e}")
+                print(f"❌ Ошибка в JSON ({path}): {e}")
                 raise ValueError(f"Ошибка в формате config.json ({path}): {e}")
     
-    # Если ни один не подошёл
     raise FileNotFoundError(
         f"❌ Не найден config.json!\n"
         f"Проверенные пути:\n"
+        f"  - PostgreSQL\n"
         f"  - {path1}\n"
         f"  - {path2}\n"
         f"  - {path3}"
@@ -90,9 +84,7 @@ def get_vk_owner_id():
     return os.environ.get("VK_OWNER_ID")
 
 def get_vk_reader_token():
-    """Короткий сервисный ключ группы (71 символ) — для VK Reader"""
     return os.environ.get("VK_READER_TOKEN")
 
 def get_vk_group_id():
-    """ID сообщества VK — для публикации в группу"""
     return os.environ.get("VK_GROUP_ID")
