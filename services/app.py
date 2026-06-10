@@ -2,7 +2,7 @@
 # Файл: services/app.py
 # Справка: README.md → Веб-морда
 # Задача: запуск, подключение модулей, VK OAuth + авто-рефреш
-# Комментарий: flask-cdn убран, статика через url_for
+# Комментарий: flask-cdn убран, статика через url_for, добавлен /health
 # ==========================================
 
 import os
@@ -42,7 +42,7 @@ socketio.init_app(app, cors_allowed_origins="*")
 
 @app.before_request
 def require_auth():
-    public_paths = ['/auth/login', '/auth/check', '/static', '/api/check_auth']
+    public_paths = ['/auth/login', '/auth/check', '/static', '/api/check_auth', '/health']
     for path in public_paths:
         if flask_request.path.startswith(path):
             return None
@@ -54,6 +54,13 @@ def require_auth():
 @app.route('/api/check_auth')
 def check_auth():
     return jsonify({'authenticated': session.get('authenticated', False)})
+
+# ==========================================
+# HEALTH CHECK ДЛЯ BOTHOST
+# ==========================================
+@app.route('/health')
+def health():
+    return jsonify({"status": "ok", "ritm": "0.8 Hz"})
 
 app.register_blueprint(auth_bp, url_prefix='/auth')
 app.register_blueprint(static_bp, url_prefix='/static')
