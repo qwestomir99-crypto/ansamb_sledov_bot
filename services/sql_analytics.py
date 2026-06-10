@@ -1,30 +1,36 @@
 # ==========================================
 # Файл: services/sql_analytics.py
-# Справка: README.md → Аналитика / SQL
-# Задача: сбор аналитики напрямую в SQLite с автоматической очисткой
-# Комментарий: теперь на SQLite, очистка по времени (7 дней)
-# Зависит от: datetime, debug_utils, sqlite3
+# Справка: README.md → Аналитика / PostgreSQL
+# Задача: сбор аналитики напрямую в PostgreSQL с автоматической очисткой
+# Комментарий: переход с SQLite на PostgreSQL
+# Зависит от: datetime, debug_utils, psycopg2
 # Вызывается из: bot.py, web_api/analytics.py, routing_engine.py
 # ==========================================
 
-import sqlite3
 import os
 from datetime import datetime
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from debug_utils import debug_log
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'analytics.db')
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def log_sql(level, message):
     debug_log("SQL_ANALYTICS", message, level)
 
+def get_connection():
+    if not DATABASE_URL:
+        raise Exception("DATABASE_URL не задан")
+    return psycopg2.connect(DATABASE_URL)
+
 def init_analytics_db():
-    """Создаёт таблицу analytics и индекс, если их нет"""
+    """Создаёт таблицу analytics, если её нет"""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_connection()
         c = conn.cursor()
         c.execute('''
             CREATE TABLE IF NOT EXISTS analytics (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 timestamp TEXT,
                 module TEXT,
                 action TEXT,
@@ -42,7 +48,7 @@ def init_analytics_db():
         log_sql("ERROR", f"Ошибка инициализации БД: {e}")
 
 def record_activity(module, action, metadata=None, status="info"):
-    """Записывает активность в SQLite"""
+    """Записывает активность в PostgreSQL"""
     data = {
         "timestamp": datetime.now().isoformat(),
         "module": module,
@@ -51,10 +57,10 @@ def record_activity(module, action, metadata=None, status="info"):
         "metadata": metadata or {}
     }
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_connection()
         c = conn.cursor()
         c.execute(
-            "INSERT INTO analytics (timestamp, module, action, status, metadata) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO analytics (timestamp, module, action, status, metadata) VALUES (%s, %s, %s, %s, %s)",
             (data["timestamp"], data["module"], data["action"], data["status"], str(data["metadata"]))
         )
         conn.commit()
@@ -66,26 +72,24 @@ def record_activity(module, action, metadata=None, status="info"):
 def clean_old_analytics(days=7):
     """Удаляет записи старше days дней"""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_connection()
         c = conn.cursor()
-        c.execute("DELETE FROM analytics WHERE datetime(timestamp) < datetime('now', '-? day')", (days,))
+        c.execute("DELETE FROM analytics WHERE timestamp < NOW() - INTERVAL '%s days'", (days,))
         conn.commit()
         conn.close()
         log_sql("INFO", f"Очищена аналитика старше {days} дней")
     except Exception as e:
         log_sql("ERROR", f"Ошибка очистки аналитики: {e}")
-    return None
 
 def get_routing_context():
     """Возвращает контекст для маршрутизации на основе аналитики"""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_connection()
         c = conn.cursor()
-        c.execute("SELECT COUNT(*) FROM analytics WHERE module = ? AND datetime(timestamp) > datetime('now', '-1 hour')", ("web",))
+        c.execute("SELECT COUNT(*) FROM analytics WHERE module = %s AND timestamp > NOW() - INTERVAL '1 hour'", ("web",))
         activity_count = c.fetchone()[0]
         conn.close()
         
-        # Определяем уровень активности
         if activity_count > 50:
             level = "high"
         elif activity_count > 10:
@@ -105,9 +109,9 @@ def get_routing_context():
 def get_detailed_routing_context():
     """Возвращает расширенный контекст для маршрутизации"""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_connection()
         c = conn.cursor()
-        c.execute("SELECT module, status FROM analytics WHERE datetime(timestamp) > datetime('now', '-1 hour')")
+        c.execute("SELECT module, status FROM analytics WHERE timestamp > NOW() - INTERVAL '1 hour'")
         rows = c.fetchall()
         conn.close()
         
@@ -134,9 +138,9 @@ def get_detailed_routing_context():
 def get_activity_by_hour(hours=24):
     """Возвращает активность по часам"""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_connection()
         c = conn.cursor()
-        c.execute("SELECT timestamp FROM analytics WHERE module = ? AND datetime(timestamp) > datetime('now', '-? hour')", ("web", hours))
+        c.execute("SELECT timestamp FROM analytics WHERE module = %s AND timestamp > NOW() - INTERVAL '%s hours'", ("web", hours))
         rows = c.fetchall()
         conn.close()
         
@@ -152,9 +156,9 @@ def get_activity_by_hour(hours=24):
 def get_top_errors(limit=5):
     """Возвращает топ ошибок"""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_connection()
         c = conn.cursor()
-        c.execute("SELECT module, COUNT(*) FROM analytics WHERE status = ? GROUP BY module ORDER BY COUNT(*) DESC LIMIT ?", ("error", limit))
+        c.execute("SELECT module, COUNT(*) FROM analytics WHERE status = %s GROUP BY module ORDER BY COUNT(*) DESC LIMIT %s", ("error", limit))
         rows = c.fetchall()
         conn.close()
         return rows
