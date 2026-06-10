@@ -1,3 +1,10 @@
+<!--
+==========================================
+Файл: templates/youtube.html
+Справка: README.md → Веб-морда / YouTube-прокси
+Задача: поиск и просмотр YouTube без VPN и рекламы
+==========================================
+-->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -5,28 +12,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes">
     <title>YouTube через Ансамбль — прокси и поиск</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='10' y='65' font-family='monospace' font-size='50' fill='%2300ffcc'%3E0.8%3C/text%3E%3C/svg%3E">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/' + theme) }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/visuals.css') }}">
+    <link rel="stylesheet" href="{{ cdn_for('static', filename='css/' + theme) }}">
+    <link rel="stylesheet" href="{{ cdn_for('static', filename='css/visuals.css') }}">
 </head>
 <body>
-
-<!-- ========================================== -->
-<!-- ЗАЩИТА: проверка авторизации -->
-<!-- ========================================== -->
 <script>
     (async function() {
         try {
             const resp = await fetch('/api/check_auth');
             const data = await resp.json();
-            if (!data.authenticated) {
-                window.location.href = '/auth/login';
-            }
-        } catch (e) {
-            window.location.href = '/auth/login';
-        }
+            if (!data.authenticated) window.location.href = '/auth/login';
+        } catch (e) { window.location.href = '/auth/login'; }
     })();
 </script>
-
 <div class="container">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
         <h1>🎬 YouTube через Ансамбль</h1>
@@ -36,340 +34,68 @@
         </div>
     </div>
     <p>Поиск, каталог, прокси — без VPN и рекламы. Ритм 0,8 Гц.</p>
-    
-    <!-- Поиск -->
-    <div class="card">
-        <div class="card-header">
-            <h2>🔍 Поиск видео</h2>
-            <span class="toggle-icon">▼</span>
-        </div>
-        <div class="card-content">
-            <div class="search-row">
-                <input type="text" id="search-query" placeholder="Поиск: квантовая физика, философия, нейросети, искусство..." 
-                       onkeypress="if(event.key==='Enter') searchVideos()">
-                <button onclick="searchVideos()">🔍 Поиск</button>
-            </div>
-            
-            <div id="catalog" class="video-grid">
-                <div style="color: var(--text-secondary); text-align: center; padding: 2rem;">Введите запрос для поиска.</div>
-            </div>
-            
-            <div id="player-container" class="player-container"></div>
-        </div>
-    </div>
-    
-    <!-- О прокси -->
-    <div class="card">
-        <div class="card-header">
-            <h2>📜 О прокси</h2>
-            <span class="toggle-icon">▼</span>
-        </div>
-        <div class="card-content">
-            <p style="font-size: 0.85rem; line-height: 1.4;">
-                Видео идут через сервер Render. YouTube видит только IP сервера, а не ваш.<br>
-                Реклама отсутствует. Качество — до 720p для экономии трафика.<br>
-                <strong>0,8 Гц — частота нашей сети.</strong>
-            </p>
-        </div>
-    </div>
-    
-    <div class="footer-links">
-        <a href="/">🏠 Главная</a>
-        <a href="/timeline">📅 Таймлайн</a>
-        <a href="/logs/admin">📋 admin.log</a>
-        <a href="/logs/error">❌ error.log</a>
-    </div>
+    <div class="card"><div class="card-header"><h2>🔍 Поиск видео</h2><span class="toggle-icon">▼</span></div><div class="card-content"><div class="search-row"><input type="text" id="search-query" placeholder="Поиск: квантовая физика, философия, нейросети, искусство..." onkeypress="if(event.key==='Enter') searchVideos()"><button onclick="searchVideos()">🔍 Поиск</button></div><div id="catalog" class="video-grid"><div style="color: var(--text-secondary); text-align: center; padding: 2rem;">Введите запрос для поиска.</div></div><div id="player-container" class="player-container"></div></div></div>
+    <div class="card"><div class="card-header"><h2>📜 О прокси</h2><span class="toggle-icon">▼</span></div><div class="card-content"><p style="font-size: 0.85rem; line-height: 1.4;">Видео идут через сервер Render. YouTube видит только IP сервера, а не ваш.<br>Реклама отсутствует. Качество — до 720p для экономии трафика.<br><strong>0,8 Гц — частота нашей сети.</strong></p></div></div>
+    <div class="footer-links"><a href="/">🏠 Главная</a><a href="/timeline">📅 Таймлайн</a><a href="/logs/admin">📋 admin.log</a><a href="/logs/error">❌ error.log</a></div>
 </div>
-
 <script>
-// ==========================================
-// ПЕРЕКЛЮЧЕНИЕ ТЕМЫ
-// ==========================================
 async function toggleThemeManually() {
     const currentLink = document.querySelector('link[rel="stylesheet"][href*="/static/css/"]');
     const isDark = currentLink.href.includes('dark.css');
     const newTheme = isDark ? 'macos.css' : 'dark.css';
-    
-    try {
-        await fetch('/api/set_theme', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ theme: newTheme })
-        });
-        currentLink.href = `/static/css/${newTheme}`;
-        localStorage.setItem('web_theme', newTheme);
-    } catch (e) {
-        console.error('Ошибка сохранения темы:', e);
-    }
+    try { await fetch('/api/set_theme', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: newTheme }) }); currentLink.href = `/static/css/${newTheme}`; localStorage.setItem('web_theme', newTheme); } catch (e) { console.error('Ошибка сохранения темы:', e); }
 }
-
-// Загружаем сохранённую тему при загрузке
 document.addEventListener('DOMContentLoaded', () => {
     const savedTheme = localStorage.getItem('web_theme');
-    if (savedTheme) {
-        const currentLink = document.querySelector('link[rel="stylesheet"][href*="/static/css/"]');
-        if (currentLink && !currentLink.href.includes(savedTheme)) {
-            currentLink.href = `/static/css/${savedTheme}`;
-        }
-    }
-    
-    // Аккордеоны
-    document.querySelectorAll('.card').forEach(card => {
-        const header = card.querySelector('.card-header');
-        if (header) {
-            header.addEventListener('click', (e) => {
-                if (e.target.tagName === 'BUTTON') return;
-                card.classList.toggle('collapsed');
-            });
-        }
-    });
-    
+    if (savedTheme) { const currentLink = document.querySelector('link[rel="stylesheet"][href*="/static/css/"]'); if (currentLink && !currentLink.href.includes(savedTheme)) currentLink.href = `/static/css/${savedTheme}`; }
+    document.querySelectorAll('.card').forEach(card => { const header = card.querySelector('.card-header'); if (header) header.addEventListener('click', (e) => { if (e.target.tagName === 'BUTTON') return; card.classList.toggle('collapsed'); }); });
     logToDebug('INFO', 'Страница YouTube загружена');
 });
-
-// ==========================================
-// ЛОГИРОВАНИЕ
-// ==========================================
-async function logToDebug(level, message) {
-    try {
-        await fetch('/api/debug/log', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({level: level, module: 'YOUTUBE_PAGE', message: message})
-        });
-    } catch(e) {
-        console.log('Лог не отправлен:', e);
-    }
-}
-
-// ==========================================
-// ПОИСК ВИДЕО
-// ==========================================
+async function logToDebug(level, message) { try { await fetch('/api/debug/log', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({level: level, module: 'YOUTUBE_PAGE', message: message}) }); } catch(e) { console.log('Лог не отправлен:', e); } }
 async function searchVideos() {
     const query = document.getElementById('search-query').value.trim();
-    if (!query) {
-        logToDebug('WARNING', 'Пустой поисковый запрос');
-        return;
-    }
-    
+    if (!query) { logToDebug('WARNING', 'Пустой поисковый запрос'); return; }
     const catalogDiv = document.getElementById('catalog');
     catalogDiv.innerHTML = '<div class="status-loading" style="color: var(--accent); text-align: center; padding: 2rem;">⏳ Поиск...</div>';
     logToDebug('INFO', `Поиск: ${query}`);
-    
     try {
-        const resp = await fetch(`/youtube_search?q=${encodeURIComponent(query)}`);
-        const data = await resp.json();
-        
-        if (data.error) {
-            catalogDiv.innerHTML = `<div class="status-error" style="color: var(--error); text-align: center; padding: 2rem;">❌ ${escapeHtml(data.error)}</div>`;
-            logToDebug('ERROR', `Ошибка поиска: ${data.error}`);
-            return;
-        }
-        
-        if (!data.length) {
-            catalogDiv.innerHTML = '<div style="color: var(--text-secondary); text-align: center; padding: 2rem;">Ничего не найдено</div>';
-            logToDebug('INFO', `Поиск "${query}" не дал результатов`);
-            return;
-        }
-        
-        catalogDiv.innerHTML = '';
-        logToDebug('INFO', `Найдено ${data.length} видео по запросу "${query}"`);
-        
-        data.forEach(video => {
-            const card = document.createElement('div');
-            card.className = 'video-card';
-            card.innerHTML = `
-                <div class="video-title">${escapeHtml(video.title)}</div>
-                <div class="video-channel">${escapeHtml(video.author)} • ${video.views_short || '0'} просмотров</div>
-            `;
-            card.onclick = () => loadVideo(video.video_url, video.title);
-            catalogDiv.appendChild(card);
-        });
-    } catch(e) {
-        catalogDiv.innerHTML = '<div class="status-error" style="color: var(--error); text-align: center; padding: 2rem;">❌ Ошибка поиска</div>';
-        logToDebug('ERROR', `Исключение при поиске: ${e.message}`);
-    }
+        const resp = await fetch(`/youtube_search?q=${encodeURIComponent(query)}`); const data = await resp.json();
+        if (data.error) { catalogDiv.innerHTML = `<div class="status-error" style="color: var(--error); text-align: center; padding: 2rem;">❌ ${escapeHtml(data.error)}</div>`; logToDebug('ERROR', `Ошибка поиска: ${data.error}`); return; }
+        if (!data.length) { catalogDiv.innerHTML = '<div style="color: var(--text-secondary); text-align: center; padding: 2rem;">Ничего не найдено</div>'; logToDebug('INFO', `Поиск "${query}" не дал результатов`); return; }
+        catalogDiv.innerHTML = ''; logToDebug('INFO', `Найдено ${data.length} видео по запросу "${query}"`);
+        data.forEach(video => { const card = document.createElement('div'); card.className = 'video-card'; card.innerHTML = `<div class="video-title">${escapeHtml(video.title)}</div><div class="video-channel">${escapeHtml(video.author)} • ${video.views_short || '0'} просмотров</div>`; card.onclick = () => loadVideo(video.video_url, video.title); catalogDiv.appendChild(card); });
+    } catch(e) { catalogDiv.innerHTML = '<div class="status-error" style="color: var(--error); text-align: center; padding: 2rem;">❌ Ошибка поиска</div>'; logToDebug('ERROR', `Исключение при поиске: ${e.message}`); }
 }
-
-// ==========================================
-// ЗАГРУЗКА ВИДЕО
-// ==========================================
 async function loadVideo(videoUrl, videoTitle) {
     const container = document.getElementById('player-container');
     container.innerHTML = '<div class="status-loading" style="color: var(--accent); text-align: center; padding: 2rem;">⏳ Загрузка видео...</div>';
     logToDebug('INFO', `Загрузка видео: ${videoTitle || videoUrl}`);
-    
     try {
-        const resp = await fetch('/youtube_info', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({url: videoUrl})
-        });
-        const data = await resp.json();
-        
-        if (data.error) {
-            container.innerHTML = `<div class="status-error" style="color: var(--error); text-align: center; padding: 2rem;">❌ ${escapeHtml(data.error)}</div>`;
-            logToDebug('ERROR', `Ошибка загрузки видео: ${data.error}`);
-            return;
-        }
-        
-        const minutes = Math.floor(data.duration / 60);
-        const seconds = (data.duration % 60).toString().padStart(2, '0');
-        const duration = `${minutes}:${seconds}`;
-        
-        container.innerHTML = `
-            <div style="text-align: center;">
-                <video controls autoplay style="width: 100%; max-width: 800px; border-radius: 16px; box-shadow: var(--shadow);">
-                    <source src="${escapeHtml(data.stream_url)}" type="video/mp4">
-                    Ваш браузер не поддерживает видео.
-                </video>
-                <div style="margin-top: 12px; font-size: 0.85rem; color: var(--text-secondary);">
-                    🎵 ${escapeHtml(data.title)} | Длительность: ${duration}
-                </div>
-            </div>
-        `;
+        const resp = await fetch('/youtube_info', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url: videoUrl}) }); const data = await resp.json();
+        if (data.error) { container.innerHTML = `<div class="status-error" style="color: var(--error); text-align: center; padding: 2rem;">❌ ${escapeHtml(data.error)}</div>`; logToDebug('ERROR', `Ошибка загрузки видео: ${data.error}`); return; }
+        const minutes = Math.floor(data.duration / 60); const seconds = (data.duration % 60).toString().padStart(2, '0'); const duration = `${minutes}:${seconds}`;
+        container.innerHTML = `<div style="text-align: center;"><video controls autoplay style="width: 100%; max-width: 800px; border-radius: 16px; box-shadow: var(--shadow);"><source src="${escapeHtml(data.stream_url)}" type="video/mp4">Ваш браузер не поддерживает видео.</video><div style="margin-top: 12px; font-size: 0.85rem; color: var(--text-secondary);">🎵 ${escapeHtml(data.title)} | Длительность: ${duration}</div></div>`;
         logToDebug('INFO', `Видео загружено: ${data.title}`);
-    } catch(e) {
-        container.innerHTML = '<div class="status-error" style="color: var(--error); text-align: center; padding: 2rem;">❌ Ошибка загрузки видео</div>';
-        logToDebug('ERROR', `Исключение при загрузке видео: ${e.message}`);
-    }
+    } catch(e) { container.innerHTML = '<div class="status-error" style="color: var(--error); text-align: center; padding: 2rem;">❌ Ошибка загрузки видео</div>'; logToDebug('ERROR', `Исключение при загрузке видео: ${e.message}`); }
 }
-
-// ==========================================
-// ВСПОМОГАТЕЛЬНЫЕ
-// ==========================================
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 </script>
-
 <style>
-/* ==========================================
-   ДОПОЛНИТЕЛЬНЫЕ СТИЛИ ДЛЯ YOUTUBE
-   ========================================== */
-.search-row {
-    display: flex;
-    gap: 0.75rem;
-    margin-bottom: 1.25rem;
-    flex-wrap: wrap;
-}
-
-.search-row input {
-    flex: 1;
-    padding: 12px 16px;
-    font-size: 1rem;
-    border-radius: 12px;
-    background: rgba(0, 0, 0, 0.04);
-    border: none;
-    font-family: inherit;
-}
-
-.search-row button {
-    padding: 12px 24px;
-    font-size: 1rem;
-    font-weight: 500;
-}
-
-.video-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1rem;
-}
-
-.video-card {
-    background: rgba(0, 0, 0, 0.03);
-    border-radius: 14px;
-    padding: 1rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: 0.5px solid var(--border);
-}
-
-.video-card:hover {
-    transform: translateY(-3px);
-    background: rgba(0, 0, 0, 0.05);
-    box-shadow: var(--shadow);
-}
-
-.video-title {
-    font-weight: 600;
-    margin-bottom: 6px;
-    font-size: 0.9rem;
-    line-height: 1.3;
-}
-
-.video-channel {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-}
-
-.player-container {
-    margin-top: 1.5rem;
-}
-
-.back-link {
-    display: inline-block;
-    color: var(--accent);
-    text-decoration: none;
-    font-size: 0.9rem;
-    padding: 8px 16px;
-    border-radius: 10px;
-    background: rgba(0, 0, 0, 0.04);
-    transition: all 0.2s;
-}
-
-.back-link:hover {
-    background: rgba(0, 0, 0, 0.08);
-    text-decoration: none;
-}
-
-.footer-links {
-    margin-top: 2rem;
-    text-align: center;
-    font-size: 0.75rem;
-    border-top: 0.5px solid var(--border);
-    padding-top: 1.25rem;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 1rem;
-}
-
-.footer-links a {
-    color: var(--text-secondary);
-    text-decoration: none;
-}
-
-.footer-links a:hover {
-    color: var(--accent);
-}
-
-/* Адаптив */
-@media (max-width: 768px) {
-    .search-row {
-        flex-direction: column;
-    }
-    
-    .search-row button {
-        width: 100%;
-    }
-    
-    .video-grid {
-        grid-template-columns: 1fr;
-        gap: 0.75rem;
-    }
-    
-    .video-card {
-        padding: 0.75rem;
-    }
-    
-    .video-title {
-        font-size: 0.85rem;
-    }
-}
+.search-row { display: flex; gap: 0.75rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.search-row input { flex: 1; padding: 12px 16px; font-size: 1rem; border-radius: 12px; background: rgba(0, 0, 0, 0.04); border: none; font-family: inherit; }
+.search-row button { padding: 12px 24px; font-size: 1rem; font-weight: 500; }
+.video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+.video-card { background: rgba(0, 0, 0, 0.03); border-radius: 14px; padding: 1rem; cursor: pointer; transition: all 0.2s ease; border: 0.5px solid var(--border); }
+.video-card:hover { transform: translateY(-3px); background: rgba(0, 0, 0, 0.05); box-shadow: var(--shadow); }
+.video-title { font-weight: 600; margin-bottom: 6px; font-size: 0.9rem; line-height: 1.3; }
+.video-channel { font-size: 0.75rem; color: var(--text-secondary); }
+.player-container { margin-top: 1.5rem; }
+.back-link { display: inline-block; color: var(--accent); text-decoration: none; font-size: 0.9rem; padding: 8px 16px; border-radius: 10px; background: rgba(0, 0, 0, 0.04); transition: all 0.2s; }
+.back-link:hover { background: rgba(0, 0, 0, 0.08); text-decoration: none; }
+.footer-links { margin-top: 2rem; text-align: center; font-size: 0.75rem; border-top: 0.5px solid var(--border); padding-top: 1.25rem; display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; }
+.footer-links a { color: var(--text-secondary); text-decoration: none; }
+.footer-links a:hover { color: var(--accent); }
+@media (max-width: 768px) { .search-row { flex-direction: column; } .search-row button { width: 100%; } .video-grid { grid-template-columns: 1fr; gap: 0.75rem; } .video-card { padding: 0.75rem; } .video-title { font-size: 0.85rem; } }
 </style>
 </body>
 </html>
