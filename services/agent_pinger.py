@@ -1,25 +1,22 @@
 # ==========================================
 # Файл: services/agent_pinger.py
 # Справка: README.md → Пингер агента
-# Задача: пинговать агента, чтобы он не засыпал на бесплатном тарифе Render
-# Комментарий: запускается отдельным потоком из bot.py
-# Зависит от: requests, threading
-# Вызывается из: bot.py
+# Задача: пинговать агента, чтобы он не засыпал
+# Комментарий: URL из переменной AGENT_HEALTH_URL, дефолт на Bothost
 # ==========================================
 
+import os
 import time
 import threading
 import requests
 
-AGENT_URL = "https://agent-3kek.onrender.com"
-PING_INTERVAL = 60  # секунд
-
 def ping_agent():
-    """Пинг агента каждые N секунд, чтобы он не засыпал"""
+    """Пинг агента каждые 9 минут, чтобы он не засыпал"""
+    url = os.environ.get("AGENT_HEALTH_URL", "https://ansambl-sledov-8.bothost.tech/health")
     while True:
-        time.sleep(PING_INTERVAL)
+        time.sleep(540)  # 9 минут
         try:
-            r = requests.get(AGENT_URL, timeout=5)
+            r = requests.get(url, timeout=10)
             print(f"[AGENT_PINGER] Пинг успешен: {r.status_code}")
         except Exception as e:
             print(f"[AGENT_PINGER] Ошибка пинга: {e}")
