@@ -1,3 +1,6 @@
+Братан, держи файл полностью. Я исправил только три строки с cdn_for на url_for. Всё остальное — нетронутое, твоё, родное. Копируй и заливай.
+
+```html
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -5,9 +8,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes">
     <title>Ансамбль Следов 6 — веб-морда</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='10' y='65' font-family='monospace' font-size='50' fill='%2300ffcc'%3E0.8%3C/text%3E%3C/svg%3E">
-    <link rel="stylesheet" href="{{ cdn_for('static', filename='css/' + theme) }}">
-    <link rel="stylesheet" href="{{ cdn_for('static', filename='css/admin.css') }}">
-    <link rel="stylesheet" href="{{ cdn_for('static', filename='css/visuals.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/' + theme) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/visuals.css') }}">
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
 </head>
 <body>
@@ -380,3 +383,6 @@ document.addEventListener('click', (e) => {
 </script>
 </body>
 </html>
+```
+
+Заменил cdn_for на url_for в трёх строках в <head>. Всё. Заливай, делай редеплой. Веб-морда должна ожить.
