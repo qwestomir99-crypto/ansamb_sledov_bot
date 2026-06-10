@@ -2,8 +2,7 @@
 # Модуль: dialogue/adaptive_modes.py
 # Справка: README.md → Адаптивные режимы
 # Задача: динамическое изменение режимов на основе метрик
-# Комментарий: добавлена функция set_adaptive_enabled() для управления из админки,
-#              состояние сохраняется в adaptive_config.json
+# Комментарий: состояние теперь хранится в PostgreSQL через services/sqlite_client
 # ==========================================
 
 import os
@@ -11,78 +10,69 @@ import json
 import time
 from datetime import datetime
 from collections import deque
+from debug_utils import debug_log
+from dialogue.shabbat_manager import is_shabbat
 
 # Путь к файлу конфигурации
 CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
-ADAPTIVE_STATE_FILE = "dialogue/data/adaptive_state.json"
-ADAPTIVE_CONFIG_FILE = "dialogue/data/adaptive_config.json"
 
 # Настройки адаптации (по умолчанию)
 ADAPTIVE_ENABLED = False
-ADAPTIVE_COOLDOWN = 3600  # 1 час между сменами режимов
-DEADEND_TIMEOUT = 7200    # 2 часа тупика → возврат к эталону
+ADAPTIVE_COOLDOWN = 3600
+DEADEND_TIMEOUT = 7200
 
-# История метрик
 metrics_history = deque(maxlen=100)
 
 
 def load_adaptive_config():
-    """Загружает состояние адаптивных режимов из файла"""
+    """Загружает состояние адаптивных режимов из PostgreSQL"""
     global ADAPTIVE_ENABLED
-    if not os.path.exists(ADAPTIVE_CONFIG_FILE):
-        return {"enabled": False}
     try:
-        with open(ADAPTIVE_CONFIG_FILE, "r") as f:
-            config = json.load(f)
-            ADAPTIVE_ENABLED = config.get("enabled", False)
-            return config
-    except:
+        from services.sqlite_client import load_adaptive_state
+        state = load_adaptive_state()
+        # Если в базе есть enabled, используем его
+        ADAPTIVE_ENABLED = state.get("enabled", False)
+        return state
+    except Exception as e:
+        print(f"[ADAPTIVE] Ошибка загрузки конфига: {e}")
         return {"enabled": False}
 
 
 def save_adaptive_config(config):
-    """Сохраняет состояние адаптивных режимов в файл"""
+    """Сохраняет состояние адаптивных режимов в PostgreSQL"""
     global ADAPTIVE_ENABLED
-    os.makedirs(os.path.dirname(ADAPTIVE_CONFIG_FILE), exist_ok=True)
-    with open(ADAPTIVE_CONFIG_FILE, "w") as f:
-        json.dump(config, f, indent=2)
-    ADAPTIVE_ENABLED = config.get("enabled", False)
+    try:
+        from services.sqlite_client import save_adaptive_state
+        config["enabled"] = config.get("enabled", False)
+        save_adaptive_state(config)
+        ADAPTIVE_ENABLED = config.get("enabled", False)
+    except Exception as e:
+        print(f"[ADAPTIVE] Ошибка сохранения конфига: {e}")
 
 
 def set_adaptive_enabled(enabled):
-    """Включает или выключает адаптивные режимы (вызывается из админки)"""
-    config = {"enabled": enabled}
+    """Включает или выключает адаптивные режимы"""
+    config = load_adaptive_config()
+    config["enabled"] = enabled
     save_adaptive_config(config)
     print(f"[ADAPTIVE] Адаптивные режимы {'включены' if enabled else 'выключены'}")
     return True
 
 
 def load_config():
-    with open(CONFIG_FILE, "r") as f:
-        return json.load(f)
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return {}
 
 
 def load_adaptive_state():
-    if not os.path.exists(ADAPTIVE_STATE_FILE):
-        return {
-            "last_switch": 0,
-            "current_adaptive_mode": None,
-            "deadend_count": 0,
-            "last_return_to_etalon": 0
-        }
+    """Загружает состояние из PostgreSQL"""
     try:
-        with open(ADAPTIVE_STATE_FILE, "r") as f:
-            content = f.read().strip()
-            if not content:
-                return {
-                    "last_switch": 0,
-                    "current_adaptive_mode": None,
-                    "deadend_count": 0,
-                    "last_return_to_etalon": 0
-                }
-            return json.loads(content)
-    except Exception as e:
-        print(f"[ADAPTIVE] Ошибка чтения: {e}")
+        from services.sqlite_client import load_adaptive_state as pg_load
+        return pg_load()
+    except:
         return {
             "last_switch": 0,
             "current_adaptive_mode": None,
@@ -92,16 +82,15 @@ def load_adaptive_state():
 
 
 def save_adaptive_state(state):
+    """Сохраняет состояние в PostgreSQL"""
     try:
-        os.makedirs(os.path.dirname(ADAPTIVE_STATE_FILE), exist_ok=True)
-        with open(ADAPTIVE_STATE_FILE, "w") as f:
-            json.dump(state, f, indent=2)
-    except Exception as e:
-        print(f"[ADAPTIVE] Ошибка сохранения: {e}")
+        from services.sqlite_client import save_adaptive_state as pg_save
+        pg_save(state)
+    except:
+        pass
 
 
 def collect_metrics():
-    """Собирает метрики для адаптации"""
     metrics = {
         "errors_last_hour": count_errors_last_hour(),
         "commands_last_hour": count_commands_last_hour(),
@@ -149,8 +138,7 @@ def get_last_publication_age():
         if not pubs:
             return 999
         last_pub = max(pubs, key=lambda x: x.get("publish_at", 0))
-        age = (time.time() - last_pub.get("publish_at", 0)) / 60
-        return int(age)
+        return int((time.time() - last_pub.get("publish_at", 0)) / 60)
     except:
         return 999
 
@@ -161,45 +149,30 @@ def get_adaptive_mode(metrics):
     is_weekend = metrics.get("is_weekend", False)
     hour = metrics.get("hour", 0)
     last_pub_age = metrics.get("last_publication_age", 999)
-    
-    # Авральный режим (много ошибок)
+
     if errors > 10:
         return "авральный"
-    
-    # Ночной режим (по времени)
     if hour < 6 or hour > 23:
         if commands < 3 and last_pub_age > 120:
             return "ночной"
-    
-    # Ускоренный режим (высокая активность)
     if commands > 20 or (is_weekend and commands > 10):
         return "ускоренный"
-    
-    # Замедленный режим (мало активности)
     if commands < 3 and last_pub_age > 60:
         return "замедленный"
-    
-    # Сон (полное затишье)
     if commands == 0 and last_pub_age > 180:
         return "сон"
-    
     return "обычный"
 
 
 def is_dead_end(adaptive_mode, metrics):
-    """Проверяет тупик — только если режим активен дольше DEADEND_TIMEOUT"""
     errors = metrics.get("errors_last_hour", 0)
     commands = metrics.get("commands_last_hour", 0)
     last_pub_age = metrics.get("last_publication_age", 999)
-    
-    # Если ошибок больше 15 — тупик
+
     if errors > 15:
         return True
-    
-    # Если полное затишье более 3 часов
     if commands == 0 and last_pub_age > 180:
         return True
-    
     return False
 
 
@@ -207,7 +180,6 @@ def get_etalon_mode_by_time():
     config = load_config()
     current_hour = datetime.now().hour
     modes = config.get("modes", {})
-    
     for mode_name, mode_config in modes.items():
         start = mode_config.get("hour_start")
         end = mode_config.get("hour_end")
@@ -227,46 +199,39 @@ def get_adaptive_interval(base_interval, adaptive_mode):
         return min(480, base_interval * 2)
     elif adaptive_mode in ["авральный", "сон"]:
         return 0
-    else:
-        return base_interval
+    return base_interval
 
 
 def get_current_adaptive_mode():
-    # Загружаем актуальное состояние ADAPTIVE_ENABLED из файла
     load_adaptive_config()
-    
     if not ADAPTIVE_ENABLED:
         return get_etalon_mode_by_time()
-    
+
     state = load_adaptive_state()
     metrics = collect_metrics()
     adaptive_mode = get_adaptive_mode(metrics)
-    
-    # Проверка на тупик (только если есть предыдущий режим)
+
     prev_mode = state.get("current_adaptive_mode")
     if prev_mode and prev_mode != "обычный" and is_dead_end(adaptive_mode, metrics):
-        print(f"[ADAPTIVE] Тупик в режиме {prev_mode}, возврат к эталону")
         state["last_return_to_etalon"] = time.time()
         state["deadend_count"] += 1
         state["current_adaptive_mode"] = None
         save_adaptive_state(state)
         return get_etalon_mode_by_time()
-    
+
     now = time.time()
     if adaptive_mode != state.get("current_adaptive_mode"):
         if now - state.get("last_switch", 0) > ADAPTIVE_COOLDOWN:
-            print(f"[ADAPTIVE] Смена режима: {state.get('current_adaptive_mode')} → {adaptive_mode}")
             state["last_switch"] = now
             state["current_adaptive_mode"] = adaptive_mode
             save_adaptive_state(state)
         else:
             adaptive_mode = state.get("current_adaptive_mode", "обычный")
     else:
-        # Обновляем состояние, если режим не менялся
         if adaptive_mode not in [None, "обычный"]:
             state["current_adaptive_mode"] = adaptive_mode
             save_adaptive_state(state)
-    
+
     return adaptive_mode
 
 
