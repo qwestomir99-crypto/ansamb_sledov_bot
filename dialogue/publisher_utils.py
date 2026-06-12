@@ -67,9 +67,10 @@ def post_to_telegram(bot, chat_id, message, file_id=None, tags=None, auto_quote=
         debug_log("PUBLISHER", f"Ошибка TG: {e}", "ERROR")
         return False
 
-def post_to_vk(message, tags, access_token, owner_id, file_id=None, auto_quote=True, auto_tags=True, repost_from=None):
+def post_to_vk(message, tags, access_token, owner_id, file_id=None, auto_quote=True, auto_tags=True, repost_from=None, target='group'):
+    # target не используется напрямую, но нужен для совместимости с publisher.py
     if not access_token:
-        access_token = os.environ.get("VK_TOKEN_USER")  # <— ИСПРАВЛЕНО: VK_TOKEN → VK_TOKEN_USER
+        access_token = os.environ.get("VK_TOKEN_USER")
     if not access_token or not owner_id:
         return False, "Ошибка авторизации VK"
     
@@ -84,7 +85,7 @@ def post_to_vk(message, tags, access_token, owner_id, file_id=None, auto_quote=T
         "v": "5.199",
         "owner_id": int(owner_id),
         "message": full_message,
-        "from_group": 1 if int(owner_id) < 0 else 0  # <0 — группа, >0 — личка
+        "from_group": 1 if int(owner_id) < 0 else 0
     }
     
     try:
