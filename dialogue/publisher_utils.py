@@ -69,7 +69,7 @@ def post_to_telegram(bot, chat_id, message, file_id=None, tags=None, auto_quote=
 
 def post_to_vk(message, tags, access_token, owner_id, file_id=None, auto_quote=True, auto_tags=True, repost_from=None):
     if not access_token:
-        access_token = os.environ.get("VK_TOKEN")
+        access_token = os.environ.get("VK_TOKEN_USER")  # <— ИСПРАВЛЕНО: VK_TOKEN → VK_TOKEN_USER
     if not access_token or not owner_id:
         return False, "Ошибка авторизации VK"
     
