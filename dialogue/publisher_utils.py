@@ -2,8 +2,7 @@
 # Файл: dialogue/publisher_utils.py
 # Справка: README.md → Публикатор / Утилиты
 # Задача: отправка постов в Telegram и VK
-# Комментарий: VK — сервисный токен сообщества для группы.
-#              VK_GROUP_ID уже содержит минус — не дублируем.
+# Комментарий: VK — поддерживает группу и личку через target
 # ==========================================
 
 import os
@@ -69,7 +68,6 @@ def post_to_telegram(bot, chat_id, message, file_id=None, tags=None, auto_quote=
         return False
 
 def post_to_vk(message, tags, access_token, owner_id, file_id=None, auto_quote=True, auto_tags=True, repost_from=None):
-    """Публикация в группу VK через сервисный токен сообщества"""
     if not access_token:
         access_token = os.environ.get("VK_TOKEN")
     if not access_token or not owner_id:
@@ -81,20 +79,19 @@ def post_to_vk(message, tags, access_token, owner_id, file_id=None, auto_quote=T
         tags = get_auto_tags(message, "vk")
     full_message = f"{message}\n\n{tags}" if message else tags
     
-    # VK_GROUP_ID уже приходит с минусом — не добавляем лишний
     params = {
         "access_token": access_token,
         "v": "5.199",
         "owner_id": int(owner_id),
         "message": full_message,
-        "from_group": 1
+        "from_group": 1 if int(owner_id) < 0 else 0  # <0 — группа, >0 — личка
     }
     
     try:
         r = requests.get('https://api.vk.com/method/wall.post', params=params, timeout=30)
         data = r.json()
         if 'response' in data:
-            debug_log("VK", f"Опубликовано в группе VK, post_id={data['response']['post_id']}")
+            debug_log("VK", f"Опубликовано, post_id={data['response']['post_id']}")
             return True, None
         else:
             error_msg = data.get('error', {}).get('error_msg', 'неизвестная')
