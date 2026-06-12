@@ -2,7 +2,7 @@
 # Файл: dialogue/publisher.py
 # Справка: README.md → Публикатор
 # Задача: публикация постов в TG и VK (немедленная, отложенная, из пула)
-# Комментарий: VK — группа через VK_TOKEN + VK_GROUP_ID
+# Комментарий: VK — поддерживает группу и личку через target
 # ==========================================
 
 import os
@@ -57,7 +57,12 @@ def publish_post_immediately(bot, chat_id, text, tags_str=None, file_id=None):
         debug_log("PUBLISH", f"Ошибка: {e}", "ERROR")
         return False
 
-def publish_from_pool(bot, vk_token, vk_group_id, tg_chat_id):
+def publish_from_pool(bot, vk_token, vk_group_id, tg_chat_id, target='group'):
+    """
+    Публикует пост из пула.
+    target='group' → в группу (бизнес)
+    target='private' → в личку (творчество)
+    """
     pool = load_post_pool()
     if not pool:
         try:
@@ -92,7 +97,8 @@ def publish_from_pool(bot, vk_token, vk_group_id, tg_chat_id):
         try:
             from dialogue.publisher_utils import post_to_vk
             tags = build_tags(post)
-            sv, _ = post_to_vk(full_text, tags, vk_token, vk_group_id)
+            # ВАЖНО: передаём target в post_to_vk
+            sv, _ = post_to_vk(full_text, tags, vk_token, vk_group_id, target=target)
             if sv: success = True
         except Exception as e: debug_log("PUBLISH", f"Ошибка VK: {e}", "ERROR")
     
@@ -109,7 +115,9 @@ def publish_loop(bot, vk_token, vk_group_id, tg_chat_id):
             except ImportError: pass
             clean_pool()
             interval = load_config().get("publisher", {}).get("interval_seconds", 7200)
-            if publish_from_pool(bot, vk_token, vk_group_id, tg_chat_id):
+            # Здесь можно менять target в зависимости от времени или типа поста
+            # По умолчанию — группа (бизнес)
+            if publish_from_pool(bot, vk_token, vk_group_id, tg_chat_id, target='group'):
                 debug_log("PUBLISH", f"Опубликовано, следующая через {interval} сек")
             else: debug_log("PUBLISH", "Нет постов")
             time.sleep(interval)
