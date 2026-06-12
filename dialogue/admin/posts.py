@@ -2,12 +2,13 @@
 # Файл: dialogue/admin/posts.py
 # Справка: README.md → Админка (публикации)
 # Задача: TG-посты, отложенные публикации, интервал, VK
-# Комментарий: VK — группа через VK_GROUP_ID
+# Комментарий: VK — поддержка двух потоков (группа/личка)
 # ==========================================
 
 import os
 import json
 import tempfile
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dialogue.post_manager import add_post_to_pool, load_post_pool
 from dialogue.publisher_utils import get_auto_tags, get_random_quote, post_to_vk
 from debug_utils import debug_log
@@ -108,19 +109,47 @@ def process_publish_interval(message, bot):
         bot.reply_to(message, "❌ Число от 10 до 1440.", reply_markup=get_admin_menu())
     safe_delete(message, 5)
 
-def handle_vk_post(bot, chat_id, message_id, user_id):
-    msg = bot.send_message(chat_id, "✍️ Введите текст поста для VK:")
-    bot.register_next_step_handler(msg, process_vk_post_text, bot, chat_id, user_id)
+# ==========================================
+# VK POST — С ВЫБОРОМ ЦЕЛИ
+# ==========================================
 
-def process_vk_post_text(message, bot, chat_id, user_id):
+def handle_vk_post(bot, chat_id, message_id, user_id):
+    markup = InlineKeyboardMarkup()
+    markup.add(
+        InlineKeyboardButton("📢 В группу", callback_data="vk_target_group"),
+        InlineKeyboardButton("💬 В личку", callback_data="vk_target_private")
+    )
+    msg = bot.send_message(chat_id, "🎯 Куда публиковать в VK?", reply_markup=markup)
+    bot.register_next_step_handler(msg, process_vk_target_choice, bot, chat_id, user_id)
+
+def process_vk_target_choice(message, bot, chat_id, user_id):
+    if message.text and message.text.lower() == "/cancel":
+        bot.send_message(chat_id, "❌ Отменено.")
+        return
+    target = "group" if "группу" in message.text.lower() else "private"
+    msg = bot.send_message(chat_id, f"✍️ Введите текст поста для VK ({target}):")
+    bot.register_next_step_handler(msg, process_vk_post_text, bot, chat_id, target, user_id)
+
+# (Обработчик кнопок inline)
+def handle_vk_target_callback(call, bot):
+    target = "group" if call.data == "vk_target_group" else "private"
+    msg = bot.send_message(call.message.chat.id, f"✍️ Введите текст поста для VK ({target}):")
+    bot.register_next_step_handler(msg, process_vk_post_text, bot, call.message.chat.id, target, call.from_user.id)
+    bot.answer_callback_query(call.id)
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except:
+        pass
+
+def process_vk_post_text(message, bot, chat_id, target, user_id):
     text = message.text.strip()
     if not text:
         bot.send_message(chat_id, "❌ Текст не может быть пустым")
         return
     msg = bot.send_message(chat_id, "📎 Пришлите фото, видео или /skip")
-    bot.register_next_step_handler(msg, process_vk_post_file, bot, chat_id, text, user_id)
+    bot.register_next_step_handler(msg, process_vk_post_file, bot, chat_id, text, target, user_id)
 
-def process_vk_post_file(message, bot, chat_id, text, user_id):
+def process_vk_post_file(message, bot, chat_id, text, target, user_id):
     file_path = None
     if message.text and message.text.lower() == "/skip":
         file_path = None
@@ -137,13 +166,24 @@ def process_vk_post_file(message, bot, chat_id, text, user_id):
     
     vk_token = os.environ.get("VK_TOKEN")
     vk_group_id = os.environ.get("VK_GROUP_ID")
-    if not vk_token or not vk_group_id:
-        bot.send_message(chat_id, "❌ VK отключён.")
+    if target == "group":
+        owner_id = vk_group_id
+        access_token = vk_token
+    else:
+        owner_id = os.environ.get("VK_OWNER_ID")
+        access_token = os.environ.get("VK_ACCESS_TOKEN")
+    
+    if not access_token or not owner_id:
+        bot.send_message(chat_id, "❌ VK не настроен (токен или owner_id).")
         return
     
     full_text = f"{text}\n\n📜 {get_random_quote()}"
     auto_tags = get_auto_tags(text, "vk")
-    success, error_msg = post_to_vk(full_text, auto_tags, vk_token, vk_group_id, file_path, auto_quote=False, auto_tags=False)
+    success, error_msg = post_to_vk(full_text, auto_tags, access_token, owner_id, file_path, auto_quote=False, auto_tags=False)
     bot.send_message(chat_id, "✅ Пост отправлен в VK!" if success else (error_msg or "❌ Ошибка VK"))
     if file_path and os.path.exists(file_path):
         os.remove(file_path)
+
+# ==========================================
+# КОНЕЦ
+# ==========================================
