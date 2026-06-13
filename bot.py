@@ -1,19 +1,29 @@
-# ==========================================
+# ===========================================
 # Файл: bot.py
-# Справка: README.md → Бот / Точка входа
+# Справка: README.md - Бот / Точка входа
 # Задача: запуск бота, веб-морды и пингеров
-# Комментарий: порт 10000 по умолчанию (Bothost)
-# ==========================================
+# ===========================================
 
-import os
 import sys
+import os
+
+# Добавляем пути к локальным библиотекам
+sys.path.insert(0, '/home/c/ch756438/.local/lib/python3.10/site-packages')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# Подключаем менеджер секретов
+from services.secrets_manager import get_secret
+
 import threading
 
 print("=== ПОИСК ФАЙЛОВ С config.json ===")
 for root, dirs, files in os.walk('.'):
-    if '.venv' in dirs: dirs.remove('.venv')
-    if 'env' in dirs: dirs.remove('env')
-    if '__pycache__' in dirs: dirs.remove('__pycache__')
+    if '.venv' in dirs:
+        dirs.remove('.venv')
+    if 'env' in dirs:
+        dirs.remove('env')
+    if '__pycache__' in dirs:
+        dirs.remove('__pycache__')
     for file in files:
         if file.endswith('.py'):
             path = os.path.join(root, file)
@@ -38,9 +48,9 @@ if __name__ == "__main__":
         print("[BOT] Пингеры запущены")
     except Exception as e:
         print(f"[BOT] Ошибка запуска пингеров: {e}")
-    
-    port = int(os.environ.get("PORT", 10000))
+
+    port = int(get_secret("PORT", 10000))
     threading.Thread(target=app.run, args=('0.0.0.0', port), daemon=True).start()
-    
+
     from bot.main import main
     main()
