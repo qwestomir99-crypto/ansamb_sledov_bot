@@ -5,16 +5,22 @@
 # Комментарий: использует VK_READER_TOKEN
 # ==========================================
 
+import sys
+import os
 import time
 import json
-import os
 import requests
 from datetime import datetime
 from debug_utils import debug_log
 
-# Путь к файлу конфигурации
-CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
-VK_POSTS_FILE = "dialogue/data/vk_posts.json"
+# ===== ЗАГРУЗКА СЕКРЕТОВ ИЗ БД =====
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from services.secrets_manager import get_secret
+# ===================================
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CONFIG_FILE = os.path.join(PROJECT_ROOT, 'dialogue', 'data', 'config.json')
+VK_POSTS_FILE = os.path.join(PROJECT_ROOT, 'dialogue', 'data', 'vk_posts.json')
 
 def load_config():
     with open(CONFIG_FILE, "r") as f:
