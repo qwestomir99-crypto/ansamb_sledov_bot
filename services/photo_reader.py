@@ -10,6 +10,10 @@ import random
 import requests
 from debug_utils import debug_log
 
+# Загружаем переменные из .env
+from dotenv import load_dotenv
+load_dotenv()
+
 def get_random_post():
     token = os.environ.get("VK_READER_TOKEN")
     owner_id = os.environ.get("VK_OWNER_ID")
