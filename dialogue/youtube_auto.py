@@ -5,6 +5,7 @@
 # Комментарий: видео хранятся в БД (links), кэш в SQLite
 # ==========================================
 
+import sys
 import os
 import random
 import sqlite3
@@ -12,18 +13,22 @@ import requests
 from datetime import datetime
 from debug_utils import debug_log
 
+# ===== ЗАГРУЗКА СЕКРЕТОВ ИЗ БД =====
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from services.secrets_manager import get_secret
+# ===================================
+
 # Путь к базе данных
-DB_PATH = 'data/ansambl.db'
-YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY")
-YOUTUBE_PLAYLIST_ID = os.environ.get("YOUTUBE_PLAYLIST_ID")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(PROJECT_ROOT, 'data/ansambl.db')
+YOUTUBE_API_KEY = get_secret("YOUTUBE_API_KEY")
+YOUTUBE_PLAYLIST_ID = get_secret("YOUTUBE_PLAYLIST_ID")
 
 def get_db_connection():
-    """Создаёт подключение к SQLite"""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     return sqlite3.connect(DB_PATH)
 
 def init_links_table():
-    """Создаёт таблицу links, если её нет"""
     conn = get_db_connection()
     c = conn.cursor()
     c.execute('''
@@ -43,7 +48,6 @@ def init_links_table():
     debug_log("YOUTUBE_AUTO", "Таблица links создана/подтверждена")
 
 def get_random_video():
-    """Возвращает случайное видео из базы данных (источник youtube)"""
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -62,7 +66,6 @@ def get_random_video():
         return None
 
 def add_video_to_db(url, title, tags=''):
-    """Добавляет видео в базу, если ещё не существует"""
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -83,7 +86,6 @@ def add_video_to_db(url, title, tags=''):
         return False
 
 def refresh_cache():
-    """Обновляет кэш видео из YouTube API"""
     if not YOUTUBE_API_KEY or not YOUTUBE_PLAYLIST_ID:
         debug_log("YOUTUBE_RANDOM", "Нет API_KEY или PLAYLIST_ID", "ERROR")
         return
@@ -125,7 +127,6 @@ def refresh_cache():
         debug_log("YOUTUBE_RANDOM", f"Ошибка обновления: {e}", "ERROR")
 
 def mark_video_used(url):
-    """Отмечает видео как использованное (увеличивает счётчик)"""
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -140,5 +141,4 @@ def mark_video_used(url):
         debug_log("YOUTUBE_AUTO", f"Ошибка обновления счётчика: {e}", "ERROR")
         return False
 
-# Инициализация таблицы при загрузке модуля
 init_links_table()
