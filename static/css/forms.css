@@ -1,0 +1,44 @@
+/**
+ * ==================================================
+ * @file: static/css/forms.css
+ * @author: Ансамбль Следов
+ * @version: 1.0
+ * @description:
+ *   Поля ввода, textarea, select.
+ * ==================================================
+ */
+
+input, textarea, select {
+    background: rgba(0, 0, 0, 0.04);
+    color: var(--text);
+    border: none;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    width: 100%;
+}
+
+body.dark input,
+body.dark textarea,
+body.dark select {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+input:focus, textarea:focus, select:focus {
+    outline: none;
+    background: rgba(0, 0, 0, 0.06);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+body.dark input:focus,
+body.dark textarea:focus,
+body.dark select:focus {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+textarea {
+    resize: vertical;
+    min-height: 80px;
+}
