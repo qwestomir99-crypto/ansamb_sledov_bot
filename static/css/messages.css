@@ -1,0 +1,73 @@
+/**
+ * ==================================================
+ * @file: static/css/messages.css
+ * @author: Ансамбль Следов
+ * @version: 1.0
+ * @description:
+ *   Лента сообщений, действия над сообщениями.
+ * ==================================================
+ */
+
+.messages {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: var(--space-md);
+}
+
+.message {
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 14px;
+    padding: 12px;
+    margin: 8px 0;
+    border: 0.5px solid var(--border);
+    transition: 0.1s;
+}
+
+body.dark .message {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.message.own {
+    background: var(--accent-soft);
+    color: var(--text);
+}
+
+.message-telegram {
+    border-left: 3px solid #26a5e4;
+}
+
+.message-vk {
+    border-left: 3px solid #4c75a3;
+}
+
+.message small {
+    font-size: 0.7rem;
+    opacity: 0.7;
+}
+
+.message-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.message-actions button {
+    font-size: 0.7rem;
+    padding: 4px 10px;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+body.dark .message-actions button {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.message-actions button:hover {
+    background: var(--accent);
+    color: white;
+}
