@@ -5,6 +5,7 @@
 # Комментарий: VK — поддерживает группу и личку через target
 # ==========================================
 
+import sys
 import os
 import random
 import json
@@ -12,9 +13,14 @@ import requests
 from utils import escape_markdown
 from debug_utils import debug_log
 
-# Путь к файлу конфигурации
-CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
-QUOTES_FILE = "dialogue/data/quotes.txt"
+# ===== ЗАГРУЗКА СЕКРЕТОВ ИЗ БД =====
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from services.secrets_manager import get_secret
+# ===================================
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CONFIG_FILE = os.path.join(PROJECT_ROOT, 'dialogue', 'data', 'config.json')
+QUOTES_FILE = os.path.join(PROJECT_ROOT, 'dialogue', 'data', 'quotes.txt')
 
 def load_config():
     with open(CONFIG_FILE, "r") as f:
@@ -51,7 +57,8 @@ def post_to_telegram(bot, chat_id, message, file_id=None, tags=None, auto_quote=
     try:
         if file_id:
             import telebot
-            bot2 = telebot.TeleBot(os.environ.get("BOT_TOKEN"))
+            bot_token = get_secret("BOT_TOKEN")
+            bot2 = telebot.TeleBot(bot_token)
             file_info = bot2.get_file(file_id)
             downloaded = bot2.download_file(file_info.file_path)
             ext = os.path.splitext(file_info.file_path)[1].lower()
@@ -68,9 +75,8 @@ def post_to_telegram(bot, chat_id, message, file_id=None, tags=None, auto_quote=
         return False
 
 def post_to_vk(message, tags, access_token, owner_id, file_id=None, auto_quote=True, auto_tags=True, repost_from=None, target='group'):
-    # target не используется напрямую, но нужен для совместимости с publisher.py
     if not access_token:
-        access_token = os.environ.get("VK_TOKEN_USER")
+        access_token = get_secret("VK_TOKEN_USER")
     if not access_token or not owner_id:
         return False, "Ошибка авторизации VK"
     
