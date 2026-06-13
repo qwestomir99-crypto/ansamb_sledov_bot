@@ -5,11 +5,17 @@
 # Комментарий: TG всегда, VK в группу с VK_TOKEN + VK_GROUP_ID, цитаты из publisher_utils
 # ==========================================
 
+import sys
 import os
 import time
 from debug_utils import debug_log
 from dialogue.youtube_auto import get_random_video
 from dialogue.publisher_utils import get_random_quote, post_to_vk
+
+# ===== ЗАГРУЗКА СЕКРЕТОВ ИЗ БД =====
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from services.secrets_manager import get_secret
+# ===================================
 
 def log_auto(level, message):
     debug_log("AUTOPOSTER", message, level)
@@ -35,8 +41,8 @@ def check_and_publish(bot, tg_chat_id):
         log_auto("ERROR", f"Ошибка TG: {e}")
     
     # VK
-    vk_token = os.environ.get("VK_TOKEN")
-    vk_owner_id = os.environ.get("VK_GROUP_ID")
+    vk_token = get_secret("VK_TOKEN")
+    vk_owner_id = get_secret("VK_GROUP_ID")
     if vk_token and vk_owner_id:
         try:
             success, _ = post_to_vk(full_text, "", vk_token, vk_owner_id)
