@@ -1,0 +1,91 @@
+/**
+ * ==================================================
+ * @file: static/css/tables.css
+ * @author: Ансамбль Следов
+ * @version: 1.0
+ * @description:
+ *   Адаптивные таблицы для всех тем.
+ *   Подключается после основного CSS.
+ * ==================================================
+ */
+
+.table-wrapper {
+    overflow-x: auto;
+    margin: 16px 0;
+}
+
+.adaptive-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.adaptive-table th,
+.adaptive-table td {
+    padding: 12px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+.adaptive-table th {
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.adaptive-table th:nth-child(1),
+.adaptive-table td:nth-child(1) { width: 45px; }
+.adaptive-table th:nth-child(2),
+.adaptive-table td:nth-child(2) { width: auto; }
+.adaptive-table th:nth-child(3),
+.adaptive-table td:nth-child(3) { width: 85px; }
+.adaptive-table th:nth-child(4),
+.adaptive-table td:nth-child(4) { width: 50px; }
+.adaptive-table th:nth-child(5),
+.adaptive-table td:nth-child(5) { width: 85px; }
+
+.adaptive-table td:nth-child(2) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.adaptive-table td:last-child {
+    white-space: nowrap;
+    text-align: right;
+}
+
+.adaptive-table td:last-child a {
+    display: inline-block;
+    margin: 0 4px;
+    padding: 4px 12px;
+    text-decoration: none;
+    border-radius: 20px;
+    font-size: 12px;
+    background: rgba(0, 0, 0, 0.05);
+    transition: 0.2s;
+}
+
+body.dark .adaptive-table td:last-child a {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.adaptive-table td:last-child a:hover {
+    background: var(--accent);
+    color: white;
+}
+
+@media (max-width: 600px) {
+    .adaptive-table th,
+    .adaptive-table td {
+        padding: 8px 4px;
+        font-size: 13px;
+    }
+    .adaptive-table td:last-child a {
+        padding: 3px 8px;
+        font-size: 11px;
+    }
+}
