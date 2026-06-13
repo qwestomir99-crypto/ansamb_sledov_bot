@@ -1,17 +1,18 @@
+#!/usr/bin/env python3
 # ==========================================
 # Файл: bot/core.py
 # Справка: README.md → Бот / Ядро
 # Задача: глобальные обработчики, конфиг, токены
-# Комментарий: ищет config.json в /app/shared/, PostgreSQL и файлах
 # ==========================================
 
 import sys
-import threading
-import traceback
-from datetime import datetime
 import os
 import json
 import telebot
+import threading
+import traceback
+from datetime import datetime
+from services.secrets_manager import get_secret
 
 ERROR_LOG = "error.log"
 
@@ -33,10 +34,11 @@ threading.excepthook = thread_exception_handler
 def load_config():
     """Загружает config.json: сначала /app/shared/, потом PostgreSQL, потом файлы"""
     
-    # Путь к общим файлам
-    shared_path = '/app/shared/config.json'
+    # Определяем корень проекта
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
-    # === Попытка 1: Общие файлы Bothost ===
+    # === Попытка 1: Общая папка (для совместимости) ===
+    shared_path = os.path.join(project_root, 'shared', 'config.json')
     if os.path.exists(shared_path):
         try:
             with open(shared_path, 'r', encoding='utf-8') as f:
@@ -56,12 +58,13 @@ def load_config():
     except Exception as e:
         print(f"[CONFIG] PostgreSQL недоступен: {e}")
     
-    # === Попытка 3: Файлы ===
-    path1 = '/app/dialogue/data/config.json'
-    path2 = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'dialogue', 'data', 'config.json')
-    path3 = 'dialogue/data/config.json'
+    # === Попытка 3: Локальные файлы ===
+    possible_paths = [
+        os.path.join(project_root, 'dialogue', 'data', 'config.json'),
+        'dialogue/data/config.json'
+    ]
     
-    for path in [path1, path2, path3]:
+    for path in possible_paths:
         if os.path.exists(path):
             try:
                 with open(path, 'r', encoding='utf-8') as f:
@@ -77,28 +80,28 @@ def load_config():
         f"Проверенные пути:\n"
         f"  - {shared_path}\n"
         f"  - PostgreSQL\n"
-        f"  - {path1}\n"
-        f"  - {path2}\n"
-        f"  - {path3}"
+        f"  - {possible_paths[0]}\n"
+        f"  - {possible_paths[1]}"
     )
 
 def get_bot():
-    TOKEN = os.environ.get("BOT_TOKEN")
+    TOKEN = get_secret("BOT_TOKEN")
     if not TOKEN:
         raise ValueError("BOT_TOKEN не задан")
     return telebot.TeleBot(TOKEN)
 
 def get_admin_user_id():
-    return int(os.environ.get("ADMIN_USER_ID", 0))
+    uid = get_secret("ADMIN_USER_ID")
+    return int(uid) if uid else 0
 
 def get_vk_token():
-    return os.environ.get("VK_TOKEN")
+    return get_secret("VK_TOKEN")
 
 def get_vk_owner_id():
-    return os.environ.get("VK_OWNER_ID")
+    return get_secret("VK_OWNER_ID")
 
 def get_vk_reader_token():
-    return os.environ.get("VK_READER_TOKEN")
+    return get_secret("VK_READER_TOKEN")
 
 def get_vk_group_id():
-    return os.environ.get("VK_GROUP_ID")
+    return get_secret("VK_GROUP_ID")
