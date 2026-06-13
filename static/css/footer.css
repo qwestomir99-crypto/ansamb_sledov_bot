@@ -1,0 +1,31 @@
+/**
+ * ==================================================
+ * @file: static/css/footer.css
+ * @author: Ансамбль Следов
+ * @version: 1.0
+ * @description:
+ *   Футер (нижняя часть страницы со ссылками).
+ * ==================================================
+ */
+
+.footer-links {
+    margin-top: var(--space-xl);
+    text-align: center;
+    font-size: 0.75rem;
+    border-top: 0.5px solid var(--border);
+    padding-top: var(--space-md);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-md);
+}
+
+.footer-links a {
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+
+.footer-links a:hover {
+    color: var(--accent);
+    text-decoration: underline;
+}
