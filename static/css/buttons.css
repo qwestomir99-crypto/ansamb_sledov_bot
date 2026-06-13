@@ -1,0 +1,75 @@
+/**
+ * ==================================================
+ * @file: static/css/buttons.css
+ * @author: Ансамбль Следов
+ * @version: 1.0
+ * @description:
+ *   Кнопки и группы кнопок.
+ * ==================================================
+ */
+
+/* ==========================================
+   ГРУППЫ КНОПОК
+   ========================================== */
+.button-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+}
+
+.button-group button {
+    flex: 1 1 auto;
+    min-width: 80px;
+}
+
+@media (max-width: 768px) {
+    .button-group {
+        flex-direction: column;
+    }
+    .button-group button {
+        width: 100%;
+    }
+}
+
+/* ==========================================
+   БАЗОВЫЕ КНОПКИ
+   ========================================== */
+button {
+    background: var(--accent);
+    color: white;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+button:hover {
+    background: var(--accent-hover);
+}
+
+button:active {
+    transform: scale(0.98);
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ==========================================
+   ВТОРИЧНЫЕ КНОПКИ
+   ========================================== */
+button.secondary {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--accent);
+}
+
+body.dark button.secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--accent);
+}
+
+button.secondary:hover {
+    background: var(--accent-soft);
+}
