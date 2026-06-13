@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # ==========================================
 # Файл: services/sqlite_client.py
 # Справка: README.md → SQLite клиент для TimeWeb
@@ -5,14 +6,21 @@
 # Комментарий: адаптировано для TimeWeb, используется data/ansambl.db
 # ==========================================
 
+import sys
 import os
 import sqlite3
 import json
 from datetime import datetime
+
+# ===== ФИКС ПУТИ К БИБЛИОТЕКАМ =====
+sys.path.insert(0, '/home/c/ch756438/.local/lib/python3.10/site-packages')
+# ===================================
+
 from debug_utils import debug_log
 
 # Путь к единой базе данных
-DB_PATH = 'data/ansambl.db'
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(PROJECT_ROOT, 'data/ansambl.db')
 
 def log_db(level, message):
     debug_log("SQLITE", message, level)
