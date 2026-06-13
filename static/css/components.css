@@ -1,0 +1,399 @@
+/**
+ * ==================================================
+ * @file: static/css/components.css
+ * @author: Ансамбль Следов
+ * @version: 1.0
+ * @description:
+ *   Компоненты интерфейса: карточки, кнопки, формы, сообщения, футер.
+ *   Зависит от переменных темы (macos.css или macos-new.css).
+ * ==================================================
+ */
+
+/* ==========================================
+   КАРТОЧКИ (аккордеоны)
+   ========================================== */
+.card {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
+    margin: var(--space-md) 0;
+    box-shadow: var(--shadow);
+    border: 0.5px solid var(--border);
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.card-header {
+    padding: var(--space-md) var(--space-lg);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    transition: background 0.2s;
+}
+
+.card-header:hover {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+body.dark .card-header:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.card-header h2 {
+    font-weight: 590;
+    letter-spacing: -0.01em;
+    font-size: 1.2rem;
+    margin: 0;
+    color: var(--text);
+}
+
+.card-header .toggle-icon {
+    font-size: 0.9rem;
+    transition: transform 0.2s;
+    color: var(--text-secondary);
+}
+
+.card.collapsed .card-header .toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.card-content {
+    padding: 0 var(--space-lg) var(--space-lg) var(--space-lg);
+    transition: all 0.3s ease;
+}
+
+.card.collapsed .card-content {
+    display: none;
+}
+
+/* ==========================================
+   ВЫПАДАЮЩИЕ МЕНЮ (DROPDOWN)
+   ========================================== */
+.dropdown {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.dropdown-trigger {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text);
+    border: none;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+    width: 100%;
+}
+
+body.dark .dropdown-trigger {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.dropdown-trigger:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+body.dark .dropdown-trigger:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    border: 0.5px solid var(--border);
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition: all 0.2s;
+    min-width: 100%;
+}
+
+.dropdown.open .dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(4px);
+}
+
+.dropdown-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 16px;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.dropdown-menu button:hover {
+    background: var(--accent-soft);
+}
+
+.dropdown-menu button:first-child {
+    border-radius: 12px 12px 0 0;
+}
+
+.dropdown-menu button:last-child {
+    border-radius: 0 0 12px 12px;
+}
+
+/* ==========================================
+   ГРУППЫ КНОПОК
+   ========================================== */
+.button-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+}
+
+.button-group button {
+    flex: 1 1 auto;
+    min-width: 80px;
+}
+
+@media (max-width: 768px) {
+    .button-group {
+        flex-direction: column;
+    }
+    .button-group button {
+        width: 100%;
+    }
+}
+
+/* ==========================================
+   КНОПКИ
+   ========================================== */
+button, input, textarea, select {
+    background: rgba(0, 0, 0, 0.04);
+    color: var(--text);
+    border: none;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+body.dark button,
+body.dark input,
+body.dark textarea,
+body.dark select {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+button {
+    background: var(--accent);
+    color: white;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+button:hover {
+    background: var(--accent-hover);
+}
+
+button:active {
+    transform: scale(0.98);
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+button.secondary {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--accent);
+}
+
+body.dark button.secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--accent);
+}
+
+button.secondary:hover {
+    background: var(--accent-soft);
+}
+
+input, textarea, select {
+    background: rgba(0, 0, 0, 0.04);
+    width: 100%;
+}
+
+body.dark input,
+body.dark textarea,
+body.dark select {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+input:focus, textarea:focus, select:focus {
+    outline: none;
+    background: rgba(0, 0, 0, 0.06);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+body.dark input:focus,
+body.dark textarea:focus,
+body.dark select:focus {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+/* ==========================================
+   СООБЩЕНИЯ (ЛЕНТА)
+   ========================================== */
+.messages {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: var(--space-md);
+}
+
+.message {
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 14px;
+    padding: 12px;
+    margin: 8px 0;
+    border: 0.5px solid var(--border);
+    transition: 0.1s;
+}
+
+body.dark .message {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.message.own {
+    background: var(--accent-soft);
+    color: var(--text);
+}
+
+.message-telegram {
+    border-left: 3px solid #26a5e4;
+}
+
+.message-vk {
+    border-left: 3px solid #4c75a3;
+}
+
+.message small {
+    font-size: 0.7rem;
+    opacity: 0.7;
+}
+
+.message-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.message-actions button {
+    font-size: 0.7rem;
+    padding: 4px 10px;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text);
+}
+
+body.dark .message-actions button {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.message-actions button:hover {
+    background: var(--accent);
+    color: white;
+}
+
+/* ==========================================
+   ЗАГОЛОВКИ
+   ========================================== */
+h1 {
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    font-size: 1.6rem;
+    margin-bottom: 0.25rem;
+}
+
+/* ==========================================
+   ССЫЛКИ
+   ========================================== */
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* ==========================================
+   СТАТУСЫ
+   ========================================== */
+.status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 500;
+}
+
+/* ==========================================
+   ФУТЕР
+   ========================================== */
+.footer-links {
+    margin-top: var(--space-xl);
+    text-align: center;
+    font-size: 0.75rem;
+    border-top: 0.5px solid var(--border);
+    padding-top: var(--space-md);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-md);
+}
+
+.footer-links a {
+    color: var(--text-secondary);
+}
+
+.footer-links a:hover {
+    color: var(--accent);
+}
+
+/* ==========================================
+   АНИМАЦИИ
+   ========================================== */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.card, .message {
+    animation: fadeIn 0.3s ease;
+}
