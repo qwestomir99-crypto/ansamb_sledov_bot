@@ -1,14 +1,17 @@
+#!/usr/bin/env python3
 # ==========================================
 # Файл: utils.py
 # Справка: README.md → Вспомогательные утилиты
 # Задача: общие функции для работы с текстом, файлами, экранированием
-# Комментарий: используется в разных модулях (bot.py, publisher_utils.py и др.)
-# Зависит от: re, os
-# Вызывается из: bot.py, publisher_utils.py, admin_commands.py
 # ==========================================
 
+import sys
 import re
 import os
+
+# ===== ФИКС ПУТИ К БИБЛИОТЕКАМ =====
+sys.path.insert(0, '/home/c/ch756438/.local/lib/python3.10/site-packages')
+# ===================================
 
 def escape_markdown(text: str) -> str:
     """
@@ -17,7 +20,6 @@ def escape_markdown(text: str) -> str:
     """
     escape_chars = r'_*[]()~`>#+-=|{}.!'
     return re.sub(f'([{re.escape(escape_chars)}])', r'\\\1', text)
-
 
 def sanitize_filename(filename: str, max_length: int = 50) -> str:
     """
@@ -29,7 +31,6 @@ def sanitize_filename(filename: str, max_length: int = 50) -> str:
     if len(clean_name) > max_length:
         clean_name = clean_name[:max_length]
     return f"{clean_name}{ext.lower()}"
-
 
 def safe_send_audio(bot, chat_id, file_path: str, caption: str = None):
     """
@@ -49,7 +50,6 @@ def safe_send_audio(bot, chat_id, file_path: str, caption: str = None):
             parse_mode='MarkdownV2' if safe_caption else None
         )
     return True
-
 
 def safe_send_video(bot, chat_id, file_path: str, caption: str = None):
     """
