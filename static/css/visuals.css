@@ -1,12 +1,16 @@
-/* ==========================================
- * Файл: static/css/visuals.css
- * Справка: README.md → Веб-морда / Визуал
- * Задача: анимации, toast-уведомления, индикаторы загрузки
- * Комментарий: добавлена поддержка тёмной темы и мобильных устройств
- * Зависит от: theme.css (переменные)
- * ========================================== */
+/**
+ * ==================================================
+ * @file: static/css/visuals.css
+ * @author: Ансамбль Следов
+ * @version: 1.0
+ * @description:
+ *   Визуальные элементы: тост-уведомления, спиннеры, статус-точки.
+ * ==================================================
+ */
 
-/* --- Toast-уведомления --- */
+/* ==========================================
+   ТОСТ-УВЕДОМЛЕНИЯ
+   ========================================== */
 #toast-container {
     position: fixed;
     bottom: 20px;
@@ -48,7 +52,7 @@
 .toast.error { border-left-color: var(--error); }
 .toast.warning { border-left-color: var(--warning); }
 
-/* --- Анимации --- */
+/* Анимации тостов */
 @keyframes slideIn {
     from { opacity: 0; transform: translateX(100px); }
     to { opacity: 1; transform: translateX(0); }
@@ -70,29 +74,9 @@
     }
 }
 
-/* --- Индикатор загрузки --- */
-.spinner {
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    border: 3px solid rgba(128, 128, 128, 0.2);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-}
-
-/* Крупный спиннер для модальных окон */
-.spinner-lg {
-    width: 40px;
-    height: 40px;
-    border-width: 4px;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-/* --- Статус Алисы --- */
+/* ==========================================
+   СТАТУС-ТОЧКИ (для Алисы и др.)
+   ========================================== */
 .status-dot {
     display: inline-block;
     width: 10px;
@@ -115,18 +99,9 @@
     box-shadow: 0 0 4px var(--warning);
 }
 
-/* --- Эффект пульсации для активных элементов --- */
-@keyframes pulse {
-    0% { opacity: 0.6; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.02); }
-    100% { opacity: 0.6; transform: scale(1); }
-}
-
-.pulse {
-    animation: pulse 2s infinite;
-}
-
-/* --- Скелетон (загрузка контента) --- */
+/* ==========================================
+   СКЕЛЕТОН (загрузка контента)
+   ========================================== */
 .skeleton {
     background: linear-gradient(
         90deg,
@@ -144,13 +119,17 @@
     100% { background-position: -200% 0; }
 }
 
-/* --- Подсветка фокуса для кнопок (безопасность) --- */
+/* ==========================================
+   ПОДСВЕТКА ФОКУСА (безопасность)
+   ========================================== */
 button:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
 }
 
-/* --- Плавное появление элементов --- */
+/* ==========================================
+   ПЛАВНОЕ ПОЯВЛЕНИЕ
+   ========================================== */
 .fade-in {
     animation: fadeIn 0.3s ease;
 }
@@ -158,29 +137,4 @@ button:focus-visible {
 @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
-}
-
-/* --- Стилизация скроллбара (как в macOS) --- */
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-    background: rgba(128, 128, 128, 0.4);
-    border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: rgba(128, 128, 128, 0.6);
-}
-
-/* Для Firefox */
-* {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(128, 128, 128, 0.4) transparent;
 }
