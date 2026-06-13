@@ -5,12 +5,19 @@
 # Комментарий: URL берутся из переменных окружения, дефолт на Bothost
 # ==========================================
 
+import sys
+import os
 import requests
 import threading
 import time
 import json
-import os
 from datetime import datetime
+
+# ===== ФИКС ПУТИ К БИБЛИОТЕКАМ =====
+sys.path.insert(0, '/home/c/ch756438/.local/lib/python3.10/site-packages')
+# ===================================
+
+from services.secrets_manager import get_secret
 
 CONFIG_FILE = "config.json"
 
@@ -27,7 +34,7 @@ def load_config():
 
 def ping_self():
     """Пинг самого бота (веб-морды)"""
-    url = os.environ.get("APP_URL", "https://ansambl-sledov-8.bothost.tech")
+    url = get_secret("APP_URL", "https://ansambl-sledov-8.bothost.tech")
     try:
         response = requests.get(f"{url}/health", timeout=10)
         print(f"[PING] Бот пинганулся: {response.status_code}")
@@ -41,7 +48,7 @@ def ping_agent():
             time.sleep(540)  # 9 минут
             config = load_config()
             agent_enabled = config.get("ping", {}).get("agent_enabled", True)
-            agent_url = os.environ.get("AGENT_HEALTH_URL", "https://ansambl-sledov-8.bothost.tech/health")
+            agent_url = get_secret("AGENT_HEALTH_URL", "https://ansambl-sledov-8.bothost.tech/health")
             
             if not agent_enabled:
                 print("[PING] Пинг агента отключён в конфиге")
