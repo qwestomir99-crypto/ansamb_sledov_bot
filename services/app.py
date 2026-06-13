@@ -7,12 +7,6 @@
 
 import sys
 import os
-
-# ===== ПРАВИЛЬНЫЙ ПУТЬ К БИБЛИОТЕКАМ =====
-lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../.local/lib/python3.10/site-packages'))
-sys.path.insert(0, lib_path)
-# ===========================================
-
 import hashlib
 import base64
 import secrets
@@ -23,7 +17,9 @@ from flask_socketio import SocketIO
 from debug_utils import debug_log
 import requests as req
 
+# ===== ЗАГРУЗКА СЕКРЕТОВ ИЗ БД =====
 from services.secrets_manager import get_secret
+# ===================================
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
@@ -167,4 +163,4 @@ start_background_thread()
 
 if __name__ == '__main__':
     port = int(get_secret("PORT", 10000))
-    socketio.run(app, host='127.0.0.1', port=port, debug=False)
+    socketio.run(app, host='0.0.0.0', port=port, debug=False)
