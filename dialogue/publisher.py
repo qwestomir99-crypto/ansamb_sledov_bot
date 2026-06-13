@@ -6,6 +6,7 @@
 # Версия: 2.0 (SQLite)
 # ==========================================
 
+import sys
 import os
 import json
 import time
@@ -16,18 +17,23 @@ from datetime import datetime
 from debug_utils import debug_log
 from utils import escape_markdown
 
+# ===== ЗАГРУЗКА СЕКРЕТОВ ИЗ БД =====
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from services.secrets_manager import get_secret
+# ===================================
+
 # ==========================================
 # 1. ПУТИ К БАЗЕ ДАННЫХ
 # ==========================================
-DB_PATH = 'data/ansambl.db'
-CONFIG_JSON = os.path.join('dialogue', 'data', 'config.json')  # fallback
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(PROJECT_ROOT, 'data/ansambl.db')
+CONFIG_JSON = os.path.join(PROJECT_ROOT, 'dialogue', 'data', 'config.json')  # fallback
 
 def get_db_connection():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     return sqlite3.connect(DB_PATH)
 
 def init_posts_table():
-    """Создаёт таблицу posts, если её нет"""
     conn = get_db_connection()
     c = conn.cursor()
     c.execute('''
@@ -49,7 +55,6 @@ def init_posts_table():
 # 2. РАБОТА С КОНФИГАМИ (SQLite + JSON fallback)
 # ==========================================
 def load_config():
-    """Загружает настройки из SQLite (таблица config)"""
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -64,14 +69,12 @@ def load_config():
     except Exception as e:
         debug_log("PUBLISH", f"Ошибка загрузки config из SQLite: {e}", "WARNING")
     
-    # fallback на JSON
     if os.path.exists(CONFIG_JSON):
         with open(CONFIG_JSON, "r") as f:
             return json.load(f)
     return {}
 
 def save_config_to_sqlite(config):
-    """Сохраняет настройки в SQLite"""
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -88,7 +91,6 @@ def save_config_to_sqlite(config):
 # 3. РАБОТА С ПУЛОМ ПОСТОВ (SQLite)
 # ==========================================
 def get_pending_posts():
-    """Возвращает неопубликованные посты из базы"""
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -101,7 +103,6 @@ def get_pending_posts():
         return []
 
 def add_post_to_pool(text, tags='', author='admin'):
-    """Добавляет пост в базу (статус pending)"""
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -115,7 +116,6 @@ def add_post_to_pool(text, tags='', author='admin'):
         return False
 
 def remove_post_from_pool(post_id):
-    """Удаляет пост из базы"""
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -129,7 +129,6 @@ def remove_post_from_pool(post_id):
         return False
 
 def mark_post_published(post_id, platform='both'):
-    """Отмечает пост как опубликованный"""
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -149,7 +148,6 @@ def mark_post_published(post_id, platform='both'):
 # 4. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 # ==========================================
 def get_random_quote():
-    """Возвращает случайную цитату из SQLite"""
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -163,7 +161,6 @@ def get_random_quote():
     return "Ритм 0,8 Гц стабилен. Сеть тлеет."
 
 def get_auto_tags(text, platform="tg"):
-    """Возвращает случайные хэштеги из SQLite"""
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -181,15 +178,11 @@ def get_auto_tags(text, platform="tg"):
 # 5. ПУБЛИКАЦИЯ
 # ==========================================
 def publish_post_immediately(bot, chat_id, text, tags_str=None, file_id=None):
-    """Немедленная публикация поста (с цитатой и хэштегами)"""
     quote = get_random_quote()
     full_text = f"{text}\n\n📜 {quote}" if text else quote
-    
-    # Добавляем хэштеги
     auto_tags = get_auto_tags(full_text, "tg")
     if auto_tags:
         full_text = f"{full_text}\n\n{auto_tags}"
-    
     try:
         from services.photo_reader import get_random_post
         post = get_random_post()
@@ -197,7 +190,6 @@ def publish_post_immediately(bot, chat_id, text, tags_str=None, file_id=None):
             bot.send_photo(chat_id, post['photo_url'], caption=full_text[:1024])
             return True
     except: pass
-    
     try:
         bot.send_message(chat_id, full_text)
         return True
@@ -206,11 +198,6 @@ def publish_post_immediately(bot, chat_id, text, tags_str=None, file_id=None):
         return False
 
 def publish_from_pool(bot, vk_token, vk_group_id, tg_chat_id, target='group'):
-    """
-    Публикует пост из пула (SQLite)
-    target='group' → в группу (бизнес)
-    target='private' → в личку (творчество)
-    """
     pending_posts = get_pending_posts()
     if not pending_posts:
         try:
@@ -221,13 +208,10 @@ def publish_from_pool(bot, vk_token, vk_group_id, tg_chat_id, target='group'):
     
     post = random.choice(pending_posts)
     full_text = f"{post['text']}\n\n📜 {get_random_quote()}"
-    
-    # Добавляем хэштеги
     auto_tags = get_auto_tags(full_text, "tg")
     if auto_tags:
         full_text = f"{full_text}\n\n{auto_tags}"
     
-    # Пробуем добавить фото
     try:
         from services.photo_reader import get_random_post
         p = get_random_post()
@@ -260,7 +244,6 @@ def publish_from_pool(bot, vk_token, vk_group_id, tg_chat_id, target='group'):
     return success
 
 def publish_loop(bot, vk_token, vk_group_id, tg_chat_id):
-    """Основной цикл публикации (запускается в отдельном потоке)"""
     debug_log("PUBLISH", "Цикл публикации запущен (TG + VK группа)")
     while True:
         try:
