@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # ===========================================
 # Файл: bot.py
 # Справка: README.md - Бот / Точка входа
@@ -7,13 +8,12 @@
 import sys
 import os
 
-# Добавляем пути к локальным библиотекам
-sys.path.insert(0, '/home/c/ch756438/.local/lib/python3.10/site-packages')
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# ===== ПРАВИЛЬНЫЙ ПУТЬ К БИБЛИОТЕКАМ =====
+lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.local/lib/python3.10/site-packages'))
+sys.path.insert(0, lib_path)
+# ===========================================
 
-# Подключаем менеджер секретов
 from services.secrets_manager import get_secret
-
 import threading
 
 print("=== ПОИСК ФАЙЛОВ С config.json ===")
@@ -35,8 +35,6 @@ for root, dirs, files in os.walk('.'):
             except Exception as e:
                 print(f"  Ошибка чтения {path}: {e}")
 print("=== КОНЕЦ ПОИСКА ===")
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from services.app import app
 from ping_utils import start_background_pinger, start_agent_pinger
