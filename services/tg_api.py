@@ -5,26 +5,41 @@
 # Комментарий: без telebot
 # ==========================================
 
+import sys
 import os
 import requests
 from flask import Blueprint, request, jsonify
 from debug_utils import debug_log
 
-tg_api_bp = Blueprint('tg_api', __name__)
+# ===== ЗАГРУЗКА СЕКРЕТОВ ИЗ БД =====
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from services.secrets_manager import get_secret
+# ===================================
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-ADMIN_USER_ID = int(os.environ.get("ADMIN_USER_ID", 0))
-PUBLISH_CHANNEL = os.environ.get("PUBLISH_CHANNEL", "@qwestomir")
+tg_api_bp = Blueprint('tg_api', __name__)
 
 def log_tg(level, message):
     debug_log("TG_API", message, level)
 
-def tg_request(method, params):
-    """Универсальная функция для запросов к Telegram API"""
-    if not BOT_TOKEN:
+def get_bot_token():
+    token = get_secret("BOT_TOKEN")
+    if not token:
         log_tg("ERROR", "BOT_TOKEN не задан")
+    return token
+
+def get_admin_user_id():
+    uid = get_secret("ADMIN_USER_ID")
+    return int(uid) if uid else 0
+
+def get_publish_channel():
+    channel = get_secret("PUBLISH_CHANNEL")
+    return channel if channel else "@qwestomir"
+
+def tg_request(method, params):
+    token = get_bot_token()
+    if not token:
         return None
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/{method}"
+    url = f"https://api.telegram.org/bot{token}/{method}"
     try:
         r = requests.get(url, params=params, timeout=30)
         data = r.json()
@@ -39,10 +54,6 @@ def tg_request(method, params):
 
 @tg_api_bp.route('/comment', methods=['POST'])
 def api_tg_comment():
-    """
-    Отправляет комментарий (ответ на сообщение) в Telegram.
-    Ожидает JSON: {"chat_id": 123456789, "text": "текст", "reply_to": 123}
-    """
     data = request.json
     chat_id = data.get('chat_id')
     text = data.get('text', '').strip()
@@ -67,10 +78,6 @@ def api_tg_comment():
 
 @tg_api_bp.route('/send_message', methods=['POST'])
 def api_tg_send_message():
-    """
-    Отправляет личное сообщение пользователю в Telegram.
-    Ожидает JSON: {"user_id": 123456789, "text": "текст"}
-    """
     data = request.json
     user_id = data.get('user_id')
     text = data.get('text', '').strip()
@@ -91,13 +98,9 @@ def api_tg_send_message():
 
 @tg_api_bp.route('/send_to_channel', methods=['POST'])
 def api_tg_send_to_channel():
-    """
-    Отправляет пост в канал Telegram.
-    Ожидает JSON: {"text": "текст", "channel": "@channel"}
-    """
     data = request.json
     text = data.get('text', '').strip()
-    channel = data.get('channel', PUBLISH_CHANNEL)
+    channel = data.get('channel', get_publish_channel())
     
     if not text:
         return jsonify({"status": "error", "error": "text обязателен"}), 400
@@ -116,10 +119,6 @@ def api_tg_send_to_channel():
 
 @tg_api_bp.route('/send_photo', methods=['POST'])
 def api_tg_send_photo():
-    """
-    Отправляет фото в Telegram.
-    Ожидает JSON: {"chat_id": 123, "photo_url": "https://...", "caption": "текст"}
-    """
     data = request.json
     chat_id = data.get('chat_id')
     photo_url = data.get('photo_url')
@@ -143,10 +142,6 @@ def api_tg_send_photo():
 
 @tg_api_bp.route('/pin', methods=['POST'])
 def api_tg_pin():
-    """
-    Закрепляет сообщение в чате/канале Telegram.
-    Ожидает JSON: {"chat_id": 123, "message_id": 456}
-    """
     data = request.json
     chat_id = data.get('chat_id')
     message_id = data.get('message_id')
@@ -167,10 +162,6 @@ def api_tg_pin():
 
 @tg_api_bp.route('/unpin', methods=['POST'])
 def api_tg_unpin():
-    """
-    Открепляет сообщение в чате/канале Telegram.
-    Ожидает JSON: {"chat_id": 123, "message_id": 456}
-    """
     data = request.json
     chat_id = data.get('chat_id')
     message_id = data.get('message_id')
@@ -191,10 +182,6 @@ def api_tg_unpin():
 
 @tg_api_bp.route('/get_chat_id', methods=['GET'])
 def api_tg_get_chat_id():
-    """
-    Возвращает ID чата по username (или текущий чат).
-    Параметр: ?username=@channel
-    """
     username = request.args.get('username')
     
     if not username:
@@ -209,9 +196,6 @@ def api_tg_get_chat_id():
     else:
         return jsonify({"status": "error", "error": "Ошибка получения"}), 500
 
-# ==========================================
-# ДЛЯ ТЕСТА
-# ==========================================
 if __name__ == "__main__":
     print("TG API модуль загружен")
     print("Доступные эндпоинты:")
