@@ -4,8 +4,8 @@
  * @author: Ансамбль Следов
  * @version: 1.0
  * @description:
- *   Адаптивные таблицы для всех тем.
- *   Подключается после основного CSS.
+ *   Адаптивные таблицы с горизонтальной прокруткой.
+ *   Обрезка длинных строк, фиксированные кнопки действий.
  * ==================================================
  */
 
@@ -36,6 +36,7 @@
     letter-spacing: 0.5px;
 }
 
+/* Ширина столбцов */
 .adaptive-table th:nth-child(1),
 .adaptive-table td:nth-child(1) { width: 45px; }
 .adaptive-table th:nth-child(2),
@@ -47,12 +48,14 @@
 .adaptive-table th:nth-child(5),
 .adaptive-table td:nth-child(5) { width: 85px; }
 
+/* Обрезка длинных строк во втором столбце */
 .adaptive-table td:nth-child(2) {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
+/* Кнопки в последнем столбце */
 .adaptive-table td:last-child {
     white-space: nowrap;
     text-align: right;
@@ -78,6 +81,7 @@ body.dark .adaptive-table td:last-child a {
     color: white;
 }
 
+/* Адаптивность для телефонов */
 @media (max-width: 600px) {
     .adaptive-table th,
     .adaptive-table td {
