@@ -1,9 +1,14 @@
-/* ==========================================
-   Файл: static/css/macos.css
-   Справка: README.md → Веб-морда / Светлая тема
-   Задача: светлая тема оформления в стиле современной macOS
-   Комментарий: мягкие серые тона, размытие, минимальный акцент
-   ========================================== */
+/**
+ * ==================================================
+ * @file: static/css/macos.css
+ * @author: Ансамбль Следов
+ * @version: 1.1
+ * @description:
+ *   Светлая тема оформления в стиле современной macOS.
+ *   Только переменные и базовая стилизация.
+ *   Адаптивные таблицы вынесены в tables.css.
+ * ==================================================
+ */
 
 :root {
     /* Основные цвета — мягкий серый, как в macOS */
@@ -20,8 +25,6 @@
     --success: #34c759;
     --error: #ff3b30;
     --warning: #ff9500;
-    
-    /* Адаптивные отступы */
     --space-xs: 0.25rem;
     --space-sm: 0.5rem;
     --space-md: 1rem;
@@ -50,7 +53,7 @@ body {
 }
 
 /* ==========================================
-   КАРТОЧКИ (аккордеоны) — стиль macOS
+   КАРТОЧКИ (аккордеоны)
    ========================================== */
 .card {
     background: var(--card-bg);
@@ -106,7 +109,7 @@ body {
 }
 
 /* ==========================================
-   ВЫПАДАЮЩИЕ МЕНЮ (DROPDOWN)
+   ВЫПАДАЮЩИЕ МЕНЮ
    ========================================== */
 .dropdown {
     position: relative;
@@ -211,7 +214,7 @@ body {
 }
 
 /* ==========================================
-   КНОПКИ — минималистичные
+   КНОПКИ
    ========================================== */
 button, input, textarea, select {
     background: rgba(0, 0, 0, 0.04);
@@ -245,11 +248,9 @@ button:disabled {
     transform: none;
 }
 
-/* Вторичные кнопки (неосновные действия) */
 button.secondary {
     background: rgba(0, 0, 0, 0.05);
     color: var(--accent);
-    border: none;
 }
 
 button.secondary:hover {
@@ -392,40 +393,31 @@ a:hover {
     body {
         padding: var(--space-sm);
     }
-    
     .container {
         max-width: 100%;
     }
-    
     .card-header {
         padding: var(--space-sm) var(--space-md);
     }
-    
     .card-header h2 {
         font-size: 1rem;
     }
-    
     .card-content {
         padding: 0 var(--space-md) var(--space-md) var(--space-md);
     }
-    
     h1 {
         font-size: 1.4rem;
     }
-    
     pre, .messages {
         max-width: 100%;
         overflow-x: auto;
     }
-    
     .message {
         padding: 8px;
     }
-    
     .message-actions {
         flex-direction: column;
     }
-    
     .message-actions button {
         width: 100%;
     }
