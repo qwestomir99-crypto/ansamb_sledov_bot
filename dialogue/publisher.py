@@ -1,19 +1,26 @@
 # ==========================================
 # Файл: dialogue/publisher.py
 # Справка: README.md → Публикатор
-# Задача: публикация постов в TG и VK (из SQLite)
+# Задача: публикация постов в TG и VK (немедленная, отложенная, из пула)
 # Комментарий: VK — поддерживает группу и личку через target
+# Версия: 2.0 (SQLite)
 # ==========================================
 
-import sqlite3
 import os
-import random
+import json
 import time
+import random
+import sqlite3
 import threading
 from datetime import datetime
 from debug_utils import debug_log
+from utils import escape_markdown
 
+# ==========================================
+# 1. ПУТИ К БАЗЕ ДАННЫХ
+# ==========================================
 DB_PATH = 'data/ansambl.db'
+CONFIG_JSON = os.path.join('dialogue', 'data', 'config.json')  # fallback
 
 def get_db_connection():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
@@ -38,6 +45,48 @@ def init_posts_table():
     conn.close()
     debug_log("POST_POOL", "Таблица posts создана/подтверждена")
 
+# ==========================================
+# 2. РАБОТА С КОНФИГАМИ (SQLite + JSON fallback)
+# ==========================================
+def load_config():
+    """Загружает настройки из SQLite (таблица config)"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT key, value FROM config")
+        rows = c.fetchall()
+        conn.close()
+        config = {}
+        for key, value in rows:
+            config[key] = json.loads(value)
+        if config:
+            return config
+    except Exception as e:
+        debug_log("PUBLISH", f"Ошибка загрузки config из SQLite: {e}", "WARNING")
+    
+    # fallback на JSON
+    if os.path.exists(CONFIG_JSON):
+        with open(CONFIG_JSON, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_config_to_sqlite(config):
+    """Сохраняет настройки в SQLite"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        for key, value in config.items():
+            c.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", (key, json.dumps(value)))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        debug_log("PUBLISH", f"Ошибка сохранения config: {e}", "ERROR")
+        return False
+
+# ==========================================
+# 3. РАБОТА С ПУЛОМ ПОСТОВ (SQLite)
+# ==========================================
 def get_pending_posts():
     """Возвращает неопубликованные посты из базы"""
     try:
@@ -97,16 +146,10 @@ def mark_post_published(post_id, platform='both'):
         return False
 
 # ==========================================
-# ОСТАЛЬНЫЕ ФУНКЦИИ (без изменений)
+# 4. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 # ==========================================
-
-def load_config():
-    config_file = os.path.join('dialogue', 'data', 'config.json')
-    with open(config_file, "r") as f:
-        return json.load(f)
-
 def get_random_quote():
-    """Возвращает случайную цитату из базы"""
+    """Возвращает случайную цитату из SQLite"""
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -115,18 +158,38 @@ def get_random_quote():
         conn.close()
         if row:
             return row[0]
-    except:
-        pass
+    except Exception as e:
+        debug_log("PUBLISH", f"Ошибка получения цитаты: {e}", "ERROR")
     return "Ритм 0,8 Гц стабилен. Сеть тлеет."
 
-def get_auto_tags(text, platform):
-    """Генерация хэштегов (заглушка, можно расширить)"""
-    # Здесь можно вызвать hashtag_generator
+def get_auto_tags(text, platform="tg"):
+    """Возвращает случайные хэштеги из SQLite"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT tag FROM hashtags ORDER BY RANDOM() LIMIT 5")
+        rows = c.fetchall()
+        conn.close()
+        tags = [row[0] for row in rows]
+        if tags:
+            return " ".join(tags)
+    except Exception as e:
+        debug_log("PUBLISH", f"Ошибка получения хэштегов: {e}", "ERROR")
     return ""
 
+# ==========================================
+# 5. ПУБЛИКАЦИЯ
+# ==========================================
 def publish_post_immediately(bot, chat_id, text, tags_str=None, file_id=None):
+    """Немедленная публикация поста (с цитатой и хэштегами)"""
     quote = get_random_quote()
     full_text = f"{text}\n\n📜 {quote}" if text else quote
+    
+    # Добавляем хэштеги
+    auto_tags = get_auto_tags(full_text, "tg")
+    if auto_tags:
+        full_text = f"{full_text}\n\n{auto_tags}"
+    
     try:
         from services.photo_reader import get_random_post
         post = get_random_post()
@@ -134,10 +197,7 @@ def publish_post_immediately(bot, chat_id, text, tags_str=None, file_id=None):
             bot.send_photo(chat_id, post['photo_url'], caption=full_text[:1024])
             return True
     except: pass
-    try:
-        auto_tags = get_auto_tags(full_text, "tg")
-        if auto_tags: full_text = f"{full_text}\n\n{auto_tags}"
-    except: pass
+    
     try:
         bot.send_message(chat_id, full_text)
         return True
@@ -162,6 +222,12 @@ def publish_from_pool(bot, vk_token, vk_group_id, tg_chat_id, target='group'):
     post = random.choice(pending_posts)
     full_text = f"{post['text']}\n\n📜 {get_random_quote()}"
     
+    # Добавляем хэштеги
+    auto_tags = get_auto_tags(full_text, "tg")
+    if auto_tags:
+        full_text = f"{full_text}\n\n{auto_tags}"
+    
+    # Пробуем добавить фото
     try:
         from services.photo_reader import get_random_post
         p = get_random_post()
@@ -171,31 +237,40 @@ def publish_from_pool(bot, vk_token, vk_group_id, tg_chat_id, target='group'):
     success = False
     if tg_chat_id:
         try:
-            if photo: bot.send_photo(tg_chat_id, photo, caption=full_text[:1024])
-            else: bot.send_message(tg_chat_id, full_text)
+            if photo:
+                bot.send_photo(tg_chat_id, photo, caption=full_text[:1024])
+            else:
+                bot.send_message(tg_chat_id, full_text)
             success = True
-        except Exception as e: debug_log("PUBLISH", f"Ошибка TG: {e}", "ERROR")
+        except Exception as e:
+            debug_log("PUBLISH", f"Ошибка TG: {e}", "ERROR")
     
     if vk_token and vk_group_id:
         try:
             from dialogue.publisher_utils import post_to_vk
             tags = post.get('tags', '')
             sv, _ = post_to_vk(full_text, tags, vk_token, vk_group_id, target=target)
-            if sv: success = True
-        except Exception as e: debug_log("PUBLISH", f"Ошибка VK: {e}", "ERROR")
+            if sv:
+                success = True
+        except Exception as e:
+            debug_log("PUBLISH", f"Ошибка VK: {e}", "ERROR")
     
     if success:
         mark_post_published(post['id'], 'both')
     return success
 
 def publish_loop(bot, vk_token, vk_group_id, tg_chat_id):
+    """Основной цикл публикации (запускается в отдельном потоке)"""
     debug_log("PUBLISH", "Цикл публикации запущен (TG + VK группа)")
     while True:
         try:
             try:
                 from dialogue.shabbat_manager import is_shabbat
-                if is_shabbat(): time.sleep(3600); continue
-            except ImportError: pass
+                if is_shabbat():
+                    time.sleep(3600)
+                    continue
+            except ImportError:
+                pass
             
             config = load_config()
             interval = config.get("publisher", {}).get("interval_seconds", 7200)
@@ -206,8 +281,10 @@ def publish_loop(bot, vk_token, vk_group_id, tg_chat_id):
                 debug_log("PUBLISH", "Нет постов")
             time.sleep(interval)
         except Exception as e:
-            debug_log("PUBLISH", f"Ошибка: {e}", "ERROR")
+            debug_log("PUBLISH", f"Ошибка в цикле: {e}", "ERROR")
             time.sleep(300)
 
-# Инициализация таблицы при загрузке модуля
+# ==========================================
+# 6. ИНИЦИАЛИЗАЦИЯ
+# ==========================================
 init_posts_table()
