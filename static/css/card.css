@@ -1,0 +1,66 @@
+/**
+ * ==================================================
+ * @file: static/css/card.css
+ * @author: Ансамбль Следов
+ * @version: 1.0
+ * @description:
+ *   Карточки-аккордеоны (свёртываемые блоки).
+ * ==================================================
+ */
+
+.card {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
+    margin: var(--space-md) 0;
+    box-shadow: var(--shadow);
+    border: 0.5px solid var(--border);
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.card-header {
+    padding: var(--space-md) var(--space-lg);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    transition: background 0.2s;
+}
+
+.card-header:hover {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+body.dark .card-header:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.card-header h2 {
+    font-weight: 590;
+    letter-spacing: -0.01em;
+    font-size: 1.2rem;
+    margin: 0;
+    color: var(--text);
+}
+
+.card-header .toggle-icon {
+    font-size: 0.9rem;
+    transition: transform 0.2s;
+    color: var(--text-secondary);
+}
+
+.card.collapsed .card-header .toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.card-content {
+    padding: 0 var(--space-lg) var(--space-lg) var(--space-lg);
+    transition: all 0.3s ease;
+}
+
+.card.collapsed .card-content {
+    display: none;
+}
