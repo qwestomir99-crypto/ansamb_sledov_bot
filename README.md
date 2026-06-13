@@ -179,7 +179,7 @@
 
 ## 📡 Redmi-аудит проекта
 
-*Обновлено: 13.06.2026 21:41:05*
+*Обновлено: 13.06.2026 23:16:25*
 
 | Файл | Статус |
 |------|--------|
@@ -198,7 +198,7 @@
 | `big_video_uploader.py` | ✅ Redmi-шапка |
 | `bot.py` | ❌ Без шапки |
 | `bot/__init__.py` | ❌ Без шапки |
-| `bot/core.py` | ✅ Redmi-шапка |
+| `bot/core.py` | ❌ Без шапки |
 | `bot/handlers.py` | ✅ Redmi-шапка |
 | `bot/handlers/__init__.py` | ✅ Redmi-шапка |
 | `bot/handlers/admin.py` | ❌ Без шапки |
