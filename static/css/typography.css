@@ -1,0 +1,44 @@
+/**
+ * ==================================================
+ * @file: static/css/typography.css
+ * @author: Ансамбль Следов
+ * @version: 1.0
+ * @description:
+ *   Заголовки, ссылки, статус-бейджи.
+ * ==================================================
+ */
+
+/* ==========================================
+   ЗАГОЛОВКИ
+   ========================================== */
+h1 {
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    font-size: 1.6rem;
+    margin-bottom: 0.25rem;
+}
+
+/* ==========================================
+   ССЫЛКИ
+   ========================================== */
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* ==========================================
+   СТАТУСЫ
+   ========================================== */
+.status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 500;
+}
