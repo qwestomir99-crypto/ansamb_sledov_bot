@@ -1,0 +1,94 @@
+/**
+ * ==================================================
+ * @file: static/css/dropdown.css
+ * @author: Ансамбль Следов
+ * @version: 1.0
+ * @description:
+ *   Выпадающие меню (dropdown).
+ * ==================================================
+ */
+
+.dropdown {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.dropdown-trigger {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text);
+    border: none;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+    width: 100%;
+}
+
+body.dark .dropdown-trigger {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.dropdown-trigger:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+body.dark .dropdown-trigger:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    border: 0.5px solid var(--border);
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition: all 0.2s;
+    min-width: 100%;
+}
+
+.dropdown.open .dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(4px);
+}
+
+.dropdown-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 16px;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.dropdown-menu button:hover {
+    background: var(--accent-soft);
+}
+
+.dropdown-menu button:first-child {
+    border-radius: 12px 12px 0 0;
+}
+
+.dropdown-menu button:last-child {
+    border-radius: 0 0 12px 12px;
+}
