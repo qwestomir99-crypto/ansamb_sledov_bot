@@ -1,165 +1,144 @@
 # ==========================================
 # Файл: dialogue/youtube_auto.py
 # Справка: README.md → YouTube автопостинг
-# Задача: выбор случайного видео из плейлиста
-# Комментарий: кэширует список видео на час. Приоритет: свежий API → старый кэш → None.
-#              Возвращает случайное видео (id, title, url).
-# Зависит от: requests, json, os, time, random
-# Вызывается из: services/autoposter.py (check_and_publish)
+# Задача: получение случайного видео из плейлиста YouTube
+# Комментарий: видео хранятся в БД (links), кэш в SQLite
 # ==========================================
 
 import os
-import json
 import random
-import time
+import sqlite3
 import requests
+from datetime import datetime
+from debug_utils import debug_log
 
-CACHE_FILE = "dialogue/data/youtube_playlist_cache.json"
-CACHE_TTL = 3600  # 1 час
+# Путь к базе данных
+DB_PATH = 'data/ansambl.db'
+YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY")
+YOUTUBE_PLAYLIST_ID = os.environ.get("YOUTUBE_PLAYLIST_ID")
 
-def log(msg, level="INFO"):
-    print(f"[YOUTUBE_RANDOM] {level}: {msg}")
+def get_db_connection():
+    """Создаёт подключение к SQLite"""
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    return sqlite3.connect(DB_PATH)
 
-def get_youtube_api_key():
-    api_key = os.environ.get("YOUTUBE_API_KEY")
-    if not api_key:
-        log("YOUTUBE_API_KEY не задан", "ERROR")
-    return api_key
-
-def get_youtube_playlist_id():
-    playlist_id = os.environ.get("YOUTUBE_PLAYLIST_ID")
-    if not playlist_id:
-        log("YOUTUBE_PLAYLIST_ID не задан", "ERROR")
-    return playlist_id
-
-def fetch_playlist_items(playlist_id, api_key):
-    """Загружает все видео из плейлиста через YouTube API"""
-    items = []
-    next_page_token = None
-    
-    while True:
-        url = "https://www.googleapis.com/youtube/v3/playlistItems"
-        params = {
-            "part": "snippet",
-            "playlistId": playlist_id,
-            "maxResults": 50,
-            "key": api_key
-        }
-        if next_page_token:
-            params["pageToken"] = next_page_token
-        
-        try:
-            r = requests.get(url, params=params, timeout=15)
-            data = r.json()
-            
-            if "error" in data:
-                log(f"API ошибка: {data['error']['message']}", "ERROR")
-                break
-            
-            for item in data.get("items", []):
-                snippet = item["snippet"]
-                video_id = snippet["resourceId"]["videoId"]
-                items.append({
-                    "id": video_id,
-                    "title": snippet["title"],
-                    "url": f"https://youtu.be/{video_id}"
-                })
-            
-            next_page_token = data.get("nextPageToken")
-            if not next_page_token:
-                break
-                
-        except Exception as e:
-            log(f"Ошибка запроса: {e}", "ERROR")
-            break
-    
-    log(f"Загружено {len(items)} видео из плейлиста")
-    return items
-
-def load_cached_playlist():
-    """Загружает кэш плейлиста, если он не устарел"""
-    if not os.path.exists(CACHE_FILE):
-        return None
-    
-    try:
-        with open(CACHE_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        
-        if time.time() - data.get("timestamp", 0) < CACHE_TTL:
-            log(f"Загружено из кэша: {len(data['items'])} видео")
-            return data["items"]
-        else:
-            log("Кэш устарел")
-            return None
-    except Exception as e:
-        log(f"Ошибка чтения кэша: {e}", "ERROR")
-        return None
-
-def load_cached_playlist_force():
-    """Загружает кэш плейлиста, даже если он устарел"""
-    if not os.path.exists(CACHE_FILE):
-        return None
-    
-    try:
-        with open(CACHE_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        log(f"Загружен СТАРЫЙ кэш: {len(data['items'])} видео")
-        return data["items"]
-    except Exception as e:
-        log(f"Ошибка чтения старого кэша: {e}", "ERROR")
-        return None
-
-def save_cached_playlist(items):
-    """Сохраняет плейлист в кэш"""
-    os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
-    try:
-        with open(CACHE_FILE, "w", encoding="utf-8") as f:
-            json.dump({
-                "timestamp": time.time(),
-                "items": items
-            }, f, indent=2)
-        log(f"Сохранено {len(items)} видео в кэш")
-    except Exception as e:
-        log(f"Ошибка сохранения кэша: {e}", "ERROR")
+def init_links_table():
+    """Создаёт таблицу links, если её нет"""
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS links (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            url TEXT NOT NULL,
+            title TEXT,
+            source TEXT,
+            tags TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            used_at DATETIME,
+            use_count INTEGER DEFAULT 0
+        )
+    ''')
+    conn.commit()
+    conn.close()
+    debug_log("YOUTUBE_AUTO", "Таблица links создана/подтверждена")
 
 def get_random_video():
-    """
-    Возвращает случайное видео из плейлиста.
-    Приоритет: свежий API → старый кэш → None.
-    """
-    api_key = get_youtube_api_key()
-    playlist_id = get_youtube_playlist_id()
-    
-    if not api_key or not playlist_id:
+    """Возвращает случайное видео из базы данных (источник youtube)"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT url, title FROM links WHERE source = 'youtube' ORDER BY RANDOM() LIMIT 1")
+        row = c.fetchone()
+        conn.close()
+        if row:
+            debug_log("YOUTUBE_RANDOM", f"Выбрано случайное видео: {row[1]}")
+            return {"url": row[0], "title": row[1]}
+        else:
+            debug_log("YOUTUBE_RANDOM", "Нет видео в базе, обновляем кэш...")
+            refresh_cache()
+            return get_random_video()
+    except Exception as e:
+        debug_log("YOUTUBE_RANDOM", f"Ошибка: {e}", "ERROR")
         return None
-    
-    # 1. Пробуем свежий кэш
-    items = load_cached_playlist()
-    
-    # 2. Если кэш устарел или пуст — пробуем API
-    if items is None:
-        items = fetch_playlist_items(playlist_id, api_key)
-        if items:
-            save_cached_playlist(items)
-    
-    # 3. Если API не дал — пробуем старый кэш (игнорируем TTL)
-    if not items:
-        items = load_cached_playlist_force()
-    
-    # 4. Совсем ничего — None
-    if not items:
-        log("Плейлист пуст даже из старого кэша", "WARNING")
-        return None
-    
-    video = random.choice(items)
-    log(f"Выбрано случайное видео: {video['title']}")
-    return video
 
-# Для самостоятельного тестирования
-if __name__ == "__main__":
-    print("=== ТЕСТ YOUTUBE RANDOM ===")
-    video = get_random_video()
-    if video:
-        print(f"🎬 Случайное видео: {video['title']}\n🔗 {video['url']}")
-    else:
-        print("❌ Не удалось получить видео")
+def add_video_to_db(url, title, tags=''):
+    """Добавляет видео в базу, если ещё не существует"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT id FROM links WHERE url = ?", (url,))
+        if c.fetchone():
+            conn.close()
+            return False
+        c.execute(
+            "INSERT INTO links (url, title, source, tags, created_at) VALUES (?, ?, 'youtube', ?, ?)",
+            (url, title, tags, datetime.now().isoformat())
+        )
+        conn.commit()
+        conn.close()
+        debug_log("YOUTUBE_AUTO", f"Добавлено видео: {title}")
+        return True
+    except Exception as e:
+        debug_log("YOUTUBE_AUTO", f"Ошибка добавления видео: {e}", "ERROR")
+        return False
+
+def refresh_cache():
+    """Обновляет кэш видео из YouTube API"""
+    if not YOUTUBE_API_KEY or not YOUTUBE_PLAYLIST_ID:
+        debug_log("YOUTUBE_RANDOM", "Нет API_KEY или PLAYLIST_ID", "ERROR")
+        return
+    
+    url = "https://www.googleapis.com/youtube/v3/playlistItems"
+    params = {
+        "part": "snippet",
+        "playlistId": YOUTUBE_PLAYLIST_ID,
+        "maxResults": 50,
+        "key": YOUTUBE_API_KEY
+    }
+    
+    try:
+        r = requests.get(url, params=params, timeout=15)
+        data = r.json()
+        
+        if "error" in data:
+            debug_log("YOUTUBE_RANDOM", f"Ошибка API: {data['error']['message']}", "ERROR")
+            return
+        
+        items = data.get("items", [])
+        if not items:
+            debug_log("YOUTUBE_RANDOM", "Нет видео в плейлисте", "WARNING")
+            return
+        
+        count = 0
+        for item in items:
+            snippet = item.get("snippet", {})
+            video_id = snippet.get("resourceId", {}).get("videoId")
+            title = snippet.get("title", "Без названия")
+            if video_id:
+                url = f"https://www.youtube.com/watch?v={video_id}"
+                if add_video_to_db(url, title):
+                    count += 1
+        
+        debug_log("YOUTUBE_RANDOM", f"Обновлено видео: {count} новых")
+        
+    except Exception as e:
+        debug_log("YOUTUBE_RANDOM", f"Ошибка обновления: {e}", "ERROR")
+
+def mark_video_used(url):
+    """Отмечает видео как использованное (увеличивает счётчик)"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute(
+            "UPDATE links SET use_count = use_count + 1, used_at = ? WHERE url = ?",
+            (datetime.now().isoformat(), url)
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        debug_log("YOUTUBE_AUTO", f"Ошибка обновления счётчика: {e}", "ERROR")
+        return False
+
+# Инициализация таблицы при загрузке модуля
+init_links_table()
