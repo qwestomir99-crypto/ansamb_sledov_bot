@@ -5,10 +5,10 @@
 # Комментарий: защищён от байтов и кривых данных
 # ==========================================
 
+import os
 import requests
 from flask import Blueprint, request, jsonify
 from debug_utils import debug_log
-from services.secrets_manager import get_secret
 from services.app import get_vk_token
 
 vk_api_bp = Blueprint('vk_api', __name__)
@@ -56,19 +56,19 @@ def get_current_token():
     return ensure_string(token)
 
 def get_vk_owner_id():
-    owner = get_secret("VK_OWNER_ID")
+    owner = os.getenv("VK_OWNER_ID")
     return ensure_int(owner)
 
 def get_vk_group_id():
-    group = get_secret("VK_GROUP_ID")
+    group = os.getenv("VK_GROUP_ID")
     return ensure_int(group)
 
 def get_vk_token_user():
-    token = get_secret("VK_TOKEN_USER")
+    token = os.getenv("VK_TOKEN_USER")
     return ensure_string(token)
 
 def get_vk_access_token():
-    token = get_secret("VK_ACCESS_TOKEN")
+    token = os.getenv("VK_ACCESS_TOKEN")
     return ensure_string(token)
 
 # ==========================================
