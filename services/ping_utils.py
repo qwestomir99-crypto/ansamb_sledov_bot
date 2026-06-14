@@ -5,29 +5,9 @@
 # ==========================================
 
 import time
-import json
 import os
 import threading
 import requests
-
-# ==========================================
-# КОНФИГУРАЦИЯ
-# ==========================================
-
-CONFIG_FILE = "config.json"
-
-def load_config():
-    """Загружает конфиг с защитой от байтов"""
-    try:
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        else:
-            print(f"[PING] config.json не найден, использую значения по умолчанию")
-            return {}
-    except Exception as e:
-        print(f"[PING] Ошибка загрузки config.json: {e}")
-        return {}
 
 # ==========================================
 # ПИНГЕР БОТА (Telegram)
@@ -35,11 +15,10 @@ def load_config():
 
 def ping_bot(interval=60):
     """Пингует бота через Telegram API"""
-    config = load_config()
-    token = config.get("TG_TOKEN", "")
+    token = os.getenv("BOT_TOKEN")
     
     if not token:
-        print("[PING] Нет TG_TOKEN, пингер бота не запущен")
+        print("[PING] Нет BOT_TOKEN, пингер бота не запущен")
         return
     
     url = f"https://api.telegram.org/bot{token}/getMe"
@@ -68,7 +47,7 @@ def start_background_pinger(interval=60):
 
 def ping_agent():
     """Пингует Flask-агента, чтобы он не засыпал"""
-    url = "https://ansamb-sledov.ru"  # или http://localhost:10000
+    url = os.getenv("AGENT_HEALTH_URL", "https://ansambl-sledov-8.bothost.tech/health")
     interval = 60
     
     while True:
@@ -92,6 +71,6 @@ def start_agent_pinger():
 
 if __name__ == "__main__":
     print("=== ТЕСТ PING_UTILS ===")
-    config = load_config()
-    print(f"Конфиг: {config}")
+    token = os.getenv("BOT_TOKEN")
+    print(f"BOT_TOKEN: {'найден' if token else 'не найден'}")
     print("✅ ping_utils.py готов к работе")
