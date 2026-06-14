@@ -22,17 +22,17 @@ from debug_utils import debug_log
 CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
 
 def load_config():
-    with open(CONFIG_FILE, "r") as f:
+    with open(CONFIG_FILE, "r", encoding='utf-8') as f:
         return json.load(f)
 
 config = load_config()
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "tleem2026")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "tleem2026")
 
 def safe_delete(message, delay=3):
     def _delete():
         time.sleep(delay)
         try:
-            bot = telebot.TeleBot(os.environ.get("BOT_TOKEN"))
+            bot = telebot.TeleBot(os.getenv("BOT_TOKEN"))
             bot.delete_message(message.chat.id, message.message_id)
         except:
             pass
