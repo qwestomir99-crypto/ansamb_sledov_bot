@@ -13,7 +13,11 @@ lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.local
 sys.path.insert(0, lib_path)
 # ===========================================
 
-from services.secrets_manager import get_secret
+# ===== ЗАГРУЗКА .ENV =====
+from dotenv import load_dotenv
+load_dotenv()
+# ===========================================
+
 import threading
 
 print("=== ПОИСК ФАЙЛОВ С config.json ===")
@@ -47,7 +51,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"[BOT] Ошибка запуска пингеров: {e}")
 
-    port = int(get_secret("PORT", 10000))
+    port = int(os.getenv("PORT", 10000))
     threading.Thread(target=app.run, args=('0.0.0.0', port), daemon=True).start()
 
     from bot.main import main
