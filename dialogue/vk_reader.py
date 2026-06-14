@@ -14,83 +14,23 @@ from datetime import datetime
 from debug_utils import debug_log
 
 # ==========================================
-# 1. АВТОСОЗДАНИЕ И АВТОИСПРАВЛЕНИЕ КОНФИГА
-# ==========================================
-
-def ensure_config_exists():
-    """Проверяет наличие конфига и создаёт его с дефолтами, если нет"""
-    CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
-    os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
-    
-    if not os.path.exists(CONFIG_FILE):
-        default_config = {
-            "VK_READER_TOKEN": "",
-            "TG_TOKEN": "",
-            "OWNER_ID": 0,
-            "TG_CHAT_ID": 0,
-            "VK_GROUP_ID": 0,
-            "created_at": datetime.now().isoformat(),
-            "auto_created": True
-        }
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(default_config, f, indent=2, ensure_ascii=False)
-        print(f"✅ config.json автосоздан: {CONFIG_FILE}")
-    return CONFIG_FILE
-
-def load_config_safe():
-    """Загружает конфиг с автоисправлением"""
-    CONFIG_FILE = ensure_config_exists()
-    
-    try:
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            content = f.read()
-            if not content.strip():
-                raise ValueError("Конфиг пуст")
-            return json.loads(content)
-    except (json.JSONDecodeError, ValueError) as e:
-        print(f"⚠️ Ошибка чтения конфига: {e}, пересоздаю...")
-        default_config = {
-            "VK_READER_TOKEN": "",
-            "TG_TOKEN": "",
-            "OWNER_ID": 0,
-            "TG_CHAT_ID": 0,
-            "VK_GROUP_ID": 0,
-            "created_at": datetime.now().isoformat(),
-            "auto_recreated": True,
-            "error": str(e)
-        }
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(default_config, f, indent=2, ensure_ascii=False)
-        return default_config
-
-# ==========================================
-# 2. УНИВЕРСАЛЬНЫЙ КОНВЕРТЕР БАЙТОВ → СТРОКИ
+# 1. УНИВЕРСАЛЬНЫЕ КОНВЕРТЕРЫ (защитный слой)
 # ==========================================
 
 def ensure_string(value, param_name="параметр"):
     """Приводит любой входной параметр к строке"""
     if value is None:
-        print(f"⚠️ {param_name} = None, заменяю на пустую строку")
         return ""
     if isinstance(value, bytes):
         try:
-            decoded = value.decode('utf-8')
-            print(f"🔄 {param_name} преобразован из байтов в строку")
-            return decoded
+            return value.decode('utf-8')
         except UnicodeDecodeError:
-            decoded = value.decode('latin1')
-            print(f"🔄 {param_name} преобразован из байтов (latin1) в строку")
-            return decoded
-    if isinstance(value, int) or isinstance(value, float):
-        return str(value)
-    if isinstance(value, dict) or isinstance(value, list):
-        return json.dumps(value, ensure_ascii=False)
-    return value
+            return value.decode('latin1')
+    return str(value)
 
 def ensure_int(value, param_name="параметр"):
     """Приводит к целому числу"""
     if value is None:
-        print(f"⚠️ {param_name} = None, заменяю на 0")
         return 0
     try:
         return int(value)
@@ -99,11 +39,10 @@ def ensure_int(value, param_name="параметр"):
             numbers = re.findall(r'-?\d+', value)
             if numbers:
                 return int(numbers[0])
-        print(f"⚠️ {param_name} не является числом, использую 0")
         return 0
 
 # ==========================================
-# 3. РАБОТА С КЭШЕМ ПОСТОВ
+# 2. РАБОТА С КЭШЕМ ПОСТОВ
 # ==========================================
 
 VK_POSTS_FILE = "dialogue/data/vk_posts.json"
@@ -135,11 +74,11 @@ def add_vk_post(post):
     debug_log("VK_READER", f"📥 Пост сохранён: {post.get('text', '')[:50]}...")
 
 # ==========================================
-# 4. ЗАПРОС К VK API
+# 3. ЗАПРОС К VK API (с защитой типов)
 # ==========================================
 
 def fetch_last_posts(vk_token, owner_id, count=5):
-    # Автоматическая конвертация
+    # Супер-защита на входе
     vk_token = ensure_string(vk_token, "VK_TOKEN")
     owner_id = ensure_int(owner_id, "OWNER_ID")
     
@@ -185,38 +124,31 @@ def fetch_last_posts(vk_token, owner_id, count=5):
         return []
 
 # ==========================================
-# 5. ОСНОВНОЙ ЦИКЛ
+# 4. ОСНОВНОЙ ЦИКЛ (с защитой на входе)
 # ==========================================
 
 def vk_reader_loop(bot, vk_token, owner_id, tg_chat_id):
-    # Атомная защита — конвертируем всё, что может прийти
+    # Защита на входе
     vk_token = ensure_string(vk_token, "VK_TOKEN")
     owner_id = ensure_int(owner_id, "OWNER_ID")
     tg_chat_id = ensure_string(tg_chat_id, "TG_CHAT_ID")
     
-    # Если токен пустой, пробуем взять из конфига
-    if not vk_token:
-        config = load_config_safe()
-        vk_token = config.get("VK_READER_TOKEN", "")
-        if vk_token:
-            debug_log("VK_READER", "✅ VK_TOKEN взят из config.json")
-    
     if not vk_token or not owner_id:
         debug_log("VK_READER", "❌ Нет токена или owner_id — выходим.", "ERROR")
         return
-
+    
     debug_log("VK_READER", f"🔁 Поток запущен. owner_id={owner_id}, токен длиной={len(vk_token)}")
-
+    
     last_post_id = None
     posts = load_vk_posts()
     debug_log("VK_READER", f"📦 Загружено из кэша: {len(posts)} постов")
     
     if posts:
         last_post_id = posts[-1].get("id")
-
+    
     initial_load_done = len(posts) > 0
     debug_log("VK_READER", f"initial_load_done={initial_load_done}")
-
+    
     debug_log("VK_READER", "Вход в цикл...")
     while True:
         try:
@@ -226,13 +158,13 @@ def vk_reader_loop(bot, vk_token, owner_id, tg_chat_id):
                 initial_load_done = True
             else:
                 new_posts = fetch_last_posts(vk_token, owner_id, count=3)
-
+            
             debug_log("VK_READER", f"Получено {len(new_posts) if new_posts else 0} новых постов")
             
             if not new_posts:
                 time.sleep(60)
                 continue
-
+            
             for post in reversed(new_posts):
                 if last_post_id is None or post["id"] > last_post_id:
                     add_vk_post(post)
@@ -241,14 +173,14 @@ def vk_reader_loop(bot, vk_token, owner_id, tg_chat_id):
                     if post.get("photo_url"):
                         debug_log("VK_READER", f"📸 Фото: {post['photo_url'][:60]}...")
                     last_post_id = post["id"]
-
+        
         except Exception as e:
             debug_log("VK_READER", f"❌ Ошибка цикла: {e}", "ERROR")
-
+        
         time.sleep(60)
 
 # ==========================================
-# 6. ТЕСТ
+# 5. ТЕСТ
 # ==========================================
 
 if __name__ == "__main__":
@@ -267,10 +199,5 @@ if __name__ == "__main__":
     print("\n3. Тест с int")
     int_test = ensure_string(12345, "INT_PARAM")
     print(f"Int → Строка: '{int_test}'")
-    
-    # Тест конфига
-    print("\n4. Тест автосоздания конфига")
-    config = load_config_safe()
-    print(f"Конфиг загружен: {json.dumps(config, indent=2)[:200]}...")
     
     print("\n✅ VK_READER готов к работе!")
