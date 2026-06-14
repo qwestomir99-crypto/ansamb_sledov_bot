@@ -98,7 +98,11 @@ def get_vk_token():
     return get_secret("VK_TOKEN")
 
 def get_vk_owner_id():
-    return get_secret("VK_OWNER_ID")
+    value = get_secret("VK_OWNER_ID")
+    try:
+        return int(value) if value else 0
+    except:
+        return 0
 
 def get_vk_reader_token():
     return get_secret("VK_READER_TOKEN")
