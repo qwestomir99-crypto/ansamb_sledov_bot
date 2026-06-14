@@ -5,7 +5,6 @@
 # Комментарий: видео хранятся в БД (links), кэш в SQLite
 # ==========================================
 
-import sys
 import os
 import random
 import sqlite3
@@ -13,16 +12,16 @@ import requests
 from datetime import datetime
 from debug_utils import debug_log
 
-# ===== ЗАГРУЗКА СЕКРЕТОВ ИЗ БД =====
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from services.secrets_manager import get_secret
+# ===== ЗАГРУЗКА .ENV =====
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
 # ===================================
 
 # Путь к базе данных
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(PROJECT_ROOT, 'data/ansambl.db')
-YOUTUBE_API_KEY = get_secret("YOUTUBE_API_KEY")
-YOUTUBE_PLAYLIST_ID = get_secret("YOUTUBE_PLAYLIST_ID")
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+YOUTUBE_PLAYLIST_ID = os.getenv("YOUTUBE_PLAYLIST_ID")
 
 def get_db_connection():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
