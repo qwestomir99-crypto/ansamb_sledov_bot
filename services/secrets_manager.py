@@ -1,17 +1,20 @@
+#!/usr/bin/env python3
 # ==================================================
 # @file: services/secrets_manager.py
 # @author: Ансамбль Следов
-# @version: 1.0
+# @version: 1.7
 # @description:
 #   Чтение зашифрованных секретов из SQLite.
 # ==================================================
 
-import sqlite3
 import os
+import sqlite3
+import base64
 from cryptography.fernet import Fernet
 
-DB_PATH = 'data/ansambl.db'
-KEY_FILE = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/../encryption_key.txt'
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(PROJECT_ROOT, 'data/ansambl.db')
+KEY_PATH = os.path.join(PROJECT_ROOT, 'tools', 'encryption_key.txt')
 
 class SecretsManager:
     _instance = None
@@ -23,10 +26,12 @@ class SecretsManager:
         return cls._instance
     
     def _init(self):
-        if not os.path.exists(KEY_FILE):
-            raise Exception(f"Ключ шифрования не найден: {KEY_FILE}")
-        with open(KEY_FILE, 'r') as f:
+        if not os.path.exists(KEY_PATH):
+            raise Exception(f"Ключ шифрования не найден: {KEY_PATH}")
+        with open(KEY_PATH, 'r') as f:
             key = f.read().strip()
+        if len(key) == 32 and not key.endswith('='):
+            key = base64.urlsafe_b64encode(key.encode()).decode()
         self.cipher = Fernet(key.encode())
         
     def _get_connection(self):
@@ -39,7 +44,9 @@ class SecretsManager:
         row = c.fetchone()
         conn.close()
         if row:
-            encrypted = row[0].encode()
+            encrypted = row[0]
+            if isinstance(encrypted, str):
+                encrypted = encrypted.encode()
             decrypted = self.cipher.decrypt(encrypted)
             return decrypted.decode()
         return None
@@ -52,11 +59,12 @@ class SecretsManager:
         conn.close()
         result = {}
         for key, encrypted in rows:
-            decrypted = self.cipher.decrypt(encrypted.encode())
+            if isinstance(encrypted, str):
+                encrypted = encrypted.encode()
+            decrypted = self.cipher.decrypt(encrypted)
             result[key] = decrypted.decode()
         return result
 
-# Глобальный экземпляр
 secrets = SecretsManager()
 
 def get_secret(key, default=None):
