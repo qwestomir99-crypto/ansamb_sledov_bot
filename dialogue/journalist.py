@@ -20,7 +20,7 @@ POST_POOL_FILE = "dialogue/data/post_pool.json"
 JOURNALIST_FEED = "dialogue/data/journalist_feed.json"
 
 def load_config():
-    with open(CONFIG_FILE, "r") as f:
+    with open(CONFIG_FILE, "r", encoding='utf-8') as f:
         return json.load(f)
 
 def load_vk_posts():
@@ -47,7 +47,7 @@ def extract_tags_from_text(text):
     return tags
 
 def analyze_vk_posts(posts, limit=10):
-    """Анализирует посты VK: топ тегов, популярные фразы"""
+    """Анализирует посты VK: топ теги, популярные фразы"""
     all_tags = []
     all_texts = []
     
