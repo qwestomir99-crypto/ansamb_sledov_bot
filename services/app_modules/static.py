@@ -2,7 +2,7 @@
 # Файл: services/app_modules/static.py
 # Справка: README.md → Веб-морда / Статика
 # Задача: раздача статических файлов
-# Комментарий: путь к статике теперь /usr/src/app/static (Bothost) или из переменной STATIC_DIR
+# Комментарий: путь к статике определяется автоматически
 # Зависит от: flask
 # Вызывается из: app_modules/__init__.py
 # ==========================================
@@ -12,8 +12,10 @@ import os
 
 static_bp = Blueprint('static', __name__)
 
-# Путь к папке static (для Bothost /usr/src/app/static, можно переопределить через STATIC_DIR)
-STATIC_DIR = os.environ.get("STATIC_DIR", "/usr/src/app/static")
+# ===== ОПРЕДЕЛЯЕМ ПУТЬ К СТАТИКЕ АВТОМАТИЧЕСКИ =====
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+STATIC_DIR = os.path.join(PROJECT_ROOT, 'static')
+# =================================================
 
 # Диагностика: печатаем путь в логи
 print(f"=== ДИАГНОСТИКА STATIC ===")
