@@ -11,7 +11,6 @@ import threading
 import requests
 from datetime import datetime
 from debug_utils import debug_log
-from services.secrets_manager import get_secret
 
 # ==========================================
 # ЗАЩИТНЫЕ ФУНКЦИИ
@@ -48,23 +47,23 @@ def log_ap(level, message):
     debug_log("AUTOPOSTER", message, level)
 
 def get_vk_token():
-    token = get_secret("VK_TOKEN")
+    token = os.getenv("VK_TOKEN")
     return ensure_string(token)
 
 def get_vk_group_id():
-    group_id = get_secret("VK_GROUP_ID")
+    group_id = os.getenv("VK_GROUP_ID")
     return ensure_int(group_id)
 
 def get_tg_chat_id():
-    chat_id = get_secret("TG_CHAT_ID", "@qwestomir")
+    chat_id = os.getenv("TG_CHAT_ID", "@qwestomir")
     return ensure_string(chat_id)
 
 def get_playlist_id():
-    playlist = get_secret("YOUTUBE_PLAYLIST_ID")
+    playlist = os.getenv("YOUTUBE_PLAYLIST_ID")
     return ensure_string(playlist)
 
 def get_api_key():
-    api_key = get_secret("YOUTUBE_API_KEY")
+    api_key = os.getenv("YOUTUBE_API_KEY")
     return ensure_string(api_key)
 
 def fetch_latest_video():
@@ -90,7 +89,7 @@ def fetch_latest_video():
         return None
 
 def send_to_tg(video_id, title):
-    bot_token = get_secret("BOT_TOKEN")
+    bot_token = os.getenv("BOT_TOKEN")
     chat_id = get_tg_chat_id()
     if not bot_token or not chat_id:
         log_ap("ERROR", "Нет токена бота или chat_id")
