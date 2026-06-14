@@ -1,67 +1,162 @@
 # ==========================================
 # Файл: services/autoposter.py
-# Справка: README.md → Автопостинг YouTube
-# Задача: публикация случайного видео из плейлиста в TG и VK
-# Комментарий: TG всегда, VK в группу с VK_TOKEN + VK_GROUP_ID, цитаты из publisher_utils
+# Справка: README.md → Автопостер YouTube
+# Задача: автоматически постить видео из плейлиста в TG и VK
+# Комментарий: защищён от байтов и кривых данных
 # ==========================================
 
-import sys
 import os
 import time
+import threading
+import requests
+from datetime import datetime
 from debug_utils import debug_log
-from dialogue.youtube_auto import get_random_video
-from dialogue.publisher_utils import get_random_quote, post_to_vk
-
-# ===== ЗАГРУЗКА СЕКРЕТОВ ИЗ БД =====
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from services.secrets_manager import get_secret
-# ===================================
 
-def log_auto(level, message):
+# ==========================================
+# ЗАЩИТНЫЕ ФУНКЦИИ
+# ==========================================
+
+def ensure_string(value, default=""):
+    if value is None:
+        return default
+    if isinstance(value, bytes):
+        try:
+            return value.decode('utf-8')
+        except UnicodeDecodeError:
+            return value.decode('latin1')
+    return str(value)
+
+def ensure_int(value, default=0):
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        if isinstance(value, str):
+            import re
+            numbers = re.findall(r'-?\d+', value)
+            if numbers:
+                return int(numbers[0])
+        return default
+
+# ==========================================
+# ОСНОВНЫЕ ФУНКЦИИ
+# ==========================================
+
+def log_ap(level, message):
     debug_log("AUTOPOSTER", message, level)
 
-def check_and_publish(bot, tg_chat_id):
-    log_auto("INFO", "Проверка видео из плейлиста...")
-    
-    video = get_random_video()
-    if not video:
-        log_auto("WARNING", "Не удалось получить видео из плейлиста")
-        return
-    
-    log_auto("INFO", f"Получено видео: {video['title'][:50]}...")
-    
-    quote = get_random_quote()
-    full_text = f"📜 {quote}\n\n🎬 {video['title']}\n{video['url']}"
-    
-    # TG
-    try:
-        bot.send_message(tg_chat_id, full_text)
-        log_auto("INFO", f"Видео опубликовано в TG: {video['title'][:50]}...")
-    except Exception as e:
-        log_auto("ERROR", f"Ошибка TG: {e}")
-    
-    # VK
-    vk_token = get_secret("VK_TOKEN")
-    vk_owner_id = get_secret("VK_GROUP_ID")
-    if vk_token and vk_owner_id:
-        try:
-            success, _ = post_to_vk(full_text, "", vk_token, vk_owner_id)
-            if success:
-                log_auto("INFO", "Видео опубликовано в VK")
-            else:
-                log_auto("WARNING", "VK не опубликовано")
-        except Exception as e:
-            log_auto("ERROR", f"Ошибка VK: {e}")
+def get_vk_token():
+    token = get_secret("VK_TOKEN")
+    return ensure_string(token)
 
-def start_autoposter(config=None, vk_token=None, vk_owner_id=None):
-    log_auto("INFO", "Автопостинг YouTube запущен (TG + VK, раз в день)")
-    from bot.core import get_bot
-    bot_instance = get_bot()
-    tg_chat_id = config.get("telegram", {}).get("publish_channel", "@qwestomir") if config else "@qwestomir"
+def get_vk_group_id():
+    group_id = get_secret("VK_GROUP_ID")
+    return ensure_int(group_id)
+
+def get_tg_chat_id():
+    chat_id = get_secret("TG_CHAT_ID", "@qwestomir")
+    return ensure_string(chat_id)
+
+def get_playlist_id():
+    playlist = get_secret("YOUTUBE_PLAYLIST_ID")
+    return ensure_string(playlist)
+
+def get_api_key():
+    api_key = get_secret("YOUTUBE_API_KEY")
+    return ensure_string(api_key)
+
+def fetch_latest_video():
+    api_key = get_api_key()
+    playlist_id = get_playlist_id()
+    if not api_key or not playlist_id:
+        log_ap("ERROR", "Нет API ключа или ID плейлиста")
+        return None
     
+    url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=1&playlistId={playlist_id}&key={api_key}"
+    try:
+        r = requests.get(url, timeout=10)
+        data = r.json()
+        if 'items' in data and data['items']:
+            item = data['items'][0]
+            video_id = item['snippet']['resourceId']['videoId']
+            title = item['snippet']['title']
+            return {'id': video_id, 'title': title}
+        log_ap("WARNING", "Нет видео в плейлисте")
+        return None
+    except Exception as e:
+        log_ap("ERROR", f"Ошибка получения видео: {e}")
+        return None
+
+def send_to_tg(video_id, title):
+    bot_token = get_secret("BOT_TOKEN")
+    chat_id = get_tg_chat_id()
+    if not bot_token or not chat_id:
+        log_ap("ERROR", "Нет токена бота или chat_id")
+        return False
+    
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    message = f"🎬 {title}\nhttps://www.youtube.com/watch?v={video_id}"
+    try:
+        r = requests.post(url, data={'chat_id': chat_id, 'text': message}, timeout=10)
+        if r.status_code == 200:
+            log_ap("INFO", f"Видео отправлено в TG: {title}")
+            return True
+        log_ap("ERROR", f"Ошибка TG: {r.status_code} - {r.text}")
+        return False
+    except Exception as e:
+        log_ap("ERROR", f"Ошибка отправки в TG: {e}")
+        return False
+
+def send_to_vk(video_id, title):
+    token = get_vk_token()
+    group_id = get_vk_group_id()
+    if not token or not group_id:
+        log_ap("ERROR", "Нет токена VK или ID группы")
+        return False
+    
+    message = f"🎬 {title}\nhttps://www.youtube.com/watch?v={video_id}"
+    params = {
+        'access_token': token,
+        'v': '5.199',
+        'owner_id': -group_id,
+        'from_group': 1,
+        'message': message
+    }
+    try:
+        r = requests.post('https://api.vk.com/method/wall.post', params=params, timeout=10)
+        data = r.json()
+        if 'response' in data:
+            log_ap("INFO", f"Видео отправлено в VK: {title}")
+            return True
+        log_ap("ERROR", f"Ошибка VK: {data.get('error', {}).get('error_msg', 'неизвестно')}")
+        return False
+    except Exception as e:
+        log_ap("ERROR", f"Ошибка отправки в VK: {e}")
+        return False
+
+def autoposter_loop():
+    last_video_id = None
     while True:
         try:
-            check_and_publish(bot_instance, tg_chat_id)
+            video = fetch_latest_video()
+            if video:
+                video_id = video['id']
+                if video_id != last_video_id:
+                    log_ap("INFO", f"Новое видео: {video['title']}")
+                    send_to_tg(video_id, video['title'])
+                    send_to_vk(video_id, video['title'])
+                    last_video_id = video_id
+            time.sleep(3600)  # проверка раз в час
         except Exception as e:
-            log_auto("ERROR", f"Ошибка в цикле: {e}")
-        time.sleep(86400)
+            log_ap("ERROR", f"Ошибка в цикле: {e}")
+            time.sleep(3600)
+
+def start_autoposter(config=None, vk_token=None, vk_group_id=None):
+    thread = threading.Thread(target=autoposter_loop, daemon=True)
+    thread.start()
+    log_ap("INFO", "Автопостер YouTube запущен (TG + VK)")
+
+if __name__ == "__main__":
+    print("Автопостер YouTube готов к работе")
