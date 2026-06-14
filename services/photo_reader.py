@@ -5,20 +5,14 @@
 # Комментарий: использует VK_READER_TOKEN
 # ==========================================
 
-import sys
 import os
 import random
 import requests
 from debug_utils import debug_log
 
-# ===== ЗАГРУЗКА СЕКРЕТОВ ИЗ БД =====
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from services.secrets_manager import get_secret
-# ===================================
-
 def get_random_post():
-    token = get_secret("VK_READER_TOKEN")
-    owner_id = get_secret("VK_OWNER_ID")
+    token = os.getenv("VK_READER_TOKEN")
+    owner_id = os.getenv("VK_OWNER_ID")
     
     if not token or not owner_id:
         debug_log("PHOTO_READER", "Нет VK_READER_TOKEN или VK_OWNER_ID", "ERROR")
