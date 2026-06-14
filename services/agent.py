@@ -4,7 +4,6 @@
 # Комментарий: исправлен keep_alive (URL из переменной окружения)
 # ==========================================
 
-import sys
 import os
 import logging
 import requests
@@ -13,9 +12,9 @@ import time
 from flask import Blueprint, request, jsonify
 from datetime import datetime
 
-# ===== ЗАГРУЗКА СЕКРЕТОВ ИЗ БД =====
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from services.secrets_manager import get_secret
+# ===== ЗАГРУЗКА .ENV =====
+from dotenv import load_dotenv
+load_dotenv()
 # ===================================
 
 agent_bp = Blueprint('agent', __name__)
@@ -33,8 +32,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("yandex_gpt_agent")
 
-API_KEY = get_secret("YC_API_KEY")
-FOLDER_ID = get_secret("YC_FOLDER_ID")
+API_KEY = os.getenv("YC_API_KEY")
+FOLDER_ID = os.getenv("YC_FOLDER_ID")
 YANDEX_GPT_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 
 def log_request_details(prompt, headers, payload):
@@ -129,7 +128,7 @@ def health():
 @agent_bp.route('/logs', methods=['GET'])
 def get_logs():
     secret = request.args.get('secret')
-    logs_secret = get_secret("LOGS_SECRET", "tleem2026")
+    logs_secret = os.getenv("LOGS_SECRET", "tleem2026")
     if secret != logs_secret:
         return jsonify({"error": "Forbidden"}), 403
     try:
@@ -144,7 +143,7 @@ def get_logs():
 # ==========================================
 
 def keep_alive():
-    port = get_secret("PORT", "10000")
+    port = os.getenv("PORT", "10000")
     url = f"http://127.0.0.1:{port}/agent/health"
     while True:
         time.sleep(60)
