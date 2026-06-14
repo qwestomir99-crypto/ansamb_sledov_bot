@@ -2,9 +2,10 @@
 # ==================================================
 # @file: services/secrets_manager.py
 # @author: Ансамбль Следов
-# @version: 1.7
+# @version: 1.8
 # @description:
 #   Чтение зашифрованных секретов из SQLite.
+#   Исправлена обработка байтов/строк при расшифровке.
 # ==================================================
 
 import os
@@ -28,7 +29,7 @@ class SecretsManager:
     def _init(self):
         if not os.path.exists(KEY_PATH):
             raise Exception(f"Ключ шифрования не найден: {KEY_PATH}")
-        with open(KEY_PATH, 'r') as f:
+        with open(KEY_PATH, 'r', encoding='utf-8') as f:
             key = f.read().strip()
         if len(key) == 32 and not key.endswith('='):
             key = base64.urlsafe_b64encode(key.encode()).decode()
@@ -45,10 +46,11 @@ class SecretsManager:
         conn.close()
         if row:
             encrypted = row[0]
+            # Исправление: если пришла строка — превращаем в байты с utf-8
             if isinstance(encrypted, str):
-                encrypted = encrypted.encode()
+                encrypted = encrypted.encode('utf-8')
             decrypted = self.cipher.decrypt(encrypted)
-            return decrypted.decode()
+            return decrypted.decode('utf-8')
         return None
     
     def get_all(self):
@@ -59,10 +61,11 @@ class SecretsManager:
         conn.close()
         result = {}
         for key, encrypted in rows:
+            # Исправление: если пришла строка — превращаем в байты с utf-8
             if isinstance(encrypted, str):
-                encrypted = encrypted.encode()
+                encrypted = encrypted.encode('utf-8')
             decrypted = self.cipher.decrypt(encrypted)
-            result[key] = decrypted.decode()
+            result[key] = decrypted.decode('utf-8')
         return result
 
 secrets = SecretsManager()
