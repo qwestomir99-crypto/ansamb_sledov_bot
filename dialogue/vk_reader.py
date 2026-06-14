@@ -5,22 +5,15 @@
 # Комментарий: использует VK_READER_TOKEN
 # ==========================================
 
-import sys
-import os
 import time
 import json
+import os
 import requests
 from datetime import datetime
 from debug_utils import debug_log
 
-# ===== ЗАГРУЗКА СЕКРЕТОВ ИЗ БД =====
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from services.secrets_manager import get_secret
-# ===================================
-
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONFIG_FILE = os.path.join(PROJECT_ROOT, 'dialogue', 'data', 'config.json')
-VK_POSTS_FILE = os.path.join(PROJECT_ROOT, 'dialogue', 'data', 'vk_posts.json')
+CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
+VK_POSTS_FILE = "dialogue/data/vk_posts.json"
 
 def load_config():
     with open(CONFIG_FILE, "r") as f:
@@ -53,6 +46,10 @@ def add_vk_post(post):
     debug_log("VK_READER", f"📥 Пост сохранён: {post.get('text', '')[:50]}...")
 
 def fetch_last_posts(vk_token, owner_id, count=5):
+    # Преобразуем токен в строку, если он пришёл как байты
+    if isinstance(vk_token, bytes):
+        vk_token = vk_token.decode()
+    
     params = {
         "access_token": vk_token,
         "v": "5.199",
@@ -95,6 +92,10 @@ def fetch_last_posts(vk_token, owner_id, count=5):
         return []
 
 def vk_reader_loop(bot, vk_token, owner_id, tg_chat_id):
+    # Преобразуем токен в строку, если он пришёл как байты
+    if isinstance(vk_token, bytes):
+        vk_token = vk_token.decode()
+    
     if not vk_token or not owner_id:
         debug_log("VK_READER", "❌ Нет токена или owner_id — выходим.", "ERROR")
         return
