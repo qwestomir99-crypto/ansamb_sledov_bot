@@ -189,22 +189,17 @@ def fetch_last_posts(vk_token, owner_id, count=5):
 # ==========================================
 
 def vk_reader_loop(bot, vk_token, owner_id, tg_chat_id):
-    # Автоматическая конвертация входных параметров
+    # Атомная защита — конвертируем всё, что может прийти
     vk_token = ensure_string(vk_token, "VK_TOKEN")
     owner_id = ensure_int(owner_id, "OWNER_ID")
-    tg_chat_id = ensure_int(tg_chat_id, "TG_CHAT_ID")
+    tg_chat_id = ensure_string(tg_chat_id, "TG_CHAT_ID")
     
-    # Авто-конфиг
-    config = load_config_safe()
-    
-    # Если токен пустой, берём из конфига
-    if not vk_token and config.get("VK_READER_TOKEN"):
-        vk_token = config["VK_READER_TOKEN"]
-        debug_log("VK_READER", "✅ VK_TOKEN взят из config.json")
-    
-    if not owner_id and config.get("OWNER_ID"):
-        owner_id = config["OWNER_ID"]
-        debug_log("VK_READER", "✅ OWNER_ID взят из config.json")
+    # Если токен пустой, пробуем взять из конфига
+    if not vk_token:
+        config = load_config_safe()
+        vk_token = config.get("VK_READER_TOKEN", "")
+        if vk_token:
+            debug_log("VK_READER", "✅ VK_TOKEN взят из config.json")
     
     if not vk_token or not owner_id:
         debug_log("VK_READER", "❌ Нет токена или owner_id — выходим.", "ERROR")
