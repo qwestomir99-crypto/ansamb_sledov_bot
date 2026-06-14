@@ -34,7 +34,11 @@ def load_config():
 
 def ping_self():
     """Пинг самого бота (веб-морды)"""
-    url = get_secret("APP_URL", "https://ansambl-sledov-8.bothost.tech")
+    raw_url = get_secret("APP_URL", "https://ansambl-sledov-8.bothost.tech")
+    # Защита от байтов
+    if isinstance(raw_url, bytes):
+        raw_url = raw_url.decode('utf-8')
+    url = raw_url.rstrip('/')
     try:
         response = requests.get(f"{url}/health", timeout=10)
         print(f"[PING] Бот пинганулся: {response.status_code}")
@@ -48,7 +52,11 @@ def ping_agent():
             time.sleep(540)  # 9 минут
             config = load_config()
             agent_enabled = config.get("ping", {}).get("agent_enabled", True)
-            agent_url = get_secret("AGENT_HEALTH_URL", "https://ansambl-sledov-8.bothost.tech/health")
+            raw_url = get_secret("AGENT_HEALTH_URL", "https://ansambl-sledov-8.bothost.tech/health")
+            # Защита от байтов
+            if isinstance(raw_url, bytes):
+                raw_url = raw_url.decode('utf-8')
+            agent_url = raw_url.rstrip('/')
             
             if not agent_enabled:
                 print("[PING] Пинг агента отключён в конфиге")
