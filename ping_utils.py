@@ -21,6 +21,32 @@ from services.secrets_manager import get_secret
 
 CONFIG_FILE = "config.json"
 
+# ==========================================
+# ЗАЩИТНЫЕ ФУНКЦИИ (как в vk_reader.py)
+# ==========================================
+
+def ensure_string(value, default=""):
+    """Приводит любой входной параметр к строке"""
+    if value is None:
+        return default
+    if isinstance(value, bytes):
+        try:
+            return value.decode('utf-8')
+        except UnicodeDecodeError:
+            return value.decode('latin1')
+    return str(value)
+
+def ensure_url(value, default="https://ansambl-sledov-8.bothost.tech"):
+    """Приводит к валидному URL"""
+    value = ensure_string(value)
+    if not value or not value.startswith('http'):
+        return default
+    return value.rstrip('/')
+
+# ==========================================
+# ОСНОВНЫЕ ФУНКЦИИ
+# ==========================================
+
 def load_config():
     try:
         if not os.path.exists(CONFIG_FILE):
@@ -35,10 +61,7 @@ def load_config():
 def ping_self():
     """Пинг самого бота (веб-морды)"""
     raw_url = get_secret("APP_URL", "https://ansambl-sledov-8.bothost.tech")
-    # Защита от байтов
-    if isinstance(raw_url, bytes):
-        raw_url = raw_url.decode('utf-8')
-    url = raw_url.rstrip('/')
+    url = ensure_url(raw_url)
     try:
         response = requests.get(f"{url}/health", timeout=10)
         print(f"[PING] Бот пинганулся: {response.status_code}")
@@ -53,10 +76,7 @@ def ping_agent():
             config = load_config()
             agent_enabled = config.get("ping", {}).get("agent_enabled", True)
             raw_url = get_secret("AGENT_HEALTH_URL", "https://ansambl-sledov-8.bothost.tech/health")
-            # Защита от байтов
-            if isinstance(raw_url, bytes):
-                raw_url = raw_url.decode('utf-8')
-            agent_url = raw_url.rstrip('/')
+            agent_url = ensure_url(raw_url)
             
             if not agent_enabled:
                 print("[PING] Пинг агента отключён в конфиге")
