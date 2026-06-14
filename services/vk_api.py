@@ -1,49 +1,92 @@
 # ==========================================
 # Файл: services/vk_api.py
-# Справка: README.md → Веб-морда / VK API
-# Задача: API для комментариев, ответов и постинга в VK
-# Комментарий: токен теперь берётся через get_vk_token() (автообновление)
+# Справка: README.md → VK API
+# Задача: комментарии, ответы, постинг в VK
+# Комментарий: защищён от байтов и кривых данных
 # ==========================================
 
-import sys
-import os
 import requests
 from flask import Blueprint, request, jsonify
 from debug_utils import debug_log
-from services.app import get_vk_token
 from services.secrets_manager import get_secret
+from services.app import get_vk_token
 
 vk_api_bp = Blueprint('vk_api', __name__)
+
+# ==========================================
+# ЗАЩИТНЫЕ ФУНКЦИИ
+# ==========================================
+
+def ensure_string(value, default=""):
+    if value is None:
+        return default
+    if isinstance(value, bytes):
+        try:
+            return value.decode('utf-8')
+        except UnicodeDecodeError:
+            return value.decode('latin1')
+    return str(value)
+
+def ensure_int(value, default=0):
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        if isinstance(value, str):
+            import re
+            numbers = re.findall(r'-?\d+', value)
+            if numbers:
+                return int(numbers[0])
+        return default
+
+# ==========================================
+# ЛОГИРОВАНИЕ
+# ==========================================
 
 def log_vk(level, message):
     debug_log("VK_API", message, level)
 
+# ==========================================
+# ТОКЕНЫ И ID
+# ==========================================
+
 def get_current_token():
     token = get_vk_token()
-    if not token:
-        log_vk("ERROR", "Не удалось получить токен VK")
-    return token
+    return ensure_string(token)
+
+def get_vk_owner_id():
+    owner = get_secret("VK_OWNER_ID")
+    return ensure_int(owner)
+
+def get_vk_group_id():
+    group = get_secret("VK_GROUP_ID")
+    return ensure_int(group)
+
+def get_vk_token_user():
+    token = get_secret("VK_TOKEN_USER")
+    return ensure_string(token)
+
+def get_vk_access_token():
+    token = get_secret("VK_ACCESS_TOKEN")
+    return ensure_string(token)
+
+# ==========================================
+# ПУБЛИКАЦИЯ ПОСТА
+# ==========================================
 
 def get_post_params(text, target='group'):
-    """
-    Возвращает параметры для wall.post в зависимости от цели.
-    target: 'group' (публикация в группу) или 'private' (публикация в личку)
-    """
-    # Исправление: принудительная конвертация в int
-    vk_owner_id_str = get_secret("VK_OWNER_ID")
-    vk_owner_id = int(vk_owner_id_str) if vk_owner_id_str else 0
-    
-    vk_group_id_str = get_secret("VK_GROUP_ID")
-    vk_group_id = int(vk_group_id_str) if vk_group_id_str else 0
+    vk_owner_id = get_vk_owner_id()
+    vk_group_id = get_vk_group_id()
     
     if target == 'group':
         owner_id = vk_group_id
         from_group = 1
-        token = get_secret("VK_TOKEN_USER")
+        token = get_vk_token_user()
     else:
         owner_id = vk_owner_id
         from_group = 0
-        token = get_secret("VK_ACCESS_TOKEN")
+        token = get_vk_access_token()
     
     return {
         "access_token": token,
@@ -75,21 +118,23 @@ def send_vk_post(text, target='group'):
         log_vk("ERROR", f"Исключение: {e}")
         return False
 
+# ==========================================
+# API ENDPOINTS
+# ==========================================
+
 @vk_api_bp.route('/comment', methods=['POST'])
 def api_vk_comment():
     data = request.json
     post_id = data.get('post_id')
     text = data.get('text', '').strip()
     token = get_current_token()
-    
-    # Исправление: принудительная конвертация в int
-    vk_group_id_str = get_secret("VK_GROUP_ID")
-    vk_group_id = int(vk_group_id_str) if vk_group_id_str else 0
+    vk_group_id = get_vk_group_id()
     
     if not token or not vk_group_id:
         return jsonify({"status": "error", "error": "VK не настроен"}), 500
     if not post_id or not text:
         return jsonify({"status": "error", "error": "post_id и text обязательны"}), 400
+    
     params = {
         "access_token": token,
         "v": "5.199",
@@ -117,6 +162,7 @@ def api_vk_send_message():
         return jsonify({"status": "error", "error": "VK не настроен"}), 500
     if not peer_id or not text:
         return jsonify({"status": "error", "error": "peer_id и text обязательны"}), 400
+    
     params = {
         "access_token": token,
         "v": "5.199",
@@ -138,17 +184,14 @@ def api_vk_send_message():
 def api_vk_like():
     data = request.json
     post_id = data.get('post_id')
-    
-    # Исправление: принудительная конвертация в int
-    vk_group_id_str = get_secret("VK_GROUP_ID")
-    vk_group_id = int(vk_group_id_str) if vk_group_id_str else 0
-    
+    vk_group_id = get_vk_group_id()
     owner_id = data.get('owner_id', -vk_group_id if vk_group_id else 0)
     token = get_current_token()
     if not token:
         return jsonify({"status": "error", "error": "VK не настроен"}), 500
     if not post_id:
         return jsonify({"status": "error", "error": "post_id обязателен"}), 400
+    
     params = {
         "access_token": token,
         "v": "5.199",
@@ -170,11 +213,7 @@ def api_vk_like():
 def api_vk_repost():
     data = request.json
     post_id = data.get('post_id')
-    
-    # Исправление: принудительная конвертация в int
-    vk_group_id_str = get_secret("VK_GROUP_ID")
-    vk_group_id = int(vk_group_id_str) if vk_group_id_str else 0
-    
+    vk_group_id = get_vk_group_id()
     owner_id = data.get('owner_id', -vk_group_id if vk_group_id else 0)
     text = data.get('text', '').strip()
     token = get_current_token()
@@ -182,6 +221,7 @@ def api_vk_repost():
         return jsonify({"status": "error", "error": "VK не настроен"}), 500
     if not post_id:
         return jsonify({"status": "error", "error": "post_id обязателен"}), 400
+    
     params = {
         "access_token": token,
         "v": "5.199",
@@ -201,8 +241,7 @@ def api_vk_repost():
 
 def get_vk_messages(limit=10):
     token = get_current_token()
-    vk_group_id_str = get_secret("VK_GROUP_ID")
-    vk_group_id = int(vk_group_id_str) if vk_group_id_str else 0
+    vk_group_id = get_vk_group_id()
     if not token or not vk_group_id:
         log_vk("ERROR", "VK_TOKEN или VK_GROUP_ID не заданы")
         return []
