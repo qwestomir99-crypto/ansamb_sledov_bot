@@ -5,14 +5,12 @@
 # Задача: глобальные обработчики, конфиг, токены
 # ==========================================
 
-import sys
 import os
 import json
 import telebot
 import threading
 import traceback
 from datetime import datetime
-from services.secrets_manager import get_secret
 
 ERROR_LOG = "error.log"
 
@@ -85,27 +83,27 @@ def load_config():
     )
 
 def get_bot():
-    TOKEN = get_secret("BOT_TOKEN")
+    TOKEN = os.getenv("BOT_TOKEN")
     if not TOKEN:
         raise ValueError("BOT_TOKEN не задан")
     return telebot.TeleBot(TOKEN)
 
 def get_admin_user_id():
-    uid = get_secret("ADMIN_USER_ID")
+    uid = os.getenv("ADMIN_USER_ID")
     return int(uid) if uid else 0
 
 def get_vk_token():
-    return get_secret("VK_TOKEN")
+    return os.getenv("VK_TOKEN")
 
 def get_vk_owner_id():
-    value = get_secret("VK_OWNER_ID")
+    value = os.getenv("VK_OWNER_ID")
     try:
         return int(value) if value else 0
     except:
         return 0
 
 def get_vk_reader_token():
-    return get_secret("VK_READER_TOKEN")
+    return os.getenv("VK_READER_TOKEN")
 
 def get_vk_group_id():
-    return get_secret("VK_GROUP_ID")
+    return os.getenv("VK_GROUP_ID")
