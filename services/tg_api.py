@@ -5,9 +5,9 @@
 # Комментарий: защищён от байтов и кривых данных
 # ==========================================
 
+import os
 import requests
 from debug_utils import debug_log
-from services.secrets_manager import get_secret
 
 # ==========================================
 # ЗАЩИТНЫЕ ФУНКЦИИ
@@ -39,11 +39,11 @@ def log_tg(level, message):
     debug_log("TG_API", message, level)
 
 def get_bot_token():
-    token = get_secret("BOT_TOKEN")
+    token = os.getenv("BOT_TOKEN")
     return ensure_string(token)
 
 def get_chat_id():
-    chat_id = get_secret("TG_CHAT_ID", "@qwestomir")
+    chat_id = os.getenv("TG_CHAT_ID", "@qwestomir")
     return ensure_string(chat_id)
 
 def send_telegram_message(text, parse_mode='HTML'):
