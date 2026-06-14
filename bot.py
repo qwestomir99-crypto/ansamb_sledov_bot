@@ -9,13 +9,15 @@ import sys
 import os
 
 # ===== ПРАВИЛЬНЫЙ ПУТЬ К БИБЛИОТЕКАМ =====
-lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.local/lib/python3.10/site-packages'))
+# Библиотеки лежат в .local/ внутри public_html/
+lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../.local/lib/python3.10/site-packages'))
 sys.path.insert(0, lib_path)
 # ===========================================
 
 # ===== ЗАГРУЗКА .ENV =====
+# .env лежит в public_html/ (на уровень выше)
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
 # ===========================================
 
 import threading
