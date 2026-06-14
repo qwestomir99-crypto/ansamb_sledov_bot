@@ -6,7 +6,6 @@
 # Версия: 2.0 (SQLite)
 # ==========================================
 
-import sys
 import os
 import json
 import time
@@ -17,9 +16,9 @@ from datetime import datetime
 from debug_utils import debug_log
 from utils import escape_markdown
 
-# ===== ЗАГРУЗКА СЕКРЕТОВ ИЗ БД =====
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from services.secrets_manager import get_secret
+# ===== ЗАГРУЗКА СЕКРЕТОВ ИЗ .ENV =====
+from dotenv import load_dotenv
+load_dotenv()
 # ===================================
 
 # ==========================================
@@ -55,6 +54,7 @@ def init_posts_table():
 # 2. РАБОТА С КОНФИГАМИ (SQLite + JSON fallback)
 # ==========================================
 def load_config():
+    # Сначала пробуем получить из SQLite
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -69,8 +69,9 @@ def load_config():
     except Exception as e:
         debug_log("PUBLISH", f"Ошибка загрузки config из SQLite: {e}", "WARNING")
     
+    # Fallback: config.json
     if os.path.exists(CONFIG_JSON):
-        with open(CONFIG_JSON, "r") as f:
+        with open(CONFIG_JSON, "r", encoding='utf-8') as f:
             return json.load(f)
     return {}
 
