@@ -19,7 +19,7 @@ import requests as req
 
 # ===== ЗАГРУЗКА .ENV =====
 from dotenv import load_dotenv
-load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
 # ===================================
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -159,13 +159,6 @@ def vk_auth_link():
     return f"<h2>🔗 Ссылка для авторизации VK</h2><a href='{auth_url}' target='_blank'>{auth_url}</a>"
 
 start_background_thread()
-
-# ==========================================
-# ИМПОРТ AGENT_BP В КОНЦЕ (чтобы избежать цикла)
-# ==========================================
-from services.agent import agent_bp
-app.register_blueprint(agent_bp, url_prefix='/agent')
-# ==========================================
 
 if __name__ == '__main__':
     port = int(os.getenv("PORT", 10000))
