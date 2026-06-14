@@ -18,7 +18,7 @@ from services.sqlite_client import get_quotes, get_quotes_list, add_quote
 CONFIG_FILE = os.path.join('dialogue', 'data', 'config.json')
 
 def load_config():
-    with open(CONFIG_FILE, "r") as f:
+    with open(CONFIG_FILE, "r", encoding='utf-8') as f:
         return json.load(f)
 
 def set_quotes_interval(minutes):
@@ -42,8 +42,8 @@ def send_quote_with_photo(bot, chat_id, quote):
         bot.send_message(chat_id, caption)
         debug_log("QUOTES", "Цитата отправлена в Telegram")
         
-        vk_token = os.environ.get("VK_TOKEN")
-        vk_group_id = os.environ.get("VK_GROUP_ID")
+        vk_token = os.getenv("VK_TOKEN")
+        vk_group_id = os.getenv("VK_GROUP_ID")
         if vk_token and vk_group_id:
             try:
                 from dialogue.publisher_utils import post_to_vk
