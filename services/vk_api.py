@@ -29,15 +29,19 @@ def get_post_params(text, target='group'):
     Возвращает параметры для wall.post в зависимости от цели.
     target: 'group' (публикация в группу) или 'private' (публикация в личку)
     """
-    vk_owner_id = get_secret("VK_OWNER_ID")
-    vk_group_id = get_secret("VK_GROUP_ID")
+    # Исправление: принудительная конвертация в int
+    vk_owner_id_str = get_secret("VK_OWNER_ID")
+    vk_owner_id = int(vk_owner_id_str) if vk_owner_id_str else 0
+    
+    vk_group_id_str = get_secret("VK_GROUP_ID")
+    vk_group_id = int(vk_group_id_str) if vk_group_id_str else 0
     
     if target == 'group':
-        owner_id = int(vk_group_id) if vk_group_id else 0
+        owner_id = vk_group_id
         from_group = 1
         token = get_secret("VK_TOKEN_USER")
     else:
-        owner_id = int(vk_owner_id) if vk_owner_id else 0
+        owner_id = vk_owner_id
         from_group = 0
         token = get_secret("VK_ACCESS_TOKEN")
     
@@ -77,7 +81,11 @@ def api_vk_comment():
     post_id = data.get('post_id')
     text = data.get('text', '').strip()
     token = get_current_token()
-    vk_group_id = get_secret("VK_GROUP_ID")
+    
+    # Исправление: принудительная конвертация в int
+    vk_group_id_str = get_secret("VK_GROUP_ID")
+    vk_group_id = int(vk_group_id_str) if vk_group_id_str else 0
+    
     if not token or not vk_group_id:
         return jsonify({"status": "error", "error": "VK не настроен"}), 500
     if not post_id or not text:
@@ -85,7 +93,7 @@ def api_vk_comment():
     params = {
         "access_token": token,
         "v": "5.199",
-        "owner_id": -int(vk_group_id),
+        "owner_id": -vk_group_id,
         "post_id": post_id,
         "message": text
     }
@@ -130,8 +138,12 @@ def api_vk_send_message():
 def api_vk_like():
     data = request.json
     post_id = data.get('post_id')
-    vk_group_id = get_secret("VK_GROUP_ID")
-    owner_id = data.get('owner_id', -int(vk_group_id) if vk_group_id else 0)
+    
+    # Исправление: принудительная конвертация в int
+    vk_group_id_str = get_secret("VK_GROUP_ID")
+    vk_group_id = int(vk_group_id_str) if vk_group_id_str else 0
+    
+    owner_id = data.get('owner_id', -vk_group_id if vk_group_id else 0)
     token = get_current_token()
     if not token:
         return jsonify({"status": "error", "error": "VK не настроен"}), 500
@@ -158,8 +170,12 @@ def api_vk_like():
 def api_vk_repost():
     data = request.json
     post_id = data.get('post_id')
-    vk_group_id = get_secret("VK_GROUP_ID")
-    owner_id = data.get('owner_id', -int(vk_group_id) if vk_group_id else 0)
+    
+    # Исправление: принудительная конвертация в int
+    vk_group_id_str = get_secret("VK_GROUP_ID")
+    vk_group_id = int(vk_group_id_str) if vk_group_id_str else 0
+    
+    owner_id = data.get('owner_id', -vk_group_id if vk_group_id else 0)
     text = data.get('text', '').strip()
     token = get_current_token()
     if not token:
@@ -185,7 +201,8 @@ def api_vk_repost():
 
 def get_vk_messages(limit=10):
     token = get_current_token()
-    vk_group_id = get_secret("VK_GROUP_ID")
+    vk_group_id_str = get_secret("VK_GROUP_ID")
+    vk_group_id = int(vk_group_id_str) if vk_group_id_str else 0
     if not token or not vk_group_id:
         log_vk("ERROR", "VK_TOKEN или VK_GROUP_ID не заданы")
         return []
