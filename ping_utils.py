@@ -26,7 +26,7 @@ def load_config():
         if not os.path.exists(CONFIG_FILE):
             print(f"[PING] config.json не найден, использую значения по умолчанию")
             return {}
-        with open(CONFIG_FILE, "r") as f:
+        with open(CONFIG_FILE, "r", encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
         print(f"[PING] Ошибка загрузки config.json: {e}")
