@@ -19,7 +19,7 @@ import requests as req
 
 # ===== ЗАГРУЗКА .ENV =====
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
 # ===================================
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
