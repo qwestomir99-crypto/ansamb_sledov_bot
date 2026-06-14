@@ -14,7 +14,7 @@ from datetime import datetime
 
 # ===== ЗАГРУЗКА .ENV =====
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
 # ===================================
 
 agent_bp = Blueprint('agent', __name__)
