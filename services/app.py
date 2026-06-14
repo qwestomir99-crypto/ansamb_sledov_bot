@@ -19,7 +19,7 @@ import requests as req
 
 # ===== ЗАГРУЗКА .ENV =====
 from dotenv import load_dotenv
-load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
 # ===================================
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -33,7 +33,6 @@ from services.app_modules.routes import routes_bp
 from services.app_modules.background import background_bp, start_background_thread
 from services.web_api import web_api
 from services.analytics_api import analytics_api
-from services.agent import agent_bp
 from services.error_handlers import register_error_handlers
 from services.web_server import web_server_bp
 
@@ -72,7 +71,6 @@ app.register_blueprint(routes_bp, url_prefix='/')
 app.register_blueprint(background_bp, url_prefix='/bg')
 app.register_blueprint(web_api, url_prefix='/api')
 app.register_blueprint(analytics_api, url_prefix='/api/analytics')
-app.register_blueprint(agent_bp, url_prefix='/agent')
 app.register_blueprint(web_server_bp)
 
 register_error_handlers(app)
@@ -161,6 +159,13 @@ def vk_auth_link():
     return f"<h2>🔗 Ссылка для авторизации VK</h2><a href='{auth_url}' target='_blank'>{auth_url}</a>"
 
 start_background_thread()
+
+# ==========================================
+# ИМПОРТ AGENT_BP В КОНЦЕ (чтобы избежать цикла)
+# ==========================================
+from services.agent import agent_bp
+app.register_blueprint(agent_bp, url_prefix='/agent')
+# ==========================================
 
 if __name__ == '__main__':
     port = int(os.getenv("PORT", 10000))
