@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # ==========================================
 # Файл: bot.py (для Render)
-# Задача: TG-прокси с безопасным получением ключей
-# Версия: 9.0 — фото скачивается, видео/аудио как ссылки
+# Задача: TG-прокси с безопасным получением ключей + скачивание фото
+# Версия: 10.0 — финальная с защитой try/except
 # ==========================================
 
 import os
@@ -77,6 +77,7 @@ def publish_photo():
     photo_url = data.get("photo_url")
     caption = data.get("caption", "")
     
+    # ===== СКАЧИВАЕМ ФОТО НА RENDER =====
     if photo_url:
         try:
             resp = requests.get(photo_url, timeout=15)
@@ -88,18 +89,29 @@ def publish_photo():
                 with open(temp_path, "wb") as f:
                     f.write(resp.content)
                 photo_url = temp_path
+                print(f"[RENDER] ✅ Фото скачано: {temp_path}")
             else:
+                print(f"[RENDER] ❌ Не удалось скачать фото (HTTP {resp.status_code})")
                 return jsonify({"status": "error", "message": "download failed"}), 500
         except Exception as e:
+            print(f"[RENDER] ❌ Ошибка скачивания фото: {e}")
             return jsonify({"status": "error", "message": str(e)}), 500
-    
-    if photo_url:
-        try:
-            bot.send_photo(TG_CHAT_ID, photo_url, caption=caption)
-            return jsonify({"status": "ok"}), 200
-        except Exception as e:
-            return jsonify({"status": "error", "message": str(e)}), 500
-    return jsonify({"status": "error", "message": "empty"}), 400
+    # ======================================
+
+    if not photo_url:
+        return jsonify({"status": "error", "message": "no photo"}), 400
+
+    try:
+        # Проверяем, что файл существует перед отправкой
+        if not os.path.exists(photo_url):
+            print(f"[RENDER] ❌ Файл {photo_url} не найден!")
+            return jsonify({"status": "error", "message": "file not found"}), 500
+
+        bot.send_photo(TG_CHAT_ID, photo_url, caption=caption)
+        return jsonify({"status": "ok"}), 200
+    except Exception as e:
+        print(f"[RENDER] ❌ Ошибка отправки фото: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/publish_video", methods=["POST"])
 def publish_video():
@@ -153,5 +165,5 @@ print("[PING] 🛡️ Авто-пингер запущен (ждём 30 сек �
 # ============================================================
 
 if __name__ == "__main__":
-    print(f"🚀 TG-прокси запущен (фото → медиа, видео/аудио → ссылки)")
+    print(f"🚀 TG-прокси запущен (с try/except для фото)")
     app.run(host="0.0.0.0", port=8080)
