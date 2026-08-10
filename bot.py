@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # ==========================================
 # Файл: bot.py (для Render)
-# Задача: TG-прокси с безопасным получением ключей + скачивание фото
-# Версия: 10.0 — финальная с защитой try/except
+# Задача: TG-прокси с безопасным получением ключей + поддержка сигналов
+# Версия: 11.0 — слой живой информации
 # ==========================================
 
 import os
@@ -10,6 +10,7 @@ import telebot
 import requests
 import threading
 import time
+import traceback
 from flask import Flask, request, jsonify
 
 # ===== АДРЕС ЭНДПОИНТА =====
@@ -102,7 +103,6 @@ def publish_photo():
         return jsonify({"status": "error", "message": "no photo"}), 400
 
     try:
-        # Проверяем, что файл существует перед отправкой
         if not os.path.exists(photo_url):
             print(f"[RENDER] ❌ Файл {photo_url} не найден!")
             return jsonify({"status": "error", "message": "file not found"}), 500
@@ -165,5 +165,5 @@ print("[PING] 🛡️ Авто-пингер запущен (ждём 30 сек �
 # ============================================================
 
 if __name__ == "__main__":
-    print(f"🚀 TG-прокси запущен (с try/except для фото)")
+    print(f"🚀 TG-прокси запущен (с поддержкой сигналов)")
     app.run(host="0.0.0.0", port=8080)
