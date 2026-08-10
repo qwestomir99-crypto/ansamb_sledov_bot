@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # ==========================================
 # Файл: bot.py (для Render)
-# Задача: TG-прокси с безопасным получением ключей + авто-пинг (keep-alive)
-# Версия: 6.0 — с фоновым пингером
+# Задача: TG-прокси с безопасным получением ключей + скачивание фото по URL
+# Версия: 7.0 — полная поддержка URL-фото
 # ==========================================
 
 import os
@@ -10,6 +10,7 @@ import telebot
 import requests
 import threading
 import time
+import tempfile
 from flask import Flask, request, jsonify
 
 # ===== АДРЕС ЭНДПОИНТА =====
@@ -45,6 +46,14 @@ if not TG_PROXY_SECRET:
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
+# ============================================================
+# ЭНДПОИНТЫ
+# ============================================================
+
+@app.route("/", methods=["GET"])
+def index():
+    return "TG-прокси работает!"
+
 @app.route("/publish", methods=["POST"])
 def publish():
     data = request.json
@@ -68,6 +77,26 @@ def publish_photo():
     
     photo_url = data.get("photo_url")
     caption = data.get("caption", "")
+    
+    # == СКАЧИВАЕМ ФОТО, ЕСЛИ ЭТО URL ==
+    if photo_url and not photo_url.startswith("AgA"):
+        try:
+            response = requests.get(photo_url, timeout=10)
+            if response.status_code == 200:
+                # Создаём временный файл
+                temp_path = f"/tmp/photo_{int(time.time())}.jpg"
+                with open(temp_path, "wb") as f:
+                    f.write(response.content)
+                photo_url = temp_path
+                print(f"[PROXY] ✅ Фото скачано: {temp_path}")
+            else:
+                print(f"[PROXY] ❌ Ошибка скачивания: {response.status_code}")
+                return jsonify({"status": "error", "message": "download failed"}), 500
+        except Exception as e:
+            print(f"[PROXY] ❌ Ошибка скачивания: {e}")
+            return jsonify({"status": "error", "message": str(e)}), 500
+    # =====================================
+
     if photo_url:
         try:
             bot.send_photo(TG_CHAT_ID, photo_url, caption=caption)
@@ -113,7 +142,6 @@ def publish_audio():
 # ============================================================
 
 def keep_alive():
-    """Фоновый поток: пингует свой собственный URL каждые 30 секунд"""
     my_url = "https://ansamb-sledov-bot-p56x.onrender.com"
     while True:
         try:
@@ -131,5 +159,5 @@ print("[PING] 🛡️ Авто-пингер запущен (ждём 30 сек �
 # ============================================================
 
 if __name__ == "__main__":
-    print(f"🚀 TG-прокси запущен (с авто-пингером)")
+    print(f"🚀 TG-прокси запущен (с авто-пингером и поддержкой URL-фото)")
     app.run(host="0.0.0.0", port=8080)
