@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # ==========================================
 # Файл: bot.py (для Render)
-# Задача: TG-прокси с безопасным получением ключей + скачивание фото по URL
-# Версия: 7.0 — полная поддержка URL-фото
+# Задача: TG-прокси с безопасным получением ключей
+# Версия: 9.0 — фото скачивается, видео/аудио как ссылки
 # ==========================================
 
 import os
@@ -10,7 +10,6 @@ import telebot
 import requests
 import threading
 import time
-import tempfile
 from flask import Flask, request, jsonify
 
 # ===== АДРЕС ЭНДПОИНТА =====
@@ -78,25 +77,22 @@ def publish_photo():
     photo_url = data.get("photo_url")
     caption = data.get("caption", "")
     
-    # == СКАЧИВАЕМ ФОТО, ЕСЛИ ЭТО URL ==
-    if photo_url and not photo_url.startswith("AgA"):
+    if photo_url:
         try:
-            response = requests.get(photo_url, timeout=10)
-            if response.status_code == 200:
-                # Создаём временный файл
-                temp_path = f"/tmp/photo_{int(time.time())}.jpg"
+            resp = requests.get(photo_url, timeout=15)
+            if resp.status_code == 200:
+                ext = photo_url.split('.')[-1].split('?')[0]
+                if len(ext) > 5:
+                    ext = "jpg"
+                temp_path = f"/tmp/photo_{int(time.time())}.{ext}"
                 with open(temp_path, "wb") as f:
-                    f.write(response.content)
+                    f.write(resp.content)
                 photo_url = temp_path
-                print(f"[PROXY] ✅ Фото скачано: {temp_path}")
             else:
-                print(f"[PROXY] ❌ Ошибка скачивания: {response.status_code}")
                 return jsonify({"status": "error", "message": "download failed"}), 500
         except Exception as e:
-            print(f"[PROXY] ❌ Ошибка скачивания: {e}")
             return jsonify({"status": "error", "message": str(e)}), 500
-    # =====================================
-
+    
     if photo_url:
         try:
             bot.send_photo(TG_CHAT_ID, photo_url, caption=caption)
@@ -113,12 +109,11 @@ def publish_video():
     
     video_url = data.get("video_url")
     caption = data.get("caption", "")
+    
     if video_url:
-        try:
-            bot.send_video(TG_CHAT_ID, video_url, caption=caption)
-            return jsonify({"status": "ok"}), 200
-        except Exception as e:
-            return jsonify({"status": "error", "message": str(e)}), 500
+        message = f"{caption}\n\n🎬 Видео: {video_url}"
+        bot.send_message(TG_CHAT_ID, message)
+        return jsonify({"status": "ok"}), 200
     return jsonify({"status": "error", "message": "empty"}), 400
 
 @app.route("/publish_audio", methods=["POST"])
@@ -129,12 +124,11 @@ def publish_audio():
     
     audio_url = data.get("audio_url")
     caption = data.get("caption", "")
+    
     if audio_url:
-        try:
-            bot.send_audio(TG_CHAT_ID, audio_url, caption=caption)
-            return jsonify({"status": "ok"}), 200
-        except Exception as e:
-            return jsonify({"status": "error", "message": str(e)}), 500
+        message = f"{caption}\n\n🎵 Аудио: {audio_url}"
+        bot.send_message(TG_CHAT_ID, message)
+        return jsonify({"status": "ok"}), 200
     return jsonify({"status": "error", "message": "empty"}), 400
 
 # ============================================================
@@ -159,5 +153,5 @@ print("[PING] 🛡️ Авто-пингер запущен (ждём 30 сек �
 # ============================================================
 
 if __name__ == "__main__":
-    print(f"🚀 TG-прокси запущен (с авто-пингером и поддержкой URL-фото)")
+    print(f"🚀 TG-прокси запущен (фото → медиа, видео/аудио → ссылки)")
     app.run(host="0.0.0.0", port=8080)
