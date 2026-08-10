@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 # ==========================================
-# Файл: bot.py
-# Задача: TG-прокси с безопасным получением ключей
-# Версия: 5.0 — через эндпоинт, без env
+# Файл: bot.py (для Render)
+# Задача: TG-прокси с безопасным получением ключей + авто-пинг (keep-alive)
+# Версия: 6.0 — с фоновым пингером
 # ==========================================
 
 import os
 import telebot
 import requests
+import threading
+import time
 from flask import Flask, request, jsonify
 
 # ===== АДРЕС ЭНДПОИНТА =====
@@ -58,6 +60,76 @@ def publish():
             return jsonify({"status": "error", "message": str(e)}), 500
     return jsonify({"status": "error", "message": "empty"}), 400
 
+@app.route("/publish_photo", methods=["POST"])
+def publish_photo():
+    data = request.json
+    if data.get("secret") != TG_PROXY_SECRET:
+        return jsonify({"status": "error", "message": "unauthorized"}), 403
+    
+    photo_url = data.get("photo_url")
+    caption = data.get("caption", "")
+    if photo_url:
+        try:
+            bot.send_photo(TG_CHAT_ID, photo_url, caption=caption)
+            return jsonify({"status": "ok"}), 200
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+    return jsonify({"status": "error", "message": "empty"}), 400
+
+@app.route("/publish_video", methods=["POST"])
+def publish_video():
+    data = request.json
+    if data.get("secret") != TG_PROXY_SECRET:
+        return jsonify({"status": "error", "message": "unauthorized"}), 403
+    
+    video_url = data.get("video_url")
+    caption = data.get("caption", "")
+    if video_url:
+        try:
+            bot.send_video(TG_CHAT_ID, video_url, caption=caption)
+            return jsonify({"status": "ok"}), 200
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+    return jsonify({"status": "error", "message": "empty"}), 400
+
+@app.route("/publish_audio", methods=["POST"])
+def publish_audio():
+    data = request.json
+    if data.get("secret") != TG_PROXY_SECRET:
+        return jsonify({"status": "error", "message": "unauthorized"}), 403
+    
+    audio_url = data.get("audio_url")
+    caption = data.get("caption", "")
+    if audio_url:
+        try:
+            bot.send_audio(TG_CHAT_ID, audio_url, caption=caption)
+            return jsonify({"status": "ok"}), 200
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+    return jsonify({"status": "error", "message": "empty"}), 400
+
+# ============================================================
+# АВТО-ПИНГ (чтобы Render не засыпал)
+# ============================================================
+
+def keep_alive():
+    """Фоновый поток: пингует свой собственный URL каждые 30 секунд"""
+    my_url = "https://ansamb-sledov-bot-p56x.onrender.com"
+    while True:
+        try:
+            requests.get(my_url, timeout=5)
+            print(f"[PING] ✅ Render пинганул себя: {my_url}")
+        except Exception as e:
+            print(f"[PING] ❌ Ошибка пинга: {e}")
+        time.sleep(30)
+
+threading.Thread(target=keep_alive, daemon=True).start()
+print("[PING] 🛡️ Авто-пингер запущен (ждём 30 сек между ударами)")
+
+# ============================================================
+# ЗАПУСК
+# ============================================================
+
 if __name__ == "__main__":
-    print(f"🚀 TG-прокси запущен (секреты через эндпоинт)")
+    print(f"🚀 TG-прокси запущен (с авто-пингером)")
     app.run(host="0.0.0.0", port=8080)
