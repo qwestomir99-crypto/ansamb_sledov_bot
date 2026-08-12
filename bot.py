@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # ==========================================
 # Файл: bot.py (для Render)
-# Задача: TG-прокси с безопасным получением ключей + поддержка сигналов
-# Версия: 11.0 — слой живой информации
+# Задача: TG-прокси + YouTube-прокси (домен + IP)
+# Версия: 12.1 — два способа проверки YouTube
 # ==========================================
 
 import os
@@ -144,6 +144,44 @@ def publish_audio():
     return jsonify({"status": "error", "message": "empty"}), 400
 
 # ============================================================
+# ЭНДПОИНТЫ ДЛЯ YOUTUBE-ПРОКСИ
+# ============================================================
+
+@app.route("/youtube", methods=["GET"])
+def youtube_domain():
+    """Прокси для YouTube через доменное имя"""
+    url = request.args.get("url")
+    if not url:
+        return jsonify({"error": "missing url"}), 400
+
+    try:
+        response = requests.get(url, stream=True, timeout=20)
+        return response.content, response.status_code, {
+            "Content-Type": response.headers.get("Content-Type", "application/octet-stream")
+        }
+    except Exception as e:
+        print(f"[RENDER] ❌ Ошибка YouTube (домен): {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/youtube_ip", methods=["GET"])
+def youtube_ip():
+    """Прокси для YouTube через IP-адрес"""
+    ip = request.args.get("ip")
+    if not ip:
+        return jsonify({"error": "missing ip"}), 400
+
+    # Используем IP-адрес вместо домена
+    url = f"http://{ip}"
+    try:
+        response = requests.get(url, stream=True, timeout=20)
+        return response.content, response.status_code, {
+            "Content-Type": response.headers.get("Content-Type", "application/octet-stream")
+        }
+    except Exception as e:
+        print(f"[RENDER] ❌ Ошибка YouTube (IP): {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ============================================================
 # АВТО-ПИНГ (чтобы Render не засыпал)
 # ============================================================
 
@@ -165,5 +203,5 @@ print("[PING] 🛡️ Авто-пингер запущен (ждём 30 сек �
 # ============================================================
 
 if __name__ == "__main__":
-    print(f"🚀 TG-прокси запущен (с поддержкой сигналов)")
+    print(f"🚀 TG-прокси + YouTube-прокси (домен/IP) запущен")
     app.run(host="0.0.0.0", port=8080)
