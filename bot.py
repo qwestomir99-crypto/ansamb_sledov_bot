@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 # ==========================================
 # Файл: bot.py (для Render)
-# Задача: TG-прокси + YouTube-прокси (домен + IP)
-# Версия: 12.1 — два способа проверки YouTube
+# Справка: README.md → Telegram прокси / Render
+# Задача: TG-прокси (сообщения, фото, кнопки) + YouTube-прокси
+# Комментарий: работает на Render. Принимает запросы от сервера.
+#              Кнопки передаются в JSON, строятся через telebot.
+# Зависит от: flask, telebot, requests, threading
+# Вызывается из: services/tg_api.py (через HTTPS POST)
+# Версия: 13.0 — добавлен /publish_with_buttons + защита от падений
 # ==========================================
 
 import os
@@ -12,6 +17,7 @@ import threading
 import time
 import traceback
 from flask import Flask, request, jsonify
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # ===== АДРЕС ЭНДПОИНТА =====
 SECRET_ENDPOINT = "https://ch756438.tw1.ru/api/secret/index.php"
@@ -47,6 +53,23 @@ bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
 # ============================================================
+# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# ============================================================
+
+def build_keyboard(buttons_data):
+    """Строит InlineKeyboardMarkup из JSON-структуры кнопок"""
+    keyboard = InlineKeyboardMarkup()
+    for row in buttons_data:
+        buttons_row = []
+        for btn in row:
+            buttons_row.append(InlineKeyboardButton(
+                text=btn.get("text", "?"),
+                callback_data=btn.get("callback_data", "none")
+            ))
+        keyboard.row(*buttons_row)
+    return keyboard
+
+# ============================================================
 # ЭНДПОИНТЫ
 # ============================================================
 
@@ -56,92 +79,176 @@ def index():
 
 @app.route("/publish", methods=["POST"])
 def publish():
-    data = request.json
-    if data.get("secret") != TG_PROXY_SECRET:
-        return jsonify({"status": "error", "message": "unauthorized"}), 403
-    
-    text = data.get("text", "")
-    if text:
+    try:
+        data = request.json
+        if data.get("secret") != TG_PROXY_SECRET:
+            return jsonify({"status": "error", "message": "unauthorized"}), 403
+        
+        text = data.get("text", "")
+        if text:
+            try:
+                bot.send_message(TG_CHAT_ID, text)
+                return jsonify({"status": "ok"}), 200
+            except Exception as e:
+                print(f"[RENDER] ❌ Ошибка отправки сообщения: {e}")
+                return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": "empty"}), 400
+    except Exception as e:
+        print(f"[RENDER] ❌ Критическая ошибка /publish: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/publish_with_buttons", methods=["POST"])
+def publish_with_buttons():
+    """Отправляет сообщение с инлайн-кнопками"""
+    try:
+        data = request.json
+        if data.get("secret") != TG_PROXY_SECRET:
+            return jsonify({"status": "error", "message": "unauthorized"}), 403
+        
+        text = data.get("text", "")
+        buttons_data = data.get("buttons", [])
+        
+        if not text:
+            return jsonify({"status": "error", "message": "empty"}), 400
+        
         try:
-            bot.send_message(TG_CHAT_ID, text)
+            keyboard = build_keyboard(buttons_data) if buttons_data else None
+            
+            if keyboard:
+                bot.send_message(TG_CHAT_ID, text, reply_markup=keyboard)
+            else:
+                bot.send_message(TG_CHAT_ID, text)
+            
             return jsonify({"status": "ok"}), 200
         except Exception as e:
+            # Fallback: если кнопки не сработали — отправить просто текст
+            print(f"[RENDER] ⚠️ Ошибка с кнопками: {e}. Отправляю без кнопок.")
+            try:
+                bot.send_message(TG_CHAT_ID, text)
+                return jsonify({"status": "ok", "warning": "sent without buttons"}), 200
+            except Exception as e2:
+                return jsonify({"status": "error", "message": str(e2)}), 500
+    except Exception as e:
+        print(f"[RENDER] ❌ Критическая ошибка /publish_with_buttons: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/edit_message_with_buttons", methods=["POST"])
+def edit_message_with_buttons():
+    """Редактирует сообщение с кнопками (для callback-ответов)"""
+    try:
+        data = request.json
+        if data.get("secret") != TG_PROXY_SECRET:
+            return jsonify({"status": "error", "message": "unauthorized"}), 403
+        
+        chat_id = data.get("chat_id", TG_CHAT_ID)
+        message_id = data.get("message_id")
+        text = data.get("text", "")
+        buttons_data = data.get("buttons", [])
+        
+        if not message_id:
+            return jsonify({"status": "error", "message": "no message_id"}), 400
+        
+        try:
+            keyboard = build_keyboard(buttons_data) if buttons_data else None
+            bot.edit_message_text(
+                text,
+                chat_id=chat_id,
+                message_id=message_id,
+                reply_markup=keyboard
+            )
+            return jsonify({"status": "ok"}), 200
+        except Exception as e:
+            print(f"[RENDER] ⚠️ Ошибка редактирования: {e}")
             return jsonify({"status": "error", "message": str(e)}), 500
-    return jsonify({"status": "error", "message": "empty"}), 400
+    except Exception as e:
+        print(f"[RENDER] ❌ Критическая ошибка /edit_message_with_buttons: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/publish_photo", methods=["POST"])
 def publish_photo():
-    data = request.json
-    if data.get("secret") != TG_PROXY_SECRET:
-        return jsonify({"status": "error", "message": "unauthorized"}), 403
-    
-    photo_url = data.get("photo_url")
-    caption = data.get("caption", "")
-    
-    # ===== СКАЧИВАЕМ ФОТО НА RENDER =====
-    if photo_url:
-        try:
-            resp = requests.get(photo_url, timeout=15)
-            if resp.status_code == 200:
-                ext = photo_url.split('.')[-1].split('?')[0]
-                if len(ext) > 5:
-                    ext = "jpg"
-                temp_path = f"/tmp/photo_{int(time.time())}.{ext}"
-                with open(temp_path, "wb") as f:
-                    f.write(resp.content)
-                photo_url = temp_path
-                print(f"[RENDER] ✅ Фото скачано: {temp_path}")
-            else:
-                print(f"[RENDER] ❌ Не удалось скачать фото (HTTP {resp.status_code})")
-                return jsonify({"status": "error", "message": "download failed"}), 500
-        except Exception as e:
-            print(f"[RENDER] ❌ Ошибка скачивания фото: {e}")
-            return jsonify({"status": "error", "message": str(e)}), 500
-    # ======================================
-
-    if not photo_url:
-        return jsonify({"status": "error", "message": "no photo"}), 400
-
     try:
-        if not os.path.exists(photo_url):
-            print(f"[RENDER] ❌ Файл {photo_url} не найден!")
-            return jsonify({"status": "error", "message": "file not found"}), 500
-
-        bot.send_photo(TG_CHAT_ID, photo_url, caption=caption)
-        return jsonify({"status": "ok"}), 200
+        data = request.json
+        if data.get("secret") != TG_PROXY_SECRET:
+            return jsonify({"status": "error", "message": "unauthorized"}), 403
+        
+        photo_url = data.get("photo_url")
+        caption = data.get("caption", "")
+        
+        # ===== СПОСОБ 1: пытаемся скачать и отправить файл =====
+        if photo_url:
+            try:
+                resp = requests.get(photo_url, timeout=15)
+                if resp.status_code == 200:
+                    ext = photo_url.split('.')[-1].split('?')[0]
+                    if len(ext) > 5:
+                        ext = "jpg"
+                    temp_path = f"/tmp/photo_{int(time.time())}.{ext}"
+                    with open(temp_path, "wb") as f:
+                        f.write(resp.content)
+                    
+                    try:
+                        with open(temp_path, "rb") as f:
+                            bot.send_photo(TG_CHAT_ID, f, caption=caption[:200])
+                        os.remove(temp_path)
+                        return jsonify({"status": "ok"}), 200
+                    except Exception as e:
+                        print(f"[RENDER] ⚠️ Ошибка отправки файла: {e}")
+                        os.remove(temp_path)
+                        # Fallback на URL
+                        try:
+                            bot.send_message(TG_CHAT_ID, f"{caption[:200]}\n\n📸 {photo_url}")
+                            return jsonify({"status": "ok", "warning": "sent as URL"}), 200
+                        except Exception as e2:
+                            return jsonify({"status": "error", "message": str(e2)}), 500
+                else:
+                    print(f"[RENDER] ❌ Не удалось скачать фото (HTTP {resp.status_code})")
+                    return jsonify({"status": "error", "message": "download failed"}), 500
+            except Exception as e:
+                print(f"[RENDER] ❌ Ошибка скачивания фото: {e}")
+                return jsonify({"status": "error", "message": str(e)}), 500
+        
+        return jsonify({"status": "error", "message": "no photo"}), 400
     except Exception as e:
-        print(f"[RENDER] ❌ Ошибка отправки фото: {e}")
+        print(f"[RENDER] ❌ Критическая ошибка /publish_photo: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/publish_video", methods=["POST"])
 def publish_video():
-    data = request.json
-    if data.get("secret") != TG_PROXY_SECRET:
-        return jsonify({"status": "error", "message": "unauthorized"}), 403
-    
-    video_url = data.get("video_url")
-    caption = data.get("caption", "")
-    
-    if video_url:
-        message = f"{caption}\n\n🎬 Видео: {video_url}"
-        bot.send_message(TG_CHAT_ID, message)
-        return jsonify({"status": "ok"}), 200
-    return jsonify({"status": "error", "message": "empty"}), 400
+    try:
+        data = request.json
+        if data.get("secret") != TG_PROXY_SECRET:
+            return jsonify({"status": "error", "message": "unauthorized"}), 403
+        
+        video_url = data.get("video_url")
+        caption = data.get("caption", "")
+        
+        if video_url:
+            message = f"{caption[:200]}\n\n🎬 Видео: {video_url}"
+            bot.send_message(TG_CHAT_ID, message)
+            return jsonify({"status": "ok"}), 200
+        return jsonify({"status": "error", "message": "empty"}), 400
+    except Exception as e:
+        print(f"[RENDER] ❌ Критическая ошибка /publish_video: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/publish_audio", methods=["POST"])
 def publish_audio():
-    data = request.json
-    if data.get("secret") != TG_PROXY_SECRET:
-        return jsonify({"status": "error", "message": "unauthorized"}), 403
-    
-    audio_url = data.get("audio_url")
-    caption = data.get("caption", "")
-    
-    if audio_url:
-        message = f"{caption}\n\n🎵 Аудио: {audio_url}"
-        bot.send_message(TG_CHAT_ID, message)
-        return jsonify({"status": "ok"}), 200
-    return jsonify({"status": "error", "message": "empty"}), 400
+    try:
+        data = request.json
+        if data.get("secret") != TG_PROXY_SECRET:
+            return jsonify({"status": "error", "message": "unauthorized"}), 403
+        
+        audio_url = data.get("audio_url")
+        caption = data.get("caption", "")
+        
+        if audio_url:
+            message = f"{caption[:200]}\n\n🎵 Аудио: {audio_url}"
+            bot.send_message(TG_CHAT_ID, message)
+            return jsonify({"status": "ok"}), 200
+        return jsonify({"status": "error", "message": "empty"}), 400
+    except Exception as e:
+        print(f"[RENDER] ❌ Критическая ошибка /publish_audio: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # ============================================================
 # ЭНДПОИНТЫ ДЛЯ YOUTUBE-ПРОКСИ
@@ -149,11 +256,9 @@ def publish_audio():
 
 @app.route("/youtube", methods=["GET"])
 def youtube_domain():
-    """Прокси для YouTube через доменное имя"""
     url = request.args.get("url")
     if not url:
         return jsonify({"error": "missing url"}), 400
-
     try:
         response = requests.get(url, stream=True, timeout=20)
         return response.content, response.status_code, {
@@ -165,12 +270,9 @@ def youtube_domain():
 
 @app.route("/youtube_ip", methods=["GET"])
 def youtube_ip():
-    """Прокси для YouTube через IP-адрес"""
     ip = request.args.get("ip")
     if not ip:
         return jsonify({"error": "missing ip"}), 400
-
-    # Используем IP-адрес вместо домена
     url = f"http://{ip}"
     try:
         response = requests.get(url, stream=True, timeout=20)
@@ -182,7 +284,7 @@ def youtube_ip():
         return jsonify({"error": str(e)}), 500
 
 # ============================================================
-# АВТО-ПИНГ (чтобы Render не засыпал)
+# АВТО-ПИНГ
 # ============================================================
 
 def keep_alive():
@@ -190,18 +292,18 @@ def keep_alive():
     while True:
         try:
             requests.get(my_url, timeout=5)
-            print(f"[PING] ✅ Render пинганул себя: {my_url}")
+            print(f"[PING] ✅ Render пинганул себя")
         except Exception as e:
             print(f"[PING] ❌ Ошибка пинга: {e}")
         time.sleep(30)
 
 threading.Thread(target=keep_alive, daemon=True).start()
-print("[PING] 🛡️ Авто-пингер запущен (ждём 30 сек между ударами)")
+print("[PING] 🛡️ Авто-пингер запущен")
 
 # ============================================================
 # ЗАПУСК
 # ============================================================
 
 if __name__ == "__main__":
-    print(f"🚀 TG-прокси + YouTube-прокси (домен/IP) запущен")
+    print("🚀 TG-прокси + кнопки + YouTube-прокси запущен")
     app.run(host="0.0.0.0", port=8080)
