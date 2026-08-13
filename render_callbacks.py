@@ -2,15 +2,17 @@
 # Файл: render_callbacks.py (для Render)
 # Справка: README.md → Telegram прокси / Render / Кнопки
 # Задача: обработчики текстовых команд и callback'ов на Render
-# Комментарий: вызывается из bot.py на Render. Все команды и кнопки здесь.
+# Комментарий: вызывается из bot.py на Render. Подробное логирование.
 # Зависит от: telebot, requests
 # Вызывается из: bot.py (Render)
-# Версия: 2.0 — добавлена обработка текстовых команд
+# Версия: 2.1 — добавлено подробное логирование для отладки
 # ==========================================
 
 import telebot
 import requests
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+print("[CALLBACKS] render_callbacks.py загружен")
 
 # ==========================================
 # ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
@@ -18,16 +20,20 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 def build_keyboard(buttons_data):
     """Строит клавиатуру из JSON-списка"""
-    keyboard = InlineKeyboardMarkup()
-    for row in buttons_data:
-        buttons_row = []
-        for btn in row:
-            buttons_row.append(InlineKeyboardButton(
-                text=btn.get("text", "?"),
-                callback_data=btn.get("callback_data", "none")
-            ))
-        keyboard.row(*buttons_row)
-    return keyboard
+    try:
+        keyboard = InlineKeyboardMarkup()
+        for row in buttons_data:
+            buttons_row = []
+            for btn in row:
+                buttons_row.append(InlineKeyboardButton(
+                    text=btn.get("text", "?"),
+                    callback_data=btn.get("callback_data", "none")
+                ))
+            keyboard.row(*buttons_row)
+        return keyboard
+    except Exception as e:
+        print(f"[CALLBACKS] ❌ Ошибка build_keyboard: {e}")
+        return None
 
 def get_admin_buttons():
     """Кнопки админ-меню"""
@@ -72,11 +78,12 @@ def get_diagnostic_buttons():
     ]
 
 # ==========================================
-# ОБРАБОТКА ТЕКСТОВЫХ КОМАНД
+# РЕГИСТРАЦИЯ ОБРАБОТЧИКОВ
 # ==========================================
 
 def register_callbacks(bot):
     """Регистрирует все обработчики: команды + кнопки"""
+    print("[CALLBACKS] Регистрация обработчиков...")
     
     @bot.message_handler(func=lambda message: True)
     def handle_messages(message):
@@ -86,42 +93,51 @@ def register_callbacks(bot):
             cid = message.chat.id
             uid = message.from_user.id
             
-            print(f"[MESSAGE] {text[:50]} от {uid}")
+            print(f"[MESSAGE] Получено: '{text[:50]}' от user_id={uid}")
             
             if text.startswith("#админ"):
+                print(f"[MESSAGE] Команда #админ от {uid}")
                 bot.send_message(
                     cid,
                     "🛡️ Админ-меню:",
                     reply_markup=build_keyboard(get_admin_buttons())
                 )
+                print(f"[MESSAGE] Кнопки админа отправлены")
             
             elif text.startswith("#тлеем"):
+                print(f"[MESSAGE] Команда #тлеем от {uid}")
                 bot.send_message(cid, "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет.")
             
             elif text.startswith("#фиксируем"):
+                print(f"[MESSAGE] Команда #фиксируем от {uid}")
                 bot.send_message(cid, "🔒 Фиксация принята. Сеть тлеет.")
             
             elif text.startswith("#вспышка"):
+                print(f"[MESSAGE] Команда #вспышка от {uid}")
                 bot.send_message(cid, "💥 Импульс зафиксирован. QSL.")
             
             elif text.startswith("#дышим"):
+                print(f"[MESSAGE] Команда #дышим от {uid}")
                 bot.send_message(cid, "🌬 Пинг отправлен")
             
             elif text.startswith("#говори"):
+                print(f"[MESSAGE] Команда #говори от {uid}")
                 bot.send_message(cid, "🗣 Напишите #говори <текст>")
             
             elif text.startswith("#меню") or text.startswith("#помощь"):
+                print(f"[MESSAGE] Команда #меню от {uid}")
                 bot.send_message(
                     cid,
                     "📖 #тлеем | #фиксируем | #вспышка | #дышим | #говори | #админ"
                 )
             
             else:
-                # Игнорируем обычные сообщения
-                pass
+                print(f"[MESSAGE] Проигнорировано: '{text[:30]}'")
         
         except Exception as e:
             print(f"[MESSAGE] ❌ Ошибка: {e}")
+            import traceback
+            traceback.print_exc()
     
     @bot.callback_query_handler(func=lambda call: True)
     def handle_all_callbacks(call):
@@ -131,10 +147,11 @@ def register_callbacks(bot):
             cid = call.message.chat.id
             mid = call.message.message_id
             
-            print(f"[CALLBACK] {data} от {call.from_user.id}")
+            print(f"[CALLBACK] Получен: '{data}' от user_id={call.from_user.id}")
             
             # ===== АДМИН-МЕНЮ =====
             if data == "admin_menu" or data == "admin_back":
+                print("[CALLBACK] → Показ админ-меню")
                 bot.edit_message_text(
                     "🛡️ Админ-меню:",
                     cid, mid,
@@ -142,6 +159,7 @@ def register_callbacks(bot):
                 )
             
             elif data == "submenu_modes":
+                print("[CALLBACK] → Подменю режимов")
                 bot.edit_message_text(
                     "🎛 Управление режимами:",
                     cid, mid,
@@ -149,6 +167,7 @@ def register_callbacks(bot):
                 )
             
             elif data == "submenu_adaptive":
+                print("[CALLBACK] → Подменю адаптивных")
                 buttons = [
                     [{"text": "✅ Включить", "callback_data": "adaptive_enable"},
                      {"text": "❌ Выключить", "callback_data": "adaptive_disable"}],
@@ -162,6 +181,7 @@ def register_callbacks(bot):
                 )
             
             elif data == "submenu_content":
+                print("[CALLBACK] → Подменю контента")
                 buttons = [
                     [{"text": "📝 Список", "callback_data": "pub_menu"},
                      {"text": "➕ Добавить", "callback_data": "add_post"}],
@@ -174,6 +194,7 @@ def register_callbacks(bot):
                 )
             
             elif data == "submenu_quotes":
+                print("[CALLBACK] → Подменю цитат")
                 bot.edit_message_text(
                     "📜 Управление цитатами:",
                     cid, mid,
@@ -181,115 +202,20 @@ def register_callbacks(bot):
                 )
             
             elif data == "submenu_diagnostic":
+                print("[CALLBACK] → Подменю диагностики")
                 bot.edit_message_text(
                     "🔧 Диагностика:",
                     cid, mid,
                     reply_markup=build_keyboard(get_diagnostic_buttons())
                 )
             
-            # ===== РЕЖИМЫ =====
-            elif data.startswith("mode_"):
-                mode = data.split("_")[1]
-                emojis = {"утро": "🌅", "день": "☀️", "вечер": "🌙", "ночь": "🌌"}
-                bot.edit_message_text(
-                    f"{emojis.get(mode, '')} Режим «{mode}» активирован.",
-                    cid, mid
-                )
-                try:
-                    requests.post(
-                        "https://ch756438.tw1.ru/ansamb_sledov_bot-dump/api/mode_trigger.php",
-                        json={"mode": mode},
-                        timeout=5
-                    )
-                except:
-                    pass
-            
-            # ===== АДАПТИВНЫЕ =====
-            elif data in ["adaptive_enable", "adaptive_disable", "adaptive_reset"]:
-                bot.edit_message_text(f"✅ {data} выполнено", cid, mid)
-            
-            # ===== ЦИТАТЫ =====
-            elif data == "quotes_list":
-                try:
-                    r = requests.get(
-                        "https://ch756438.tw1.ru/ansamb_sledov_bot-dump/api/quotes_list.php",
-                        timeout=10
-                    )
-                    quotes_text = r.text[:3000] if r.status_code == 200 else "❌ Ошибка"
-                except:
-                    quotes_text = "❌ Ошибка получения цитат"
-                buttons = [[{"text": "◀️ Назад", "callback_data": "submenu_quotes"}]]
-                bot.edit_message_text(
-                    quotes_text,
-                    cid, mid,
-                    reply_markup=build_keyboard(buttons)
-                )
-            
-            elif data == "quotes_add":
-                bot.edit_message_text(
-                    "➕ Введите цитату через /add_quote",
-                    cid, mid
-                )
-            
-            elif data == "quotes_interval":
-                buttons = []
-                for minutes in [15, 30, 60, 120, 240, 480]:
-                    buttons.append([{"text": f"{minutes} мин", "callback_data": f"quote_int_{minutes}"}])
-                buttons.append([{"text": "◀️ Назад", "callback_data": "submenu_quotes"}])
-                bot.edit_message_text(
-                    "⏱ Выберите интервал цитат:",
-                    cid, mid,
-                    reply_markup=build_keyboard(buttons)
-                )
-            
-            elif data.startswith("quote_int_"):
-                interval = data.split("_")[2]
-                bot.edit_message_text(
-                    f"✅ Интервал: {interval} мин",
-                    cid, mid
-                )
-            
-            # ===== ДИАГНОСТИКА =====
-            elif data == "errors":
-                bot.edit_message_text("❌ Ошибки: смотрите logs/debug.log", cid, mid)
-            
-            elif data == "log":
-                bot.edit_message_text("📋 Логи: logs/debug.log", cid, mid)
-            
-            elif data == "shabbat_info":
-                bot.edit_message_text("🕯 Шаббат: проверка на сервере", cid, mid)
-            
-            # ===== ПОЛЬЗОВАТЕЛЬСКИЕ =====
-            elif data == "tleem":
-                bot.send_message(cid, "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет.")
-            
-            elif data == "fixiruem":
-                bot.send_message(cid, "🔒 Фиксация принята. Сеть тлеет.")
-            
-            elif data == "vspishka":
-                bot.send_message(cid, "💥 Импульс зафиксирован. QSL.")
-            
-            elif data == "dyshim":
-                bot.send_message(cid, "🌬 Пинг отправлен")
-            
-            elif data == "govorim":
-                bot.send_message(cid, "🗣 Напишите #говори <текст>")
-            
-            elif data == "help":
-                bot.send_message(cid, "📖 #тлеем | #фиксируем | #вспышка | #дышим | #говори")
-            
             # ===== СОВМЕСТИМОСТЬ СО СТАРЫМИ КНОПКАМИ =====
             elif data == "admin_posts":
-                bot.edit_message_text(
-                    "📝 Посты:",
-                    cid, mid,
-                    reply_markup=build_keyboard([
-                        [{"text": "📋 Список", "callback_data": "quotes_list"}],
-                        [{"text": "◀️ Назад", "callback_data": "admin_back"}]
-                    ])
-                )
+                print("[CALLBACK] → Старая кнопка admin_posts")
+                bot.edit_message_text("📝 Посты", cid, mid)
             
             elif data == "admin_quotes":
+                print("[CALLBACK] → Старая кнопка admin_quotes")
                 bot.edit_message_text(
                     "📜 Цитаты:",
                     cid, mid,
@@ -297,17 +223,11 @@ def register_callbacks(bot):
                 )
             
             elif data == "admin_mixer":
+                print("[CALLBACK] → Миксер")
                 bot.edit_message_text("🎛️ Миксер запущен", cid, mid)
-                try:
-                    requests.post(
-                        "https://ch756438.tw1.ru/ansamb_sledov_bot-dump/api/mixer_trigger.php",
-                        json={},
-                        timeout=5
-                    )
-                except:
-                    pass
             
             elif data == "admin_schedule":
+                print("[CALLBACK] → Расписание")
                 bot.edit_message_text(
                     "📅 Расписание:",
                     cid, mid,
@@ -315,9 +235,11 @@ def register_callbacks(bot):
                 )
             
             elif data == "admin_settings":
+                print("[CALLBACK] → Настройки")
                 bot.edit_message_text("⚙️ Настройки", cid, mid)
             
             elif data == "admin_diag":
+                print("[CALLBACK] → Диагностика (старая)")
                 bot.edit_message_text(
                     "🩺 Диагностика:",
                     cid, mid,
@@ -325,14 +247,41 @@ def register_callbacks(bot):
                 )
             
             elif data == "admin_logout":
+                print("[CALLBACK] → Выход из админки")
                 bot.edit_message_text("✅ Вы вышли из админ-режима.", cid, mid)
             
-            # ===== ВЫХОД =====
+            # ===== ПОЛЬЗОВАТЕЛЬСКИЕ =====
+            elif data == "tleem":
+                print("[CALLBACK] → #тлеем")
+                bot.send_message(cid, "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет.")
+            
+            elif data == "fixiruem":
+                print("[CALLBACK] → #фиксируем")
+                bot.send_message(cid, "🔒 Фиксация принята. Сеть тлеет.")
+            
+            elif data == "vspishka":
+                print("[CALLBACK] → #вспышка")
+                bot.send_message(cid, "💥 Импульс зафиксирован. QSL.")
+            
+            elif data == "dyshim":
+                print("[CALLBACK] → #дышим")
+                bot.send_message(cid, "🌬 Пинг отправлен")
+            
+            elif data == "govorim":
+                print("[CALLBACK] → #говори")
+                bot.send_message(cid, "🗣 Напишите #говори <текст>")
+            
+            elif data == "help":
+                print("[CALLBACK] → Справка")
+                bot.send_message(cid, "📖 #тлеем | #фиксируем | #вспышка | #дышим | #говори")
+            
+            # ===== ВЫХОД / ЗАКРЫТИЕ =====
             elif data == "logout":
+                print("[CALLBACK] → Выход")
                 bot.edit_message_text("🔓 Вы вышли из админ-панели", cid, mid)
             
-            # ===== ЗАКРЫТИЕ =====
             elif data == "close_menu":
+                print("[CALLBACK] → Закрытие меню")
                 try:
                     bot.delete_message(cid, mid)
                 except:
@@ -340,12 +289,18 @@ def register_callbacks(bot):
             
             # ===== НЕИЗВЕСТНОЕ =====
             else:
+                print(f"[CALLBACK] ❓ Неизвестная команда: {data}")
                 bot.edit_message_text("❓ Неизвестная команда", cid, mid)
             
             bot.answer_callback_query(call.id)
+            print(f"[CALLBACK] Обработан: {data}")
         except Exception as e:
             print(f"[CALLBACK] ❌ Ошибка: {e}")
+            import traceback
+            traceback.print_exc()
             try:
                 bot.answer_callback_query(call.id, "Ошибка обработки")
             except:
                 pass
+    
+    print("[CALLBACKS] ✅ Обработчики зарегистрированы")
