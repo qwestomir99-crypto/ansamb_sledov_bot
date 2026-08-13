@@ -2,12 +2,12 @@
 # ==========================================
 # Файл: bot.py (для Render)
 # Справка: README.md → Telegram прокси / Render
-# Задача: TG-прокси (сообщения, фото, кнопки) + YouTube-прокси
+# Задача: TG-прокси (сообщения, фото, кнопки) + обработка callback'ов + YouTube-прокси
 # Комментарий: работает на Render. Принимает запросы от сервера.
-#              Кнопки передаются в JSON, строятся через telebot.
+#              Кнопки передаются в JSON. Callback'и обрабатываются на Render.
 # Зависит от: flask, telebot, requests, threading
 # Вызывается из: services/tg_api.py (через HTTPS POST)
-# Версия: 13.0 — добавлен /publish_with_buttons + защита от падений
+# Версия: 13.1 — добавлена обработка callback'ов на Render
 # ==========================================
 
 import os
@@ -69,6 +69,137 @@ def build_keyboard(buttons_data):
         keyboard.row(*buttons_row)
     return keyboard
 
+def get_admin_buttons():
+    """Кнопки админ-меню"""
+    return [
+        [{"text": "📝 Посты", "callback_data": "admin_posts"}],
+        [{"text": "📜 Цитаты", "callback_data": "admin_quotes"}],
+        [{"text": "🎛️ Миксер", "callback_data": "admin_mixer"}],
+        [{"text": "📅 Расписание", "callback_data": "admin_schedule"}],
+        [{"text": "⚙️ Настройки", "callback_data": "admin_settings"}],
+        [{"text": "🩺 Диагностика", "callback_data": "admin_diag"}],
+        [{"text": "🚪 Выйти", "callback_data": "admin_logout"}]
+    ]
+
+# ============================================================
+# ОБРАБОТКА CALLBACK'ОВ (на Render)
+# ============================================================
+
+@bot.callback_query_handler(func=lambda call: True)
+def handle_all_callbacks(call):
+    """Обрабатывает все нажатия на кнопки"""
+    try:
+        data = call.data
+        chat_id = call.message.chat.id
+        message_id = call.message.message_id
+        
+        print(f"[CALLBACK] {data} от {call.from_user.id}")
+        
+        if data == "admin_posts":
+            text = "📝 *Посты*\n\nУправление пулом постов:"
+            buttons = [
+                [{"text": "📋 Список", "callback_data": "admin_posts_list"}],
+                [{"text": "➕ Добавить", "callback_data": "admin_posts_add"}],
+                [{"text": "◀️ Назад", "callback_data": "admin_back"}]
+            ]
+            bot.edit_message_text(text, chat_id, message_id, reply_markup=build_keyboard(buttons))
+        
+        elif data == "admin_quotes":
+            text = "📜 *Цитаты*\n\nУправление цитатами:"
+            buttons = [
+                [{"text": "📖 Список", "callback_data": "admin_quotes_list"}],
+                [{"text": "➕ Добавить", "callback_data": "admin_quotes_add"}],
+                [{"text": "◀️ Назад", "callback_data": "admin_back"}]
+            ]
+            bot.edit_message_text(text, chat_id, message_id, reply_markup=build_keyboard(buttons))
+        
+        elif data == "admin_mixer":
+            bot.edit_message_text("🎛️ Миксер запущен...", chat_id, message_id)
+            # Отправляем запрос на наш сервер для запуска миксера
+            try:
+                requests.post(
+                    "https://ch756438.tw1.ru/ansamb_sledov_bot-dump/api/mixer_trigger.php",
+                    json={"secret": TG_PROXY_SECRET},
+                    timeout=5
+                )
+            except:
+                pass
+        
+        elif data == "admin_schedule":
+            text = "📅 *Расписание*\n\nРежимы:"
+            buttons = [
+                [{"text": "🌅 Утро", "callback_data": "admin_sched_morning"}],
+                [{"text": "☀️ День", "callback_data": "admin_sched_day"}],
+                [{"text": "🌆 Вечер", "callback_data": "admin_sched_evening"}],
+                [{"text": "🌙 Ночь", "callback_data": "admin_sched_night"}],
+                [{"text": "◀️ Назад", "callback_data": "admin_back"}]
+            ]
+            bot.edit_message_text(text, chat_id, message_id, reply_markup=build_keyboard(buttons))
+        
+        elif data == "admin_settings":
+            bot.edit_message_text("⚙️ *Настройки*\n\nЗдесь будут настройки.", chat_id, message_id)
+        
+        elif data == "admin_diag":
+            bot.edit_message_text("🩺 Запускаю диагностику...", chat_id, message_id)
+            try:
+                r = requests.post(
+                    "https://ch756438.tw1.ru/ansamb_sledov_bot-dump/api/diag_trigger.php",
+                    json={"secret": TG_PROXY_SECRET},
+                    timeout=10
+                )
+                bot.send_message(chat_id, "✅ Аудит завершён. Смотрите logs/audit.log")
+            except:
+                bot.send_message(chat_id, "❌ Не удалось запустить диагностику")
+        
+        elif data == "admin_logout":
+            bot.edit_message_text("✅ Вы вышли из админ-режима.", chat_id, message_id)
+        
+        elif data == "admin_back":
+            bot.edit_message_text(
+                "🛡️ Админ-меню:",
+                chat_id,
+                message_id,
+                reply_markup=build_keyboard(get_admin_buttons())
+            )
+        
+        elif data == "admin_posts_list":
+            # Запрашиваем список постов с нашего сервера
+            try:
+                r = requests.get(
+                    "https://ch756438.tw1.ru/ansamb_sledov_bot-dump/api/posts_list.php",
+                    timeout=10
+                )
+                posts_text = r.text[:3000] if r.status_code == 200 else "❌ Ошибка получения постов"
+            except:
+                posts_text = "❌ Ошибка получения постов"
+            
+            buttons = [[{"text": "◀️ Назад", "callback_data": "admin_posts"}]]
+            bot.edit_message_text(posts_text, chat_id, message_id, reply_markup=build_keyboard(buttons))
+        
+        elif data == "admin_quotes_list":
+            try:
+                r = requests.get(
+                    "https://ch756438.tw1.ru/ansamb_sledov_bot-dump/api/quotes_list.php",
+                    timeout=10
+                )
+                quotes_text = r.text[:3000] if r.status_code == 200 else "❌ Ошибка получения цитат"
+            except:
+                quotes_text = "❌ Ошибка получения цитат"
+            
+            buttons = [[{"text": "◀️ Назад", "callback_data": "admin_quotes"}]]
+            bot.edit_message_text(quotes_text, chat_id, message_id, reply_markup=build_keyboard(buttons))
+        
+        else:
+            bot.edit_message_text("❓ Неизвестная команда.", chat_id, message_id)
+        
+        bot.answer_callback_query(call.id)
+    except Exception as e:
+        print(f"[CALLBACK] ❌ Ошибка: {e}")
+        try:
+            bot.answer_callback_query(call.id, "Ошибка обработки")
+        except:
+            pass
+
 # ============================================================
 # ЭНДПОИНТЫ
 # ============================================================
@@ -99,7 +230,6 @@ def publish():
 
 @app.route("/publish_with_buttons", methods=["POST"])
 def publish_with_buttons():
-    """Отправляет сообщение с инлайн-кнопками"""
     try:
         data = request.json
         if data.get("secret") != TG_PROXY_SECRET:
@@ -113,15 +243,12 @@ def publish_with_buttons():
         
         try:
             keyboard = build_keyboard(buttons_data) if buttons_data else None
-            
             if keyboard:
                 bot.send_message(TG_CHAT_ID, text, reply_markup=keyboard)
             else:
                 bot.send_message(TG_CHAT_ID, text)
-            
             return jsonify({"status": "ok"}), 200
         except Exception as e:
-            # Fallback: если кнопки не сработали — отправить просто текст
             print(f"[RENDER] ⚠️ Ошибка с кнопками: {e}. Отправляю без кнопок.")
             try:
                 bot.send_message(TG_CHAT_ID, text)
@@ -130,38 +257,6 @@ def publish_with_buttons():
                 return jsonify({"status": "error", "message": str(e2)}), 500
     except Exception as e:
         print(f"[RENDER] ❌ Критическая ошибка /publish_with_buttons: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route("/edit_message_with_buttons", methods=["POST"])
-def edit_message_with_buttons():
-    """Редактирует сообщение с кнопками (для callback-ответов)"""
-    try:
-        data = request.json
-        if data.get("secret") != TG_PROXY_SECRET:
-            return jsonify({"status": "error", "message": "unauthorized"}), 403
-        
-        chat_id = data.get("chat_id", TG_CHAT_ID)
-        message_id = data.get("message_id")
-        text = data.get("text", "")
-        buttons_data = data.get("buttons", [])
-        
-        if not message_id:
-            return jsonify({"status": "error", "message": "no message_id"}), 400
-        
-        try:
-            keyboard = build_keyboard(buttons_data) if buttons_data else None
-            bot.edit_message_text(
-                text,
-                chat_id=chat_id,
-                message_id=message_id,
-                reply_markup=keyboard
-            )
-            return jsonify({"status": "ok"}), 200
-        except Exception as e:
-            print(f"[RENDER] ⚠️ Ошибка редактирования: {e}")
-            return jsonify({"status": "error", "message": str(e)}), 500
-    except Exception as e:
-        print(f"[RENDER] ❌ Критическая ошибка /edit_message_with_buttons: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/publish_photo", methods=["POST"])
@@ -174,7 +269,6 @@ def publish_photo():
         photo_url = data.get("photo_url")
         caption = data.get("caption", "")
         
-        # ===== СПОСОБ 1: пытаемся скачать и отправить файл =====
         if photo_url:
             try:
                 resp = requests.get(photo_url, timeout=15)
@@ -193,8 +287,10 @@ def publish_photo():
                         return jsonify({"status": "ok"}), 200
                     except Exception as e:
                         print(f"[RENDER] ⚠️ Ошибка отправки файла: {e}")
-                        os.remove(temp_path)
-                        # Fallback на URL
+                        try:
+                            os.remove(temp_path)
+                        except:
+                            pass
                         try:
                             bot.send_message(TG_CHAT_ID, f"{caption[:200]}\n\n📸 {photo_url}")
                             return jsonify({"status": "ok", "warning": "sent as URL"}), 200
@@ -265,7 +361,6 @@ def youtube_domain():
             "Content-Type": response.headers.get("Content-Type", "application/octet-stream")
         }
     except Exception as e:
-        print(f"[RENDER] ❌ Ошибка YouTube (домен): {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route("/youtube_ip", methods=["GET"])
@@ -273,14 +368,12 @@ def youtube_ip():
     ip = request.args.get("ip")
     if not ip:
         return jsonify({"error": "missing ip"}), 400
-    url = f"http://{ip}"
     try:
-        response = requests.get(url, stream=True, timeout=20)
+        response = requests.get(f"http://{ip}", stream=True, timeout=20)
         return response.content, response.status_code, {
             "Content-Type": response.headers.get("Content-Type", "application/octet-stream")
         }
     except Exception as e:
-        print(f"[RENDER] ❌ Ошибка YouTube (IP): {e}")
         return jsonify({"error": str(e)}), 500
 
 # ============================================================
@@ -292,18 +385,31 @@ def keep_alive():
     while True:
         try:
             requests.get(my_url, timeout=5)
-            print(f"[PING] ✅ Render пинганул себя")
-        except Exception as e:
-            print(f"[PING] ❌ Ошибка пинга: {e}")
+        except:
+            pass
         time.sleep(30)
 
 threading.Thread(target=keep_alive, daemon=True).start()
-print("[PING] 🛡️ Авто-пингер запущен")
+
+# ============================================================
+# ЗАПУСК ПОЛЛИНГА (для приёма callback'ов)
+# ============================================================
+
+def start_polling():
+    while True:
+        try:
+            bot.polling(none_stop=True, timeout=60)
+        except Exception as e:
+            print(f"[POLLING] Ошибка: {e}")
+            time.sleep(5)
+
+threading.Thread(target=start_polling, daemon=True).start()
+print("[POLLING] Приём callback'ов запущен")
 
 # ============================================================
 # ЗАПУСК
 # ============================================================
 
 if __name__ == "__main__":
-    print("🚀 TG-прокси + кнопки + YouTube-прокси запущен")
+    print("🚀 TG-прокси + кнопки + callback'и + YouTube запущен")
     app.run(host="0.0.0.0", port=8080)
