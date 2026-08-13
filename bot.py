@@ -2,12 +2,11 @@
 # ==========================================
 # Файл: bot.py (для Render)
 # Справка: README.md → Telegram прокси / Render
-# Задача: TG-прокси (сообщения, фото, кнопки) + обработка callback'ов + YouTube-прокси
-# Комментарий: работает на Render. Принимает запросы от сервера.
-#              Кнопки передаются в JSON. Callback'и обрабатываются на Render.
-# Зависит от: flask, telebot, requests, threading
+# Задача: TG-прокси (сообщения, фото, кнопки) + YouTube-прокси
+# Комментарий: работает на Render. Callback'и в render_callbacks.py.
+# Зависит от: flask, telebot, requests, threading, render_callbacks
 # Вызывается из: services/tg_api.py (через HTTPS POST)
-# Версия: 13.1 — добавлена обработка callback'ов на Render
+# Версия: 14.0 — callback'и вынесены в render_callbacks.py
 # ==========================================
 
 import os
@@ -18,6 +17,9 @@ import time
 import traceback
 from flask import Flask, request, jsonify
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+# ===== ИМПОРТ CALLBACK'ОВ ИЗ ОТДЕЛЬНОГО ФАЙЛА =====
+from render_callbacks import register_callbacks
 
 # ===== АДРЕС ЭНДПОИНТА =====
 SECRET_ENDPOINT = "https://ch756438.tw1.ru/api/secret/index.php"
@@ -52,6 +54,10 @@ if not TG_PROXY_SECRET:
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
+# ===== РЕГИСТРАЦИЯ CALLBACK'ОВ =====
+register_callbacks(bot)
+print("✅ Callback'и зарегистрированы из render_callbacks.py")
+
 # ============================================================
 # ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 # ============================================================
@@ -68,137 +74,6 @@ def build_keyboard(buttons_data):
             ))
         keyboard.row(*buttons_row)
     return keyboard
-
-def get_admin_buttons():
-    """Кнопки админ-меню"""
-    return [
-        [{"text": "📝 Посты", "callback_data": "admin_posts"}],
-        [{"text": "📜 Цитаты", "callback_data": "admin_quotes"}],
-        [{"text": "🎛️ Миксер", "callback_data": "admin_mixer"}],
-        [{"text": "📅 Расписание", "callback_data": "admin_schedule"}],
-        [{"text": "⚙️ Настройки", "callback_data": "admin_settings"}],
-        [{"text": "🩺 Диагностика", "callback_data": "admin_diag"}],
-        [{"text": "🚪 Выйти", "callback_data": "admin_logout"}]
-    ]
-
-# ============================================================
-# ОБРАБОТКА CALLBACK'ОВ (на Render)
-# ============================================================
-
-@bot.callback_query_handler(func=lambda call: True)
-def handle_all_callbacks(call):
-    """Обрабатывает все нажатия на кнопки"""
-    try:
-        data = call.data
-        chat_id = call.message.chat.id
-        message_id = call.message.message_id
-        
-        print(f"[CALLBACK] {data} от {call.from_user.id}")
-        
-        if data == "admin_posts":
-            text = "📝 *Посты*\n\nУправление пулом постов:"
-            buttons = [
-                [{"text": "📋 Список", "callback_data": "admin_posts_list"}],
-                [{"text": "➕ Добавить", "callback_data": "admin_posts_add"}],
-                [{"text": "◀️ Назад", "callback_data": "admin_back"}]
-            ]
-            bot.edit_message_text(text, chat_id, message_id, reply_markup=build_keyboard(buttons))
-        
-        elif data == "admin_quotes":
-            text = "📜 *Цитаты*\n\nУправление цитатами:"
-            buttons = [
-                [{"text": "📖 Список", "callback_data": "admin_quotes_list"}],
-                [{"text": "➕ Добавить", "callback_data": "admin_quotes_add"}],
-                [{"text": "◀️ Назад", "callback_data": "admin_back"}]
-            ]
-            bot.edit_message_text(text, chat_id, message_id, reply_markup=build_keyboard(buttons))
-        
-        elif data == "admin_mixer":
-            bot.edit_message_text("🎛️ Миксер запущен...", chat_id, message_id)
-            # Отправляем запрос на наш сервер для запуска миксера
-            try:
-                requests.post(
-                    "https://ch756438.tw1.ru/ansamb_sledov_bot-dump/api/mixer_trigger.php",
-                    json={"secret": TG_PROXY_SECRET},
-                    timeout=5
-                )
-            except:
-                pass
-        
-        elif data == "admin_schedule":
-            text = "📅 *Расписание*\n\nРежимы:"
-            buttons = [
-                [{"text": "🌅 Утро", "callback_data": "admin_sched_morning"}],
-                [{"text": "☀️ День", "callback_data": "admin_sched_day"}],
-                [{"text": "🌆 Вечер", "callback_data": "admin_sched_evening"}],
-                [{"text": "🌙 Ночь", "callback_data": "admin_sched_night"}],
-                [{"text": "◀️ Назад", "callback_data": "admin_back"}]
-            ]
-            bot.edit_message_text(text, chat_id, message_id, reply_markup=build_keyboard(buttons))
-        
-        elif data == "admin_settings":
-            bot.edit_message_text("⚙️ *Настройки*\n\nЗдесь будут настройки.", chat_id, message_id)
-        
-        elif data == "admin_diag":
-            bot.edit_message_text("🩺 Запускаю диагностику...", chat_id, message_id)
-            try:
-                r = requests.post(
-                    "https://ch756438.tw1.ru/ansamb_sledov_bot-dump/api/diag_trigger.php",
-                    json={"secret": TG_PROXY_SECRET},
-                    timeout=10
-                )
-                bot.send_message(chat_id, "✅ Аудит завершён. Смотрите logs/audit.log")
-            except:
-                bot.send_message(chat_id, "❌ Не удалось запустить диагностику")
-        
-        elif data == "admin_logout":
-            bot.edit_message_text("✅ Вы вышли из админ-режима.", chat_id, message_id)
-        
-        elif data == "admin_back":
-            bot.edit_message_text(
-                "🛡️ Админ-меню:",
-                chat_id,
-                message_id,
-                reply_markup=build_keyboard(get_admin_buttons())
-            )
-        
-        elif data == "admin_posts_list":
-            # Запрашиваем список постов с нашего сервера
-            try:
-                r = requests.get(
-                    "https://ch756438.tw1.ru/ansamb_sledov_bot-dump/api/posts_list.php",
-                    timeout=10
-                )
-                posts_text = r.text[:3000] if r.status_code == 200 else "❌ Ошибка получения постов"
-            except:
-                posts_text = "❌ Ошибка получения постов"
-            
-            buttons = [[{"text": "◀️ Назад", "callback_data": "admin_posts"}]]
-            bot.edit_message_text(posts_text, chat_id, message_id, reply_markup=build_keyboard(buttons))
-        
-        elif data == "admin_quotes_list":
-            try:
-                r = requests.get(
-                    "https://ch756438.tw1.ru/ansamb_sledov_bot-dump/api/quotes_list.php",
-                    timeout=10
-                )
-                quotes_text = r.text[:3000] if r.status_code == 200 else "❌ Ошибка получения цитат"
-            except:
-                quotes_text = "❌ Ошибка получения цитат"
-            
-            buttons = [[{"text": "◀️ Назад", "callback_data": "admin_quotes"}]]
-            bot.edit_message_text(quotes_text, chat_id, message_id, reply_markup=build_keyboard(buttons))
-        
-        else:
-            bot.edit_message_text("❓ Неизвестная команда.", chat_id, message_id)
-        
-        bot.answer_callback_query(call.id)
-    except Exception as e:
-        print(f"[CALLBACK] ❌ Ошибка: {e}")
-        try:
-            bot.answer_callback_query(call.id, "Ошибка обработки")
-        except:
-            pass
 
 # ============================================================
 # ЭНДПОИНТЫ
