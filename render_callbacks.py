@@ -1,11 +1,11 @@
 # ==========================================
 # Файл: render_callbacks.py (для Render)
 # Справка: README.md → Telegram прокси / Render / Кнопки
-# Задача: все обработчики callback'ов на Render
-# Комментарий: вызывается из bot.py на Render. Все кнопки в одном месте.
+# Задача: обработчики текстовых команд и callback'ов на Render
+# Комментарий: вызывается из bot.py на Render. Все команды и кнопки здесь.
 # Зависит от: telebot, requests
 # Вызывается из: bot.py (Render)
-# Версия: 1.0 — единый список всех кнопок
+# Версия: 2.0 — добавлена обработка текстовых команд
 # ==========================================
 
 import telebot
@@ -72,14 +72,60 @@ def get_diagnostic_buttons():
     ]
 
 # ==========================================
-# РЕГИСТРАЦИЯ CALLBACK'ОВ
+# ОБРАБОТКА ТЕКСТОВЫХ КОМАНД
 # ==========================================
 
 def register_callbacks(bot):
-    """Регистрирует все обработчики нажатий на кнопки"""
+    """Регистрирует все обработчики: команды + кнопки"""
+    
+    @bot.message_handler(func=lambda message: True)
+    def handle_messages(message):
+        """Обрабатывает текстовые команды"""
+        try:
+            text = message.text or ""
+            cid = message.chat.id
+            uid = message.from_user.id
+            
+            print(f"[MESSAGE] {text[:50]} от {uid}")
+            
+            if text.startswith("#админ"):
+                bot.send_message(
+                    cid,
+                    "🛡️ Админ-меню:",
+                    reply_markup=build_keyboard(get_admin_buttons())
+                )
+            
+            elif text.startswith("#тлеем"):
+                bot.send_message(cid, "💥 Разлом. Ритм 0,8 Гц. Сеть тлеет.")
+            
+            elif text.startswith("#фиксируем"):
+                bot.send_message(cid, "🔒 Фиксация принята. Сеть тлеет.")
+            
+            elif text.startswith("#вспышка"):
+                bot.send_message(cid, "💥 Импульс зафиксирован. QSL.")
+            
+            elif text.startswith("#дышим"):
+                bot.send_message(cid, "🌬 Пинг отправлен")
+            
+            elif text.startswith("#говори"):
+                bot.send_message(cid, "🗣 Напишите #говори <текст>")
+            
+            elif text.startswith("#меню") or text.startswith("#помощь"):
+                bot.send_message(
+                    cid,
+                    "📖 #тлеем | #фиксируем | #вспышка | #дышим | #говори | #админ"
+                )
+            
+            else:
+                # Игнорируем обычные сообщения
+                pass
+        
+        except Exception as e:
+            print(f"[MESSAGE] ❌ Ошибка: {e}")
     
     @bot.callback_query_handler(func=lambda call: True)
     def handle_all_callbacks(call):
+        """Обрабатывает все нажатия на кнопки"""
         try:
             data = call.data
             cid = call.message.chat.id
@@ -149,7 +195,6 @@ def register_callbacks(bot):
                     f"{emojis.get(mode, '')} Режим «{mode}» активирован.",
                     cid, mid
                 )
-                # Отправляем на наш сервер для применения
                 try:
                     requests.post(
                         "https://ch756438.tw1.ru/ansamb_sledov_bot-dump/api/mode_trigger.php",
@@ -182,7 +227,7 @@ def register_callbacks(bot):
             
             elif data == "quotes_add":
                 bot.edit_message_text(
-                    "➕ Введите цитату через #админ или /add_quote",
+                    "➕ Введите цитату через /add_quote",
                     cid, mid
                 )
             
@@ -232,6 +277,55 @@ def register_callbacks(bot):
             
             elif data == "help":
                 bot.send_message(cid, "📖 #тлеем | #фиксируем | #вспышка | #дышим | #говори")
+            
+            # ===== СОВМЕСТИМОСТЬ СО СТАРЫМИ КНОПКАМИ =====
+            elif data == "admin_posts":
+                bot.edit_message_text(
+                    "📝 Посты:",
+                    cid, mid,
+                    reply_markup=build_keyboard([
+                        [{"text": "📋 Список", "callback_data": "quotes_list"}],
+                        [{"text": "◀️ Назад", "callback_data": "admin_back"}]
+                    ])
+                )
+            
+            elif data == "admin_quotes":
+                bot.edit_message_text(
+                    "📜 Цитаты:",
+                    cid, mid,
+                    reply_markup=build_keyboard(get_quotes_buttons())
+                )
+            
+            elif data == "admin_mixer":
+                bot.edit_message_text("🎛️ Миксер запущен", cid, mid)
+                try:
+                    requests.post(
+                        "https://ch756438.tw1.ru/ansamb_sledov_bot-dump/api/mixer_trigger.php",
+                        json={},
+                        timeout=5
+                    )
+                except:
+                    pass
+            
+            elif data == "admin_schedule":
+                bot.edit_message_text(
+                    "📅 Расписание:",
+                    cid, mid,
+                    reply_markup=build_keyboard(get_modes_buttons())
+                )
+            
+            elif data == "admin_settings":
+                bot.edit_message_text("⚙️ Настройки", cid, mid)
+            
+            elif data == "admin_diag":
+                bot.edit_message_text(
+                    "🩺 Диагностика:",
+                    cid, mid,
+                    reply_markup=build_keyboard(get_diagnostic_buttons())
+                )
+            
+            elif data == "admin_logout":
+                bot.edit_message_text("✅ Вы вышли из админ-режима.", cid, mid)
             
             # ===== ВЫХОД =====
             elif data == "logout":
