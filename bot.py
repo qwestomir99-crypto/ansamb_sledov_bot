@@ -2,11 +2,11 @@
 # ==========================================
 # Файл: bot.py (для Render)
 # Справка: README.md → Telegram прокси / Render
-# Задача: TG-прокси (сообщения, фото, кнопки) + YouTube-прокси
-# Комментарий: работает на Render. Callback'и в render_callbacks.py.
-# Зависит от: flask, telebot, requests, threading, render_callbacks
+# Задача: TG-прокси + кнопки + callback'и + YouTube-туннели
+# Комментарий: работает на Render. Туннели в отдельных модулях.
+# Зависит от: flask, telebot, requests, render_callbacks, render_*_tunnel
 # Вызывается из: services/tg_api.py (через HTTPS POST)
-# Версия: 14.0 — callback'и вынесены в render_callbacks.py
+# Версия: 15.0 — добавлены туннели: HTTP, WebSocket, UDP
 # ==========================================
 
 import os
@@ -18,8 +18,13 @@ import traceback
 from flask import Flask, request, jsonify
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# ===== ИМПОРТ CALLBACK'ОВ ИЗ ОТДЕЛЬНОГО ФАЙЛА =====
+# ===== ИМПОРТ CALLBACK'ОВ =====
 from render_callbacks import register_callbacks
+
+# ===== ИМПОРТ ТУННЕЛЕЙ =====
+from render_http_tunnel import register_http_tunnel
+from render_ws_tunnel import register_ws_tunnel
+from render_udp_tunnel import register_udp_tunnel
 
 # ===== АДРЕС ЭНДПОИНТА =====
 SECRET_ENDPOINT = "https://ch756438.tw1.ru/api/secret/index.php"
@@ -57,6 +62,16 @@ app = Flask(__name__)
 # ===== РЕГИСТРАЦИЯ CALLBACK'ОВ =====
 register_callbacks(bot)
 print("✅ Callback'и зарегистрированы из render_callbacks.py")
+
+# ===== РЕГИСТРАЦИЯ ТУННЕЛЕЙ =====
+register_http_tunnel(app)
+print("✅ HTTP-туннель зарегистрирован")
+
+register_udp_tunnel(app)
+print("✅ UDP-тест зарегистрирован")
+
+socketio = register_ws_tunnel(app)
+print("✅ WebSocket-туннель зарегистрирован")
 
 # ============================================================
 # ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
@@ -286,5 +301,6 @@ print("[POLLING] Приём callback'ов запущен")
 # ============================================================
 
 if __name__ == "__main__":
-    print("🚀 TG-прокси + кнопки + callback'и + YouTube запущен")
-    app.run(host="0.0.0.0", port=8080)
+    print("🚀 TG-прокси + туннели + кнопки + callback'и + YouTube запущен")
+    # Используем socketio.run вместо app.run для WebSocket
+    socketio.run(app, host="0.0.0.0", port=8080, allow_unsafe_werkzeug=True)
